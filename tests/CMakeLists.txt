@@ -30,4 +30,5 @@ add_test(NAME smoke COMMAND tst_smoke)
 
 set_tests_properties(smoke PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
 )
