@@ -80,7 +80,16 @@ bool readSchemaVersion(const QJsonObject &object, int &result, QString *errorMes
         return fail(errorMessage, QStringLiteral("%1 must be an integer").arg(path));
     }
 
-    result = static_cast<int>(number);
+    const int schemaVersion = static_cast<int>(number);
+    if (schemaVersion != BlueprintDocument::CurrentSchemaVersion) {
+        return fail(errorMessage,
+                    QStringLiteral("%1 has unsupported version %2; supported version is %3")
+                        .arg(path)
+                        .arg(schemaVersion)
+                        .arg(BlueprintDocument::CurrentSchemaVersion));
+    }
+
+    result = schemaVersion;
     return true;
 }
 

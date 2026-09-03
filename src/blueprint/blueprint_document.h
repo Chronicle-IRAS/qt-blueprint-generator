@@ -52,7 +52,9 @@ struct BlueprintEdge
 
 struct BlueprintDocument
 {
-    int schemaVersion = 1;
+    static constexpr int CurrentSchemaVersion = 1;
+
+    int schemaVersion = CurrentSchemaVersion;
     QString projectId;
     QString projectName;
     QString target;

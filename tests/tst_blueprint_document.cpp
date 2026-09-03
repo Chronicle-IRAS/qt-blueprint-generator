@@ -35,7 +35,7 @@ BlueprintNode makeNode(NodeType type, const QString &id)
 BlueprintDocument makeCompleteDocument()
 {
     BlueprintDocument document;
-    document.schemaVersion = 7;
+    document.schemaVersion = BlueprintDocument::CurrentSchemaVersion;
     document.projectId = QStringLiteral("complete-project");
     document.projectName = QStringLiteral("Complete Project");
     document.target = QStringLiteral("qt6-widgets-cpp17-cmake");
@@ -81,7 +81,7 @@ QJsonObject validRoot()
         {QStringLiteral("label"), QStringLiteral("loop")},
     };
     return {
-        {QStringLiteral("schemaVersion"), 1},
+        {QStringLiteral("schemaVersion"), BlueprintDocument::CurrentSchemaVersion},
         {QStringLiteral("projectId"), QStringLiteral("project-id")},
         {QStringLiteral("projectName"), QStringLiteral("Project Name")},
         {QStringLiteral("target"), QStringLiteral("qt6-widgets-cpp17-cmake")},
@@ -105,6 +105,8 @@ private slots:
     void serializesAllNodeTypesAndFlowEdge();
     void roundTripPreservesEveryField();
     void rejectsInvalidJson();
+    void rejectsUnsupportedSchemaVersions_data();
+    void rejectsUnsupportedSchemaVersions();
     void rejectsUnknownNodeType();
     void rejectsMissingRequiredFields_data();
     void rejectsMissingRequiredFields();
@@ -198,6 +200,29 @@ void BlueprintDocumentTest::rejectsInvalidJson()
 
     QVERIFY(!result.has_value());
     QVERIFY2(!error.isEmpty(), "Invalid JSON must produce a diagnostic");
+}
+
+void BlueprintDocumentTest::rejectsUnsupportedSchemaVersions_data()
+{
+    QTest::addColumn<int>("schemaVersion");
+
+    QTest::addRow("zero") << 0;
+    QTest::addRow("negative") << -1;
+    QTest::addRow("next-version") << 2;
+    QTest::addRow("future-version") << 7;
+}
+
+void BlueprintDocumentTest::rejectsUnsupportedSchemaVersions()
+{
+    QFETCH(int, schemaVersion);
+    QJsonObject root = validRoot();
+    root.insert(QStringLiteral("schemaVersion"), schemaVersion);
+    QString error;
+
+    const std::optional<BlueprintDocument> result = BlueprintSerializer::fromJson(encode(root), &error);
+
+    QVERIFY(!result.has_value());
+    QVERIFY2(error.contains(QStringLiteral("root.schemaVersion")), qPrintable(error));
 }
 
 void BlueprintDocumentTest::rejectsUnknownNodeType()
