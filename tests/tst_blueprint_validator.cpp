@@ -102,7 +102,9 @@ private slots:
     void enforcesDecisionBranches();
     void requiresNamesAndDescriptionsForExecutableNodes();
     void validatesExternalCodeFiles();
+    void rejectsExternalRootLinksOutsideProject();
     void rejectsExternalCodeLinksOutsideProject();
+    void rejectsMixedExternalSourceLinks();
     void validatesLongGraphsWithoutRecursiveStack();
     void returnsDiagnosticsInDeterministicOrder();
 };
@@ -477,6 +479,121 @@ void BlueprintValidatorTest::rejectsExternalCodeLinksOutsideProject()
 #else
     QVERIFY(QFile::remove(linkedNode));
 #endif
+    QVERIFY(rejected);
+}
+
+void BlueprintValidatorTest::rejectsExternalRootLinksOutsideProject()
+{
+    QTemporaryDir project;
+    QTemporaryDir outside;
+    QVERIFY(project.isValid());
+    QVERIFY(outside.isValid());
+    QVERIFY(QDir(outside.path()).mkpath(QStringLiteral("external-code")));
+
+    QFile outsideSource(outside.filePath(QStringLiteral("external-code/outside.cpp")));
+    QVERIFY(outsideSource.open(QIODevice::WriteOnly));
+    outsideSource.write("// outside\n");
+    outsideSource.close();
+
+    const QString externalRoot = project.filePath(QStringLiteral("external"));
+#ifdef Q_OS_WIN
+    const int linkExitCode = QProcess::execute(
+        QStringLiteral("cmd.exe"),
+        {QStringLiteral("/c"),
+         QStringLiteral("mklink"),
+         QStringLiteral("/J"),
+         QDir::toNativeSeparators(externalRoot),
+         QDir::toNativeSeparators(outside.path())});
+    if (linkExitCode != 0) {
+        QSKIP("Directory junctions are unavailable on this platform");
+    }
+#else
+    if (!QFile::link(outside.path(), externalRoot)) {
+        QSKIP("Directory symbolic links are unavailable on this platform");
+    }
+#endif
+
+    BlueprintDocument document;
+    document.nodes = {
+        makeNode(NodeType::Start, QStringLiteral("start")),
+        makeNode(NodeType::ExternalCode, QStringLiteral("external-code")),
+        makeNode(NodeType::End, QStringLiteral("end")),
+    };
+    document.edges = {
+        makeEdge(QStringLiteral("start-external"),
+                 QStringLiteral("start"),
+                 QStringLiteral("external-code")),
+        makeEdge(QStringLiteral("external-end"),
+                 QStringLiteral("external-code"),
+                 QStringLiteral("end")),
+    };
+
+    const bool rejected = hasDiagnostic(BlueprintValidator::validate(document, {project.path()}),
+                                        QStringLiteral("external_code.path.invalid"),
+                                        QStringLiteral("external-code"));
+#ifdef Q_OS_WIN
+    QVERIFY(QDir().rmdir(externalRoot));
+#else
+    QVERIFY(QFile::remove(externalRoot));
+#endif
+    QVERIFY(rejected);
+}
+
+void BlueprintValidatorTest::rejectsMixedExternalSourceLinks()
+{
+    QTemporaryDir project;
+    QTemporaryDir outside;
+    QVERIFY(project.isValid());
+    QVERIFY(outside.isValid());
+
+    const QString nodeDirectory =
+        project.filePath(QStringLiteral("external/external-code"));
+    QVERIFY(QDir().mkpath(nodeDirectory));
+    QFile safeSource(QDir(nodeDirectory).filePath(QStringLiteral("a.cpp")));
+    QVERIFY(safeSource.open(QIODevice::WriteOnly));
+    safeSource.write("// safe\n");
+    safeSource.close();
+    QFile outsideSource(outside.filePath(QStringLiteral("outside.cpp")));
+    QVERIFY(outsideSource.open(QIODevice::WriteOnly));
+    outsideSource.write("// outside\n");
+    outsideSource.close();
+
+    const QString linkedSource = QDir(nodeDirectory).filePath(QStringLiteral("z.cpp"));
+#ifdef Q_OS_WIN
+    const int linkExitCode = QProcess::execute(
+        QStringLiteral("cmd.exe"),
+        {QStringLiteral("/c"),
+         QStringLiteral("mklink"),
+         QDir::toNativeSeparators(linkedSource),
+         QDir::toNativeSeparators(outsideSource.fileName())});
+    if (linkExitCode != 0) {
+        QSKIP("File symbolic links are unavailable on this platform");
+    }
+#else
+    if (!QFile::link(outsideSource.fileName(), linkedSource)) {
+        QSKIP("File symbolic links are unavailable on this platform");
+    }
+#endif
+
+    BlueprintDocument document;
+    document.nodes = {
+        makeNode(NodeType::Start, QStringLiteral("start")),
+        makeNode(NodeType::ExternalCode, QStringLiteral("external-code")),
+        makeNode(NodeType::End, QStringLiteral("end")),
+    };
+    document.edges = {
+        makeEdge(QStringLiteral("start-external"),
+                 QStringLiteral("start"),
+                 QStringLiteral("external-code")),
+        makeEdge(QStringLiteral("external-end"),
+                 QStringLiteral("external-code"),
+                 QStringLiteral("end")),
+    };
+
+    const bool rejected = hasDiagnostic(BlueprintValidator::validate(document, {project.path()}),
+                                        QStringLiteral("external_code.path.invalid"),
+                                        QStringLiteral("external-code"));
+    QVERIFY(QFile::remove(linkedSource));
     QVERIFY(rejected);
 }
 

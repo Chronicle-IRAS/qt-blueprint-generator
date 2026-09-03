@@ -100,6 +100,7 @@ SourceDirectoryResult inspectSourceDirectory(const QString &directoryPath,
         QStringLiteral("h"), QStringLiteral("hpp"), QStringLiteral("cpp"), QStringLiteral("cc")};
     const QFileInfoList files =
         QDir(directoryPath).entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
+    bool foundAllowedSource = false;
     for (const QFileInfo &file : files) {
         if (file.isFile() && allowedSuffixes.contains(file.suffix().toLower())) {
             const QString canonicalFilePath = canonicalExistingPath(file.absoluteFilePath());
@@ -107,10 +108,10 @@ SourceDirectoryResult inspectSourceDirectory(const QString &directoryPath,
                 || !isStrictChildPath(canonicalFilePath, canonicalDirectoryPath)) {
                 return SourceDirectoryResult::UnsafePath;
             }
-            return SourceDirectoryResult::Found;
+            foundAllowedSource = true;
         }
     }
-    return SourceDirectoryResult::Missing;
+    return foundAllowedSource ? SourceDirectoryResult::Found : SourceDirectoryResult::Missing;
 }
 
 void validateExternalCode(const BlueprintNode &node,
@@ -146,9 +147,12 @@ void validateExternalCode(const BlueprintNode &node,
         return;
     }
 
+    const QString canonicalProjectRoot = canonicalExistingPath(context.projectRoot);
     const QString canonicalExternalRoot = canonicalExistingPath(externalRoot);
     const QString canonicalNodeDirectory = canonicalExistingPath(nodeDirectory);
-    if (canonicalExternalRoot.isEmpty() || canonicalNodeDirectory.isEmpty()
+    if (canonicalProjectRoot.isEmpty() || canonicalExternalRoot.isEmpty()
+        || !isStrictChildPath(canonicalExternalRoot, canonicalProjectRoot)
+        || canonicalNodeDirectory.isEmpty()
         || !isStrictChildPath(canonicalNodeDirectory, canonicalExternalRoot)) {
         addDiagnostic(diagnostics,
                       QStringLiteral("external_code.path.invalid"),
