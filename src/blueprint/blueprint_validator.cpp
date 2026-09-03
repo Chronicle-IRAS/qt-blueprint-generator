@@ -6,9 +6,20 @@
 #include <QQueue>
 #include <QSet>
 
-#include <functional>
+#ifdef Q_OS_WIN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace {
+
+#ifdef Q_OS_WIN
+constexpr Qt::CaseSensitivity pathCaseSensitivity = Qt::CaseInsensitive;
+#else
+constexpr Qt::CaseSensitivity pathCaseSensitivity = Qt::CaseSensitive;
+#endif
 
 void addDiagnostic(QVector<BlueprintDiagnostic> &diagnostics,
                    const QString &code,
@@ -25,7 +36,65 @@ bool requiresTextContract(NodeType type)
         || type == NodeType::ExternalCode;
 }
 
-bool hasAllowedSourceFile(const QString &directoryPath)
+bool isStrictChildPath(const QString &path, const QString &parentPath)
+{
+    const QString normalizedPath = QDir::fromNativeSeparators(QDir::cleanPath(path));
+    const QString normalizedParent = QDir::fromNativeSeparators(QDir::cleanPath(parentPath));
+    return normalizedPath.startsWith(normalizedParent + QLatin1Char('/'), pathCaseSensitivity);
+}
+
+QString canonicalExistingPath(const QString &path)
+{
+#ifdef Q_OS_WIN
+    const QString nativePath = QDir::toNativeSeparators(path);
+    const HANDLE handle = CreateFileW(reinterpret_cast<LPCWSTR>(nativePath.utf16()),
+                                      0,
+                                      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                      nullptr,
+                                      OPEN_EXISTING,
+                                      FILE_FLAG_BACKUP_SEMANTICS,
+                                      nullptr);
+    if (handle == INVALID_HANDLE_VALUE) {
+        return {};
+    }
+
+    const DWORD requiredLength =
+        GetFinalPathNameByHandleW(handle, nullptr, 0, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+    if (requiredLength == 0) {
+        CloseHandle(handle);
+        return {};
+    }
+    QString resolvedPath(static_cast<qsizetype>(requiredLength), Qt::Uninitialized);
+    const DWORD writtenLength = GetFinalPathNameByHandleW(
+        handle,
+        reinterpret_cast<LPWSTR>(resolvedPath.data()),
+        requiredLength,
+        FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+    CloseHandle(handle);
+    if (writtenLength == 0 || writtenLength >= requiredLength) {
+        return {};
+    }
+    resolvedPath.truncate(static_cast<qsizetype>(writtenLength));
+    resolvedPath = QDir::fromNativeSeparators(resolvedPath);
+    if (resolvedPath.startsWith(QStringLiteral("//?/UNC/"), Qt::CaseInsensitive)) {
+        resolvedPath = QStringLiteral("//") + resolvedPath.mid(8);
+    } else if (resolvedPath.startsWith(QStringLiteral("//?/"), Qt::CaseInsensitive)) {
+        resolvedPath.remove(0, 4);
+    }
+    return QDir::cleanPath(resolvedPath);
+#else
+    return QFileInfo(path).canonicalFilePath();
+#endif
+}
+
+enum class SourceDirectoryResult {
+    Found,
+    Missing,
+    UnsafePath,
+};
+
+SourceDirectoryResult inspectSourceDirectory(const QString &directoryPath,
+                                             const QString &canonicalDirectoryPath)
 {
     static const QSet<QString> allowedSuffixes = {
         QStringLiteral("h"), QStringLiteral("hpp"), QStringLiteral("cpp"), QStringLiteral("cc")};
@@ -33,10 +102,15 @@ bool hasAllowedSourceFile(const QString &directoryPath)
         QDir(directoryPath).entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
     for (const QFileInfo &file : files) {
         if (file.isFile() && allowedSuffixes.contains(file.suffix().toLower())) {
-            return true;
+            const QString canonicalFilePath = canonicalExistingPath(file.absoluteFilePath());
+            if (canonicalFilePath.isEmpty()
+                || !isStrictChildPath(canonicalFilePath, canonicalDirectoryPath)) {
+                return SourceDirectoryResult::UnsafePath;
+            }
+            return SourceDirectoryResult::Found;
         }
     }
-    return false;
+    return SourceDirectoryResult::Missing;
 }
 
 void validateExternalCode(const BlueprintNode &node,
@@ -55,7 +129,7 @@ void validateExternalCode(const BlueprintNode &node,
         QDir::cleanPath(QDir(context.projectRoot).absoluteFilePath(QStringLiteral("external"))));
     const QString nodeDirectory = QDir::fromNativeSeparators(
         QDir::cleanPath(QDir(externalRoot).absoluteFilePath(node.id)));
-    if (!nodeDirectory.startsWith(externalRoot + QLatin1Char('/'), Qt::CaseInsensitive)) {
+    if (!isStrictChildPath(nodeDirectory, externalRoot)) {
         addDiagnostic(diagnostics,
                       QStringLiteral("external_code.path.invalid"),
                       QStringLiteral("External code node id resolves outside the external directory"),
@@ -71,7 +145,26 @@ void validateExternalCode(const BlueprintNode &node,
                       node.id);
         return;
     }
-    if (!hasAllowedSourceFile(nodeDirectory)) {
+
+    const QString canonicalExternalRoot = canonicalExistingPath(externalRoot);
+    const QString canonicalNodeDirectory = canonicalExistingPath(nodeDirectory);
+    if (canonicalExternalRoot.isEmpty() || canonicalNodeDirectory.isEmpty()
+        || !isStrictChildPath(canonicalNodeDirectory, canonicalExternalRoot)) {
+        addDiagnostic(diagnostics,
+                      QStringLiteral("external_code.path.invalid"),
+                      QStringLiteral("External code directory resolves outside the external directory"),
+                      node.id);
+        return;
+    }
+
+    const SourceDirectoryResult sourceResult =
+        inspectSourceDirectory(nodeDirectory, canonicalNodeDirectory);
+    if (sourceResult == SourceDirectoryResult::UnsafePath) {
+        addDiagnostic(diagnostics,
+                      QStringLiteral("external_code.path.invalid"),
+                      QStringLiteral("External code source resolves outside its node directory"),
+                      node.id);
+    } else if (sourceResult == SourceDirectoryResult::Missing) {
         addDiagnostic(diagnostics,
                       QStringLiteral("external_code.file.missing"),
                       QStringLiteral("External code directory contains no supported source file"),
@@ -86,7 +179,14 @@ QVector<BlueprintDiagnostic> BlueprintValidator::validate(
     const BlueprintValidationContext &context)
 {
     QVector<BlueprintDiagnostic> diagnostics;
-    QSet<QString> nodeIds;
+    QHash<QString, int> nodeIdCounts;
+    for (const BlueprintNode &node : document.nodes) {
+        if (!node.id.trimmed().isEmpty()) {
+            ++nodeIdCounts[node.id];
+        }
+    }
+
+    QSet<QString> seenNodeIds;
     QHash<QString, const BlueprintNode *> nodesById;
     for (const BlueprintNode &node : document.nodes) {
         if (node.id.trimmed().isEmpty()) {
@@ -94,13 +194,16 @@ QVector<BlueprintDiagnostic> BlueprintValidator::validate(
                           QStringLiteral("node.id.empty"),
                           QStringLiteral("Node ID must not be empty"),
                           node.id);
-        } else if (nodeIds.contains(node.id)) {
+        } else if (seenNodeIds.contains(node.id)) {
             addDiagnostic(diagnostics,
                           QStringLiteral("node.id.duplicate"),
                           QStringLiteral("Node ID '%1' is duplicated").arg(node.id),
                           node.id);
-        } else {
-            nodeIds.insert(node.id);
+        }
+        if (!node.id.trimmed().isEmpty()) {
+            seenNodeIds.insert(node.id);
+        }
+        if (!node.id.trimmed().isEmpty() && nodeIdCounts.value(node.id) == 1) {
             nodesById.insert(node.id, &node);
         }
     }
@@ -151,27 +254,60 @@ QVector<BlueprintDiagnostic> BlueprintValidator::validate(
     QHash<QString, QVector<const BlueprintEdge *>> outgoing;
     QHash<QString, QVector<const BlueprintEdge *>> incoming;
     for (const BlueprintEdge &edge : document.edges) {
-        if (!nodesById.contains(edge.source)) {
+        const int sourceCount = nodeIdCounts.value(edge.source);
+        const int targetCount = nodeIdCounts.value(edge.target);
+        if (sourceCount == 0) {
             addDiagnostic(diagnostics,
                           QStringLiteral("edge.source.missing"),
                           QStringLiteral("Edge source '%1' does not exist").arg(edge.source),
                           {},
                           edge.id);
-        } else {
-            outgoing[edge.source].append(&edge);
+        } else if (sourceCount > 1) {
+            addDiagnostic(diagnostics,
+                          QStringLiteral("edge.source.ambiguous"),
+                          QStringLiteral("Edge source '%1' matches more than one node").arg(edge.source),
+                          {},
+                          edge.id);
         }
-        if (!nodesById.contains(edge.target)) {
+        if (targetCount == 0) {
             addDiagnostic(diagnostics,
                           QStringLiteral("edge.target.missing"),
                           QStringLiteral("Edge target '%1' does not exist").arg(edge.target),
                           {},
                           edge.id);
-        } else {
+        } else if (targetCount > 1) {
+            addDiagnostic(diagnostics,
+                          QStringLiteral("edge.target.ambiguous"),
+                          QStringLiteral("Edge target '%1' matches more than one node").arg(edge.target),
+                          {},
+                          edge.id);
+        }
+        if (sourceCount == 1 && targetCount == 1) {
+            outgoing[edge.source].append(&edge);
             incoming[edge.target].append(&edge);
         }
     }
 
     for (const BlueprintNode &node : document.nodes) {
+        const bool hasUniqueId = !node.id.trimmed().isEmpty() && nodeIdCounts.value(node.id) == 1;
+        if (requiresTextContract(node.type)) {
+            if (node.name.trimmed().isEmpty()) {
+                addDiagnostic(diagnostics,
+                              QStringLiteral("node.name.empty"),
+                              QStringLiteral("Node name must not be empty"),
+                              node.id);
+            }
+            if (node.description.trimmed().isEmpty()) {
+                addDiagnostic(diagnostics,
+                              QStringLiteral("node.description.empty"),
+                              QStringLiteral("Node description must not be empty"),
+                              node.id);
+            }
+        }
+        if (!hasUniqueId) {
+            continue;
+        }
+
         const int incomingCount = incoming.value(node.id).size();
         const int outgoingCount = outgoing.value(node.id).size();
         if (node.type == NodeType::Start) {
@@ -230,20 +366,6 @@ QVector<BlueprintDiagnostic> BlueprintValidator::validate(
             }
         }
 
-        if (requiresTextContract(node.type)) {
-            if (node.name.trimmed().isEmpty()) {
-                addDiagnostic(diagnostics,
-                              QStringLiteral("node.name.empty"),
-                              QStringLiteral("Node name must not be empty"),
-                              node.id);
-            }
-            if (node.description.trimmed().isEmpty()) {
-                addDiagnostic(diagnostics,
-                              QStringLiteral("node.description.empty"),
-                              QStringLiteral("Node description must not be empty"),
-                              node.id);
-            }
-        }
         if (node.type == NodeType::ExternalCode) {
             validateExternalCode(node, context, diagnostics);
         }
@@ -275,30 +397,41 @@ QVector<BlueprintDiagnostic> BlueprintValidator::validate(
         }
     }
 
-    QHash<QString, int> colors;
-    std::function<void(const QString &)> visit = [&](const QString &nodeId) {
-        colors[nodeId] = 1;
-        for (const BlueprintEdge *edge : outgoing.value(nodeId)) {
-            if (!nodesById.contains(edge->target)) {
-                continue;
-            }
-            const int targetColor = colors.value(edge->target, 0);
-            if (targetColor == 0) {
-                visit(edge->target);
-            } else if (targetColor == 1) {
-                addDiagnostic(diagnostics,
-                              QStringLiteral("graph.cycle"),
-                              QStringLiteral("Directed cycle detected"),
-                              edge->target,
-                              edge->id);
-            }
-        }
-        colors[nodeId] = 2;
+    struct TraversalFrame {
+        QString nodeId;
+        qsizetype nextEdgeIndex = 0;
     };
+    QHash<QString, int> colors;
     for (const BlueprintNode &node : document.nodes) {
         if (!node.id.trimmed().isEmpty() && nodesById.value(node.id) == &node
             && colors.value(node.id, 0) == 0) {
-            visit(node.id);
+            QVector<TraversalFrame> stack;
+            colors[node.id] = 1;
+            stack.append({node.id, 0});
+            while (!stack.isEmpty()) {
+                TraversalFrame &frame = stack.last();
+                const auto outgoingIt = outgoing.constFind(frame.nodeId);
+                if (outgoingIt == outgoing.cend()
+                    || frame.nextEdgeIndex >= outgoingIt.value().size()) {
+                    colors[frame.nodeId] = 2;
+                    stack.removeLast();
+                    continue;
+                }
+
+                const BlueprintEdge *edge = outgoingIt.value().at(frame.nextEdgeIndex);
+                ++frame.nextEdgeIndex;
+                const int targetColor = colors.value(edge->target, 0);
+                if (targetColor == 0) {
+                    colors[edge->target] = 1;
+                    stack.append({edge->target, 0});
+                } else if (targetColor == 1) {
+                    addDiagnostic(diagnostics,
+                                  QStringLiteral("graph.cycle"),
+                                  QStringLiteral("Directed cycle detected"),
+                                  edge->target,
+                                  edge->id);
+                }
+            }
         }
     }
 

@@ -2,6 +2,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QProcess>
 #include <QTemporaryDir>
 
 #include "blueprint/blueprint_validator.h"
@@ -93,12 +94,16 @@ private slots:
     void rejectsEmptyAndDuplicateIds();
     void requiresExactlyOneStartAndAtLeastOneEnd();
     void rejectsDanglingEdgeReferences();
+    void danglingEdgesDoNotSatisfyGraphRules();
+    void duplicateNodeIdsDoNotOwnTopology();
     void enforcesNodeDegreeRules();
     void rejectsUnreachableNodes();
     void rejectsDirectedCycles();
     void enforcesDecisionBranches();
     void requiresNamesAndDescriptionsForExecutableNodes();
     void validatesExternalCodeFiles();
+    void rejectsExternalCodeLinksOutsideProject();
+    void validatesLongGraphsWithoutRecursiveStack();
     void returnsDiagnosticsInDeterministicOrder();
 };
 
@@ -174,6 +179,68 @@ void BlueprintValidatorTest::rejectsDanglingEdgeReferences()
                           QStringLiteral("edge.target.missing"),
                           {},
                           QStringLiteral("bad-target")));
+}
+
+void BlueprintValidatorTest::danglingEdgesDoNotSatisfyGraphRules()
+{
+    BlueprintDocument document;
+    document.nodes = {
+        makeNode(NodeType::Start, QStringLiteral("start")),
+        makeNode(NodeType::LogicModule, QStringLiteral("logic")),
+        makeNode(NodeType::End, QStringLiteral("end")),
+    };
+    document.edges = {
+        makeEdge(QStringLiteral("start-logic"), QStringLiteral("start"), QStringLiteral("logic")),
+        makeEdge(QStringLiteral("logic-ghost"), QStringLiteral("logic"), QStringLiteral("ghost")),
+        makeEdge(QStringLiteral("ghost-end"), QStringLiteral("ghost"), QStringLiteral("end")),
+    };
+
+    const QVector<BlueprintDiagnostic> diagnostics = BlueprintValidator::validate(document);
+    QVERIFY(hasDiagnostic(diagnostics,
+                          QStringLiteral("node.outgoing.missing"),
+                          QStringLiteral("logic")));
+    QVERIFY(hasDiagnostic(diagnostics,
+                          QStringLiteral("node.incoming.missing"),
+                          QStringLiteral("end")));
+
+    BlueprintDocument decision = makeValidDocument();
+    decision.edges[1].target = QStringLiteral("missing-true");
+    decision.edges[2].target = QStringLiteral("missing-false");
+    QVERIFY(hasDiagnostic(BlueprintValidator::validate(decision),
+                          QStringLiteral("decision.outgoing.count"),
+                          QStringLiteral("decision")));
+}
+
+void BlueprintValidatorTest::duplicateNodeIdsDoNotOwnTopology()
+{
+    BlueprintDocument document;
+    document.nodes = {
+        makeNode(NodeType::Start, QStringLiteral("start")),
+        makeNode(NodeType::LogicModule, QStringLiteral("duplicate")),
+        makeNode(NodeType::End, QStringLiteral("duplicate")),
+        makeNode(NodeType::End, QStringLiteral("end")),
+    };
+    document.edges = {
+        makeEdge(QStringLiteral("start-duplicate"),
+                 QStringLiteral("start"),
+                 QStringLiteral("duplicate")),
+        makeEdge(QStringLiteral("duplicate-end"),
+                 QStringLiteral("duplicate"),
+                 QStringLiteral("end")),
+    };
+
+    const QVector<BlueprintDiagnostic> diagnostics = BlueprintValidator::validate(document);
+    QVERIFY(hasDiagnostic(diagnostics,
+                          QStringLiteral("edge.target.ambiguous"),
+                          {},
+                          QStringLiteral("start-duplicate")));
+    QVERIFY(hasDiagnostic(diagnostics,
+                          QStringLiteral("edge.source.ambiguous"),
+                          {},
+                          QStringLiteral("duplicate-end")));
+    QVERIFY(!hasDiagnostic(diagnostics,
+                           QStringLiteral("end.outgoing"),
+                           QStringLiteral("duplicate")));
 }
 
 void BlueprintValidatorTest::enforcesNodeDegreeRules()
@@ -357,6 +424,82 @@ void BlueprintValidatorTest::validatesExternalCodeFiles()
     sourceFile.write("#pragma once\n");
     sourceFile.close();
     QVERIFY(BlueprintValidator::validate(document, context).isEmpty());
+}
+
+void BlueprintValidatorTest::rejectsExternalCodeLinksOutsideProject()
+{
+    QTemporaryDir project;
+    QTemporaryDir outside;
+    QVERIFY(project.isValid());
+    QVERIFY(outside.isValid());
+
+    const QString externalRoot = project.filePath(QStringLiteral("external"));
+    QVERIFY(QDir().mkpath(externalRoot));
+    const QString linkedNode = QDir(externalRoot).filePath(QStringLiteral("linked-node"));
+#ifdef Q_OS_WIN
+    const int linkExitCode = QProcess::execute(
+        QStringLiteral("cmd.exe"),
+        {QStringLiteral("/c"),
+         QStringLiteral("mklink"),
+         QStringLiteral("/J"),
+         QDir::toNativeSeparators(linkedNode),
+         QDir::toNativeSeparators(outside.path())});
+    if (linkExitCode != 0) {
+        QSKIP("Directory junctions are unavailable on this platform");
+    }
+#else
+    if (!QFile::link(outside.path(), linkedNode)) {
+        QSKIP("Directory symbolic links are unavailable on this platform");
+    }
+#endif
+
+    QFile outsideSource(outside.filePath(QStringLiteral("outside.cpp")));
+    QVERIFY(outsideSource.open(QIODevice::WriteOnly));
+    outsideSource.write("// outside\n");
+    outsideSource.close();
+
+    BlueprintDocument document;
+    document.nodes = {
+        makeNode(NodeType::Start, QStringLiteral("start")),
+        makeNode(NodeType::ExternalCode, QStringLiteral("linked-node")),
+        makeNode(NodeType::End, QStringLiteral("end")),
+    };
+    document.edges = {
+        makeEdge(QStringLiteral("start-linked"), QStringLiteral("start"), QStringLiteral("linked-node")),
+        makeEdge(QStringLiteral("linked-end"), QStringLiteral("linked-node"), QStringLiteral("end")),
+    };
+
+    const bool rejected = hasDiagnostic(BlueprintValidator::validate(document, {project.path()}),
+                                        QStringLiteral("external_code.path.invalid"),
+                                        QStringLiteral("linked-node"));
+#ifdef Q_OS_WIN
+    QVERIFY(QDir().rmdir(linkedNode));
+#else
+    QVERIFY(QFile::remove(linkedNode));
+#endif
+    QVERIFY(rejected);
+}
+
+void BlueprintValidatorTest::validatesLongGraphsWithoutRecursiveStack()
+{
+    constexpr int nodeCount = 5000;
+    BlueprintDocument document;
+    document.nodes.reserve(nodeCount);
+    document.edges.reserve(nodeCount - 1);
+    document.nodes.append(makeNode(NodeType::Start, QStringLiteral("node-0")));
+    for (int index = 1; index < nodeCount - 1; ++index) {
+        document.nodes.append(
+            makeNode(NodeType::LogicModule, QStringLiteral("node-%1").arg(index)));
+    }
+    document.nodes.append(
+        makeNode(NodeType::End, QStringLiteral("node-%1").arg(nodeCount - 1)));
+    for (int index = 0; index < nodeCount - 1; ++index) {
+        document.edges.append(makeEdge(QStringLiteral("edge-%1").arg(index),
+                                       QStringLiteral("node-%1").arg(index),
+                                       QStringLiteral("node-%1").arg(index + 1)));
+    }
+
+    QVERIFY(BlueprintValidator::validate(document).isEmpty());
 }
 
 void BlueprintValidatorTest::returnsDiagnosticsInDeterministicOrder()
