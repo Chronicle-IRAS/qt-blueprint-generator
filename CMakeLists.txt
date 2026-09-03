@@ -19,6 +19,12 @@ qt_add_library(BlueprintEditorCore STATIC
     src/blueprint/blueprint_serializer.h
     src/blueprint/blueprint_validator.cpp
     src/blueprint/blueprint_validator.h
+    src/editor/blueprint_scene.cpp
+    src/editor/blueprint_scene.h
+    src/editor/edge_item.cpp
+    src/editor/edge_item.h
+    src/editor/node_item.cpp
+    src/editor/node_item.h
 )
 
 target_include_directories(BlueprintEditorCore PUBLIC

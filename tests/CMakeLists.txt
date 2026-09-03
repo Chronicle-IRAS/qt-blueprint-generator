@@ -102,3 +102,38 @@ set_tests_properties(blueprint_validator PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
 )
+
+set(blueprint_scene_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_blueprint_scene.moc")
+
+add_custom_command(
+    OUTPUT "${blueprint_scene_moc}"
+    COMMAND Qt6::moc -o tst_blueprint_scene.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_blueprint_scene.cpp"
+    DEPENDS tst_blueprint_scene.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM
+)
+
+qt_add_executable(tst_blueprint_scene
+    tst_blueprint_scene.cpp
+    "${blueprint_scene_moc}"
+)
+
+set_target_properties(tst_blueprint_scene PROPERTIES
+    AUTOMOC OFF
+)
+
+target_include_directories(tst_blueprint_scene PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
+target_link_libraries(tst_blueprint_scene PRIVATE
+    BlueprintEditorCore
+    Qt6::Test
+)
+
+add_test(NAME blueprint_scene COMMAND tst_blueprint_scene)
+
+set_tests_properties(blueprint_scene PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+)
