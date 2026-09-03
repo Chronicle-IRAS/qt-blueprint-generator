@@ -203,7 +203,9 @@ void BlueprintValidatorTest::enforcesNodeDegreeRules()
                           QStringLiteral("accepted")));
 
     BlueprintDocument missingOutgoing = makeValidDocument();
+    missingOutgoing.nodes[1].type = NodeType::LogicModule;
     missingOutgoing.edges.removeAt(2);
+    missingOutgoing.edges.removeAt(1);
     QVERIFY(hasDiagnostic(BlueprintValidator::validate(missingOutgoing),
                           QStringLiteral("node.outgoing.missing"),
                           QStringLiteral("decision")));

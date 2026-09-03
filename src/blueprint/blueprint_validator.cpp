@@ -201,8 +201,7 @@ QVector<BlueprintDiagnostic> BlueprintValidator::validate(
                               QStringLiteral("End node must not have outgoing edges"),
                               node.id);
             }
-        } else if (outgoingCount == 0
-                   || (node.type == NodeType::Decision && outgoingCount < 2)) {
+        } else if (outgoingCount == 0) {
             addDiagnostic(diagnostics,
                           QStringLiteral("node.outgoing.missing"),
                           QStringLiteral("A required outgoing edge is missing"),
