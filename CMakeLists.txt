@@ -13,6 +13,10 @@ qt_standard_project_setup()
 qt_add_library(BlueprintEditorCore STATIC
     src/app/main_window.cpp
     src/app/main_window.h
+    src/blueprint/blueprint_document.cpp
+    src/blueprint/blueprint_document.h
+    src/blueprint/blueprint_serializer.cpp
+    src/blueprint/blueprint_serializer.h
 )
 
 target_include_directories(BlueprintEditorCore PUBLIC
