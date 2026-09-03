@@ -17,6 +17,8 @@ qt_add_library(BlueprintEditorCore STATIC
     src/blueprint/blueprint_document.h
     src/blueprint/blueprint_serializer.cpp
     src/blueprint/blueprint_serializer.h
+    src/blueprint/blueprint_validator.cpp
+    src/blueprint/blueprint_validator.h
 )
 
 target_include_directories(BlueprintEditorCore PUBLIC
