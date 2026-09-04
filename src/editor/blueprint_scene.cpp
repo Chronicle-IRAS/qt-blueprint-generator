@@ -5,9 +5,31 @@
 
 #include <QUndoCommand>
 
+#include <QSet>
+
 #include <functional>
 
 namespace {
+
+bool technicallyRepresentable(const BlueprintDocument &document)
+{
+    QSet<QString> nodeIds;
+    for (const BlueprintNode &node : document.nodes) {
+        if (node.id.isEmpty() || node.id != node.id.trimmed() || nodeIds.contains(node.id)) {
+            return false;
+        }
+        nodeIds.insert(node.id);
+    }
+    QSet<QString> edgeIds;
+    for (const BlueprintEdge &edge : document.edges) {
+        if (edge.id.isEmpty() || edge.id != edge.id.trimmed() || edgeIds.contains(edge.id)
+            || !nodeIds.contains(edge.source) || !nodeIds.contains(edge.target)) {
+            return false;
+        }
+        edgeIds.insert(edge.id);
+    }
+    return true;
+}
 
 class SceneCommand final : public QUndoCommand
 {
@@ -34,7 +56,11 @@ BlueprintScene::BlueprintScene(BlueprintDocument *document, QObject *parent)
     , m_document(document)
 {
     Q_ASSERT(m_document);
+    m_representable = technicallyRepresentable(*m_document);
     setSceneRect(-1000.0, -1000.0, 2000.0, 2000.0);
+    if (!m_representable) {
+        return;
+    }
     for (qsizetype index = 0; index < m_document->nodes.size(); ++index) {
         const BlueprintNode &node = m_document->nodes.at(index);
         if (!hasNode(node.id)) {
@@ -50,7 +76,7 @@ BlueprintScene::BlueprintScene(BlueprintDocument *document, QObject *parent)
 
 bool BlueprintScene::addNode(const BlueprintNode &node, const QPointF &position)
 {
-    if (node.id.isEmpty() || hasNode(node.id)) {
+    if (!m_representable || node.id.isEmpty() || node.id != node.id.trimmed() || hasNode(node.id)) {
         return false;
     }
     const qsizetype index = m_document->nodes.size();
@@ -101,7 +127,9 @@ bool BlueprintScene::moveNode(const QString &nodeId, const QPointF &position)
 
 bool BlueprintScene::connectNodes(const QString &sourceId, const QString &targetId, const QString &label)
 {
-    if (sourceId.isEmpty() || targetId.isEmpty() || !hasNode(sourceId) || !hasNode(targetId)) {
+    if (!m_representable || sourceId.isEmpty() || targetId.isEmpty() || sourceId == targetId
+        || sourceId != sourceId.trimmed() || targetId != targetId.trimmed() || !hasNode(sourceId)
+        || !hasNode(targetId)) {
         return false;
     }
     BlueprintEdge edge;
@@ -122,6 +150,13 @@ bool BlueprintScene::beginConnection(const QString &label)
     m_connectionSource.clear();
     m_connectionLabel = label;
     return true;
+}
+
+void BlueprintScene::cancelConnection()
+{
+    m_connectionMode = false;
+    m_connectionSource.clear();
+    m_connectionLabel.clear();
 }
 
 bool BlueprintScene::chooseConnectionNode(const QString &nodeId)
@@ -177,6 +212,11 @@ bool BlueprintScene::editNode(const QString &nodeId, const BlueprintNode &update
     return true;
 }
 
+bool BlueprintScene::isRepresentable() const
+{
+    return m_representable;
+}
+
 NodeItem *BlueprintScene::nodeItem(const QString &nodeId) const
 {
     return m_nodes.value(nodeId, nullptr);
@@ -195,6 +235,11 @@ QPointF BlueprintScene::nodePosition(const QString &nodeId) const
 QUndoStack *BlueprintScene::undoStack()
 {
     return &m_undoStack;
+}
+
+void BlueprintScene::setChangeHandler(std::function<void()> handler)
+{
+    m_changeHandler = std::move(handler);
 }
 
 bool BlueprintScene::hasNode(const QString &nodeId) const
@@ -258,11 +303,12 @@ void BlueprintScene::createEdgeItem(const BlueprintEdge &edge)
 
 void BlueprintScene::addNodeDirect(const BlueprintNode &node, qsizetype index, const QPointF &position)
 {
-    if (hasNode(node.id)) {
+    if (!m_representable || node.id.isEmpty() || node.id != node.id.trimmed() || hasNode(node.id)) {
         return;
     }
     m_document->nodes.insert(index, node);
     createNodeItem(node, position);
+    notifyChanged();
 }
 
 void BlueprintScene::removeNodeDirect(const QString &nodeId, QVector<IndexedEdge> *removedEdges)
@@ -270,6 +316,9 @@ void BlueprintScene::removeNodeDirect(const QString &nodeId, QVector<IndexedEdge
     const qsizetype index = nodeIndex(nodeId);
     if (index < 0) {
         return;
+    }
+    if (nodeId == m_connectionSource) {
+        cancelConnection();
     }
 
     QVector<IndexedEdge> localEdges;
@@ -293,6 +342,7 @@ void BlueprintScene::removeNodeDirect(const QString &nodeId, QVector<IndexedEdge
     }
     m_layout.remove(nodeId);
     m_document->nodes.removeAt(index);
+    notifyChanged();
 }
 
 void BlueprintScene::restoreEdgesDirect(const QVector<IndexedEdge> &edges)
@@ -304,11 +354,13 @@ void BlueprintScene::restoreEdgesDirect(const QVector<IndexedEdge> &edges)
 
 void BlueprintScene::addEdgeDirect(const BlueprintEdge &edge, qsizetype index)
 {
-    if (m_edges.contains(edge.id) || !hasNode(edge.source) || !hasNode(edge.target)) {
+    if (!m_representable || edge.id.isEmpty() || edge.id != edge.id.trimmed() || m_edges.contains(edge.id)
+        || !hasNode(edge.source) || !hasNode(edge.target)) {
         return;
     }
     m_document->edges.insert(index, edge);
     createEdgeItem(edge);
+    notifyChanged();
 }
 
 void BlueprintScene::removeEdgeDirect(const QString &edgeId)
@@ -323,6 +375,7 @@ void BlueprintScene::removeEdgeDirect(const QString &edgeId)
         delete item;
     }
     m_document->edges.removeAt(index);
+    notifyChanged();
 }
 
 void BlueprintScene::setNodePositionDirect(const QString &nodeId, const QPointF &position)
@@ -334,6 +387,7 @@ void BlueprintScene::setNodePositionDirect(const QString &nodeId, const QPointF 
     m_layout.insert(nodeId, position);
     item->setPos(position);
     updateEdgesForNode(nodeId);
+    notifyChanged();
 }
 
 void BlueprintScene::setNodeDirect(const QString &nodeId, const BlueprintNode &node)
@@ -346,6 +400,8 @@ void BlueprintScene::setNodeDirect(const QString &nodeId, const BlueprintNode &n
     if (NodeItem *item = nodeItem(nodeId)) {
         item->setNode(node);
     }
+    updateEdgesForNode(nodeId);
+    notifyChanged();
 }
 
 void BlueprintScene::updateEdgesForNode(const QString &nodeId)
@@ -380,5 +436,12 @@ void BlueprintScene::handleNodeClicked(const QString &nodeId)
 {
     if (m_connectionMode) {
         chooseConnectionNode(nodeId);
+    }
+}
+
+void BlueprintScene::notifyChanged()
+{
+    if (m_changeHandler) {
+        m_changeHandler();
     }
 }

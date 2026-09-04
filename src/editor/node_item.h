@@ -9,6 +9,7 @@
 #include <functional>
 
 class QGraphicsSceneMouseEvent;
+class BlueprintScene;
 class QPainter;
 class QStyleOptionGraphicsItem;
 class QWidget;
@@ -20,9 +21,6 @@ public:
 
     QString nodeId() const;
     const BlueprintNode &node() const;
-    void setNode(const BlueprintNode &node);
-    void setTitle(const QString &title);
-    void setPorts(const QVector<PortSpec> &inputs, const QVector<PortSpec> &outputs);
     QPointF inputAnchor(int index = 0) const;
     QPointF outputAnchor(int index = 0) const;
     void setPositionChangedHandler(std::function<void(const QString &)> handler);
@@ -39,6 +37,10 @@ protected:
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
 
 private:
+    friend class BlueprintScene;
+
+    void setNode(const BlueprintNode &node);
+
     QString m_nodeId;
     QString m_title;
     QPointF m_dragStart;

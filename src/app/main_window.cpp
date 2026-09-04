@@ -220,9 +220,9 @@ MainWindow::MainWindow(QWidget *parent)
     form->addRow(tr("Constraints (JSON)"), m_constraintsEdit);
     form->addRow(tr("Acceptance criteria (JSON)"), m_acceptanceCriteriaEdit);
     propertyLayout->addLayout(form);
-    auto *applyButton = new QPushButton(tr("Apply"), propertyWidget);
-    applyButton->setObjectName(QStringLiteral("applyNodePropertiesButton"));
-    propertyLayout->addWidget(applyButton);
+    m_applyPropertiesButton = new QPushButton(tr("Apply"), propertyWidget);
+    m_applyPropertiesButton->setObjectName(QStringLiteral("applyNodePropertiesButton"));
+    propertyLayout->addWidget(m_applyPropertiesButton);
     propertyLayout->addStretch();
     properties->setWidget(propertyWidget);
     addDockWidget(Qt::RightDockWidgetArea, properties);
@@ -232,9 +232,18 @@ MainWindow::MainWindow(QWidget *parent)
         m_scene->beginConnection(m_connectionLabelEdit->text());
         statusBar()->showMessage(tr("Choose source node, then target node"));
     });
-    connect(applyButton, &QPushButton::clicked, this, [this] { applyProperties(); });
+    connect(m_applyPropertiesButton, &QPushButton::clicked, this, [this] { applyProperties(); });
     connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] { updatePropertyEditor(); });
+    m_scene->setChangeHandler([this] { updatePropertyEditor(); });
     updatePropertyEditor();
+}
+
+MainWindow::~MainWindow()
+{
+    if (m_scene) {
+        QObject::disconnect(m_scene, nullptr, this, nullptr);
+        m_scene->setChangeHandler({});
+    }
 }
 
 bool MainWindow::addNodeOfType(NodeType type)
@@ -322,6 +331,7 @@ void MainWindow::updatePropertyEditor()
     m_outputsEdit->setEnabled(editable);
     m_constraintsEdit->setEnabled(editable);
     m_acceptanceCriteriaEdit->setEnabled(editable);
+    m_applyPropertiesButton->setEnabled(editable);
     if (!editable) {
         m_nameEdit->clear();
         m_descriptionEdit->clear();
@@ -347,10 +357,14 @@ void MainWindow::updatePropertyEditor()
 
 QString MainWindow::selectedNodeId() const
 {
+    QString selectedId;
     for (QGraphicsItem *item : m_scene->selectedItems()) {
         if (auto *node = dynamic_cast<NodeItem *>(item)) {
-            return node->nodeId();
+            if (!selectedId.isEmpty()) {
+                return {};
+            }
+            selectedId = node->nodeId();
         }
     }
-    return {};
+    return selectedId;
 }

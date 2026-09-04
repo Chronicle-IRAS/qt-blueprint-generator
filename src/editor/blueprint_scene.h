@@ -22,15 +22,18 @@ public:
     bool connectNodes(const QString &sourceId, const QString &targetId, const QString &label = {});
     bool editNodeText(const QString &nodeId, const QString &name, const QString &description);
     bool editNode(const QString &nodeId, const BlueprintNode &node);
+    bool isRepresentable() const;
 
     bool beginConnection(const QString &label = {});
     bool chooseConnectionNode(const QString &nodeId);
     QString connectionSource() const;
+    void cancelConnection();
 
     NodeItem *nodeItem(const QString &nodeId) const;
     EdgeItem *edgeItem(const QString &edgeId) const;
     QPointF nodePosition(const QString &nodeId) const;
     QUndoStack *undoStack();
+    void setChangeHandler(std::function<void()> handler);
 
 private:
     struct IndexedEdge {
@@ -55,8 +58,11 @@ private:
     void handleItemPositionChanged(const QString &nodeId);
     void handleItemMoveFinished(const QString &nodeId, const QPointF &before, const QPointF &after);
     void handleNodeClicked(const QString &nodeId);
+    void notifyChanged();
 
     BlueprintDocument *m_document = nullptr;
+    bool m_representable = true;
+    std::function<void()> m_changeHandler;
     QUndoStack m_undoStack;
     QHash<QString, NodeItem *> m_nodes;
     QHash<QString, EdgeItem *> m_edges;

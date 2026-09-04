@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QGraphicsPathItem>
+#include <QPolygonF>
 #include <QString>
 
 class NodeItem;
@@ -13,8 +14,6 @@ class EdgeItem final : public QGraphicsPathItem
 {
 public:
     EdgeItem(QString edgeId, QString sourceId, QString targetId, NodeItem *source, NodeItem *target,
-             QGraphicsItem *parent = nullptr);
-    EdgeItem(QString edgeId, QString sourceId, QString targetId, NodeItem *source, NodeItem *target,
              QString label = {}, QGraphicsItem *parent = nullptr);
 
     QString edgeId() const;
@@ -22,6 +21,7 @@ public:
     QString targetId() const;
     QString label() const;
     QPointF labelPosition() const;
+    QPolygonF arrowPolygon() const;
     void updatePath();
 
     QRectF boundingRect() const override;

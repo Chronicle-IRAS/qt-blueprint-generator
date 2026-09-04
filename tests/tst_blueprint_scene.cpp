@@ -36,10 +36,17 @@ private slots:
     void connectingNodesUpdatesDocumentAndSupportsUndo();
     void explicitConnectionSelectionPreservesDirection();
     void edgeShowsDirectedLabelAndUsesPortAnchors();
+    void editingPortsUpdatesIncidentEdgeAnchorsAndUndo();
     void deletingNodeRemovesConnectedEdgesAndSupportsUndo();
+    void multiSelectionDragHasOneCoherentUndo();
+    void sceneRejectsMalformedTechnicalDocuments();
+    void connectionStateCanBeCancelledAndSelfLoopsAreRejected();
+    void graphicsBoundsContainPaintedPortAndArrowExtents();
     void editingNodeTextUpdatesDocumentAndSupportsUndo();
     void editingAllNodeFieldsIsOneUndoableCommand();
     void mainWindowPropertyEditorPreservesAllFields();
+    void propertyDockIsDisabledForMultiSelection();
+    void propertyDockTracksUndoRedoAndDoesNotReapplyStaleValues();
     void mainWindowCreatesEveryNodeType();
     void mainWindowUsesExplicitConnectionDirection();
     void mainWindowCreatesLabeledConnectionsFromToolbar();
@@ -144,6 +151,33 @@ void BlueprintSceneTest::edgeShowsDirectedLabelAndUsesPortAnchors()
     QVERIFY(edgeItem->boundingRect().contains(edgeItem->labelPosition()));
 }
 
+void BlueprintSceneTest::editingPortsUpdatesIncidentEdgeAnchorsAndUndo()
+{
+    BlueprintDocument document;
+    BlueprintNode source = node(QStringLiteral("source"), QStringLiteral("Source"));
+    source.outputs = {{QStringLiteral("result"), QStringLiteral("bool"), QStringLiteral("Result")}};
+    BlueprintNode target = node(QStringLiteral("target"), QStringLiteral("Target"));
+    target.inputs = {{QStringLiteral("value"), QStringLiteral("bool"), QStringLiteral("Value")}};
+    document.nodes = {source, target};
+    BlueprintScene scene(&document);
+    QVERIFY(scene.connectNodes(QStringLiteral("source"), QStringLiteral("target")));
+    const QString edgeId = document.edges.constFirst().id;
+    const QPointF originalStart = scene.edgeItem(edgeId)->path().pointAtPercent(0.0);
+
+    BlueprintNode edited = source;
+    edited.outputs = {{QStringLiteral("first"), QStringLiteral("bool"), QStringLiteral("First")},
+                      {QStringLiteral("second"), QStringLiteral("bool"), QStringLiteral("Second")}};
+    QVERIFY(scene.editNode(QStringLiteral("source"), edited));
+    const QPointF editedStart = scene.edgeItem(edgeId)->path().pointAtPercent(0.0);
+    QVERIFY(editedStart != originalStart);
+    QCOMPARE(editedStart, scene.nodeItem(QStringLiteral("source"))->outputAnchor());
+
+    scene.undoStack()->undo();
+    QCOMPARE(scene.edgeItem(edgeId)->path().pointAtPercent(0.0), originalStart);
+    scene.undoStack()->redo();
+    QCOMPARE(scene.edgeItem(edgeId)->path().pointAtPercent(0.0), editedStart);
+}
+
 void BlueprintSceneTest::deletingNodeRemovesConnectedEdgesAndSupportsUndo()
 {
     BlueprintDocument document;
@@ -164,6 +198,129 @@ void BlueprintSceneTest::deletingNodeRemovesConnectedEdgesAndSupportsUndo()
     QCOMPARE(document.nodes.constFirst().id, QStringLiteral("source"));
     QCOMPARE(document.edges.size(), 1);
     QVERIFY(scene.edgeItem(QStringLiteral("flow")) != nullptr);
+}
+
+void BlueprintSceneTest::multiSelectionDragHasOneCoherentUndo()
+{
+    BlueprintDocument document;
+    document.nodes = {node(QStringLiteral("first"), QStringLiteral("First")),
+                      node(QStringLiteral("second"), QStringLiteral("Second"))};
+    BlueprintScene scene(&document);
+    QGraphicsView view(&scene);
+    view.setDragMode(QGraphicsView::RubberBandDrag);
+    view.resize(800, 500);
+    view.show();
+    QApplication::processEvents();
+    NodeItem *first = scene.nodeItem(QStringLiteral("first"));
+    NodeItem *second = scene.nodeItem(QStringLiteral("second"));
+    first->setSelected(true);
+    second->setSelected(true);
+    const QPointF firstBefore = first->pos();
+    const QPointF secondBefore = second->pos();
+    const QPoint start = view.mapFromScene(first->sceneBoundingRect().center());
+    QTest::mousePress(view.viewport(), Qt::LeftButton, Qt::NoModifier, start);
+    QTest::mouseMove(view.viewport(), start + QPoint(60, 40), 20);
+    QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier, start + QPoint(60, 40));
+    QVERIFY(first->pos() != firstBefore);
+    QCOMPARE(second->pos(), secondBefore);
+
+    scene.undoStack()->undo();
+    QCOMPARE(first->pos(), firstBefore);
+    QCOMPARE(second->pos(), secondBefore);
+}
+
+void BlueprintSceneTest::sceneRejectsMalformedTechnicalDocuments()
+{
+    BlueprintDocument duplicateNode;
+    duplicateNode.nodes = {node(QStringLiteral("same"), QStringLiteral("One")),
+                           node(QStringLiteral("same"), QStringLiteral("Two"))};
+    BlueprintScene duplicateNodeScene(&duplicateNode);
+    QVERIFY(!duplicateNodeScene.isRepresentable());
+    QVERIFY(duplicateNodeScene.items().isEmpty());
+    QCOMPARE(duplicateNode.nodes.size(), 2);
+
+    BlueprintDocument whitespaceNode;
+    whitespaceNode.nodes = {node(QStringLiteral("  "), QStringLiteral("Blank"))};
+    BlueprintScene whitespaceNodeScene(&whitespaceNode);
+    QVERIFY(!whitespaceNodeScene.isRepresentable());
+    QVERIFY(whitespaceNodeScene.items().isEmpty());
+
+    BlueprintDocument duplicateEdge;
+    duplicateEdge.nodes = {node(QStringLiteral("a"), QStringLiteral("A")),
+                           node(QStringLiteral("b"), QStringLiteral("B"))};
+    duplicateEdge.edges = {{QStringLiteral("edge"), QStringLiteral("a"), QStringLiteral("b"), {}},
+                           {QStringLiteral("edge"), QStringLiteral("b"), QStringLiteral("a"), {}}};
+    BlueprintScene duplicateEdgeScene(&duplicateEdge);
+    QVERIFY(!duplicateEdgeScene.isRepresentable());
+    QVERIFY(duplicateEdgeScene.items().isEmpty());
+
+    BlueprintDocument emptyEdgeId;
+    emptyEdgeId.nodes = duplicateEdge.nodes;
+    emptyEdgeId.edges = {{QString(), QStringLiteral("a"), QStringLiteral("b"), {}}};
+    BlueprintScene emptyEdgeIdScene(&emptyEdgeId);
+    QVERIFY(!emptyEdgeIdScene.isRepresentable());
+    QVERIFY(emptyEdgeIdScene.items().isEmpty());
+
+    BlueprintDocument danglingEdge;
+    danglingEdge.nodes = {node(QStringLiteral("a"), QStringLiteral("A"))};
+    danglingEdge.edges = {{QStringLiteral("edge"), QStringLiteral("a"), QStringLiteral("missing"), {}}};
+    BlueprintScene danglingEdgeScene(&danglingEdge);
+    QVERIFY(!danglingEdgeScene.isRepresentable());
+    QVERIFY(danglingEdgeScene.items().isEmpty());
+
+    BlueprintDocument danglingBoth;
+    danglingBoth.nodes = {node(QStringLiteral("a"), QStringLiteral("A"))};
+    danglingBoth.edges = {{QStringLiteral("edge"), QStringLiteral("missing-source"),
+                           QStringLiteral("missing-target"), {}}};
+    BlueprintScene danglingBothScene(&danglingBoth);
+    QVERIFY(!danglingBothScene.isRepresentable());
+    QVERIFY(danglingBothScene.items().isEmpty());
+
+    BlueprintDocument valid;
+    BlueprintScene validScene(&valid);
+    QVERIFY(!validScene.addNode(node(QStringLiteral("  "), QStringLiteral("Invalid")), QPointF()));
+    QVERIFY(valid.nodes.isEmpty());
+}
+
+void BlueprintSceneTest::connectionStateCanBeCancelledAndSelfLoopsAreRejected()
+{
+    BlueprintDocument document;
+    document.nodes = {node(QStringLiteral("source"), QStringLiteral("Source")),
+                      node(QStringLiteral("target"), QStringLiteral("Target"))};
+    BlueprintScene scene(&document);
+    QVERIFY(scene.beginConnection(QStringLiteral("stale")));
+    QVERIFY(scene.chooseConnectionNode(QStringLiteral("source")));
+    scene.cancelConnection();
+    QVERIFY(scene.connectionSource().isEmpty());
+    QVERIFY(scene.beginConnection(QStringLiteral("fresh")));
+    QVERIFY(scene.chooseConnectionNode(QStringLiteral("source")));
+    QVERIFY(scene.chooseConnectionNode(QStringLiteral("target")));
+    QCOMPARE(document.edges.constFirst().label, QStringLiteral("fresh"));
+    QVERIFY(!scene.connectNodes(QStringLiteral("target"), QStringLiteral("target")));
+
+    QVERIFY(scene.beginConnection(QStringLiteral("pending")));
+    QVERIFY(scene.chooseConnectionNode(QStringLiteral("target")));
+    QVERIFY(scene.deleteNode(QStringLiteral("target")));
+    QVERIFY(scene.connectionSource().isEmpty());
+}
+
+void BlueprintSceneTest::graphicsBoundsContainPaintedPortAndArrowExtents()
+{
+    BlueprintDocument document;
+    BlueprintNode source = node(QStringLiteral("source"), QStringLiteral("Source"));
+    source.outputs = {{QStringLiteral("result"), QStringLiteral("bool"), {}}};
+    BlueprintNode target = node(QStringLiteral("target"), QStringLiteral("Target"));
+    target.inputs = {{QStringLiteral("value"), QStringLiteral("bool"), {}}};
+    document.nodes = {source, target};
+    BlueprintScene scene(&document);
+    QVERIFY(scene.connectNodes(QStringLiteral("source"), QStringLiteral("target"), QStringLiteral("yes")));
+    NodeItem *sourceItem = scene.nodeItem(QStringLiteral("source"));
+    const QPointF localPort = sourceItem->mapFromScene(sourceItem->outputAnchor());
+    QVERIFY(sourceItem->boundingRect().contains(localPort - QPointF(5.0, 5.0)));
+    QVERIFY(sourceItem->boundingRect().contains(localPort + QPointF(5.0, 5.0)));
+    EdgeItem *edge = scene.edgeItem(document.edges.constFirst().id);
+    QVERIFY(edge->boundingRect().contains(edge->arrowPolygon().boundingRect()));
+    QVERIFY(edge->boundingRect().contains(edge->labelPosition()));
 }
 
 void BlueprintSceneTest::editingNodeTextUpdatesDocumentAndSupportsUndo()
@@ -246,6 +403,50 @@ void BlueprintSceneTest::mainWindowPropertyEditorPreservesAllFields()
     QCOMPARE(window.document().nodes.constFirst().name, QStringLiteral("Logic Module"));
     window.scene()->undoStack()->redo();
     QCOMPARE(window.scene()->nodeItem(id)->node(), expected);
+}
+
+void BlueprintSceneTest::propertyDockTracksUndoRedoAndDoesNotReapplyStaleValues()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::LogicModule));
+    const QString id = window.document().nodes.constFirst().id;
+    auto *nameEdit = window.findChild<QLineEdit *>(QStringLiteral("nodeNameEdit"));
+    auto *inputsEdit = window.findChild<QPlainTextEdit *>(QStringLiteral("nodeInputsEdit"));
+    auto *applyButton = window.findChild<QPushButton *>(QStringLiteral("applyNodePropertiesButton"));
+    QVERIFY(nameEdit && inputsEdit && applyButton);
+    nameEdit->setText(QStringLiteral("Changed"));
+    inputsEdit->setPlainText(QStringLiteral("[{\"name\":\"value\",\"type\":\"int\",\"description\":\"Value\"}]"));
+    QTest::mouseClick(applyButton, Qt::LeftButton);
+    QCOMPARE(window.document().nodes.constFirst().name, QStringLiteral("Changed"));
+    window.scene()->undoStack()->undo();
+    QCOMPARE(window.document().nodes.constFirst().name, QStringLiteral("Logic Module"));
+    QCOMPARE(nameEdit->text(), QStringLiteral("Logic Module"));
+    QVERIFY(!inputsEdit->toPlainText().contains(QStringLiteral("value")));
+    const int commandCountAfterUndo = window.scene()->undoStack()->count();
+    QTest::mouseClick(applyButton, Qt::LeftButton);
+    QCOMPARE(window.document().nodes.constFirst().name, QStringLiteral("Logic Module"));
+    QCOMPARE(window.scene()->undoStack()->count(), commandCountAfterUndo);
+    window.scene()->undoStack()->redo();
+    QCOMPARE(window.document().nodes.constFirst().name, QStringLiteral("Changed"));
+    QVERIFY(inputsEdit->toPlainText().contains(QStringLiteral("value")));
+    QCOMPARE(window.scene()->nodeItem(id)->node(), window.document().nodes.constFirst());
+}
+
+void BlueprintSceneTest::propertyDockIsDisabledForMultiSelection()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    QVERIFY(window.addNodeOfType(NodeType::End));
+    const BlueprintDocument before = window.document();
+    window.scene()->nodeItem(before.nodes.at(0).id)->setSelected(true);
+    window.scene()->nodeItem(before.nodes.at(1).id)->setSelected(true);
+    auto *nameEdit = window.findChild<QLineEdit *>(QStringLiteral("nodeNameEdit"));
+    auto *applyButton = window.findChild<QPushButton *>(QStringLiteral("applyNodePropertiesButton"));
+    QVERIFY(nameEdit && applyButton);
+    QVERIFY(!nameEdit->isEnabled());
+    QVERIFY(!applyButton->isEnabled() || nameEdit->text().isEmpty());
+    QTest::mouseClick(applyButton, Qt::LeftButton);
+    QCOMPARE(window.document(), before);
 }
 
 void BlueprintSceneTest::mainWindowCreatesEveryNodeType()

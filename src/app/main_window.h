@@ -9,11 +9,13 @@ class BlueprintScene;
 class QGraphicsView;
 class QLineEdit;
 class QPlainTextEdit;
+class QPushButton;
 
 class MainWindow final : public QMainWindow
 {
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
 
     bool addNodeOfType(NodeType type);
     const BlueprintDocument &document() const;
@@ -36,4 +38,5 @@ private:
     QPlainTextEdit *m_outputsEdit = nullptr;
     QPlainTextEdit *m_constraintsEdit = nullptr;
     QPlainTextEdit *m_acceptanceCriteriaEdit = nullptr;
+    QPushButton *m_applyPropertiesButton = nullptr;
 };

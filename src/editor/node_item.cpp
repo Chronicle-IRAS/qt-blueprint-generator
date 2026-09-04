@@ -1,6 +1,7 @@
 #include "editor/node_item.h"
 
 #include <QGraphicsSceneMouseEvent>
+#include <QGraphicsScene>
 #include <QObject>
 #include <QPainter>
 #include <QStyleOptionGraphicsItem>
@@ -20,7 +21,7 @@ NodeItem::NodeItem(QString nodeId, QString title, QGraphicsItem *parent)
     m_node.id = m_nodeId;
     m_node.name = m_title;
     setFlags(ItemIsMovable | ItemIsSelectable | ItemSendsGeometryChanges);
-    setCacheMode(DeviceCoordinateCache);
+    setCacheMode(NoCache);
 }
 
 QString NodeItem::nodeId() const
@@ -39,23 +40,6 @@ void NodeItem::setNode(const BlueprintNode &node)
     m_nodeId = node.id;
     m_title = node.name;
     setToolTip(node.description);
-    update();
-}
-
-void NodeItem::setTitle(const QString &title)
-{
-    if (m_title == title) {
-        return;
-    }
-    m_title = title;
-    m_node.name = title;
-    update();
-}
-
-void NodeItem::setPorts(const QVector<PortSpec> &inputs, const QVector<PortSpec> &outputs)
-{
-    m_node.inputs = inputs;
-    m_node.outputs = outputs;
     update();
 }
 
@@ -91,7 +75,7 @@ void NodeItem::setMoveFinishedHandler(
 
 QRectF NodeItem::boundingRect() const
 {
-    return {-1.0, -1.0, NodeWidth + 2.0, NodeHeight + 2.0};
+    return {-6.0, -6.0, NodeWidth + 12.0, NodeHeight + 12.0};
 }
 
 void NodeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
@@ -157,6 +141,15 @@ QVariant NodeItem::itemChange(GraphicsItemChange change, const QVariant &value)
 void NodeItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     m_dragStart = pos();
+    if (event->button() == Qt::LeftButton && !event->modifiers().testFlag(Qt::ControlModifier)
+        && !event->modifiers().testFlag(Qt::ShiftModifier) && scene() && isSelected()) {
+        const QList<QGraphicsItem *> selected = scene()->selectedItems();
+        for (QGraphicsItem *item : selected) {
+            if (item != this) {
+                item->setSelected(false);
+            }
+        }
+    }
     if (event->button() == Qt::LeftButton && m_clickedHandler) {
         m_clickedHandler(m_nodeId);
     }
