@@ -4,14 +4,15 @@
 
 ## 当前状态
 
-当前开发分支为 `feature/blueprint-editor-mvp`，已完成 MVP Task 1 至 Task 4：
+当前开发分支为 `feature/blueprint-editor-mvp`，已完成 MVP Task 1 至 Task 5：
 
 - Qt 6 Widgets / C++17 / CMake 工程骨架和 Qt Test 测试环境。
 - 蓝图领域模型及 `blueprint.json` 序列化往返。
 - 节点 ID、流程结构、可达性、环、Decision 分支和外部代码路径校验。
 - 六类节点的交互式画布、端口、有向连线、Decision 标签、属性编辑、缩放、框选及撤销/重做。
+- 确定性 IR 编译、合法 C++ 命名空间、最小邻接上下文，以及项目级和模块级提示词模板。
 
-Task 5 至 Task 10 尚在开发中。真实 AI 调用、候选代码管理、构建验证和项目导出目前尚未实现。
+Task 6 至 Task 10 尚在开发中。真实 AI 调用、候选代码管理、构建验证和项目导出目前尚未实现。
 
 ## MVP 工作流
 
@@ -77,11 +78,12 @@ project/
 ├─ src/
 │  ├─ app/              # 主窗口
 │  ├─ blueprint/        # 领域模型、序列化和校验
-│  └─ editor/           # 蓝图场景、节点和连线图元
+│  ├─ editor/           # 蓝图场景、节点和连线图元
+│  └─ generation/       # IR 与提示词编译
 └─ tests/               # Qt Test 自动化测试
 ```
 
-`src/generation/`、`src/ai/` 和 `src/workspace/` 将随后续 MVP Task 逐步加入。
+`src/ai/` 和 `src/workspace/` 将随后续 MVP Task 逐步加入。
 
 ## 设计文档
 
