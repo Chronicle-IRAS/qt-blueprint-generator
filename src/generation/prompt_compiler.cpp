@@ -4,12 +4,22 @@
 
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QStringList>
 
 namespace {
 
 QString projectValue(const QJsonObject &project, const char *key)
 {
     return project.value(QLatin1String(key)).toString();
+}
+
+QString projectConventions(const QJsonObject &project)
+{
+    QStringList conventions;
+    for (const QJsonValue &value : project.value(QStringLiteral("codingConventions")).toArray()) {
+        conventions.append(value.toString());
+    }
+    return conventions.join(QStringLiteral(", "));
 }
 
 std::optional<QJsonObject> findModule(const QJsonObject &ir, const QString &nodeId)
@@ -49,13 +59,15 @@ QString PromptCompiler::compileProjectPrompt(const QJsonObject &ir)
                           "- Framework: %4\n"
                           "- Language standard: %5\n"
                           "- Build system: %6\n"
-                          "- Overall goal: %7")
+                          "- Coding conventions: %7\n"
+                          "- Overall goal: %8")
         .arg(projectValue(project, "name"),
              projectValue(project, "namespace"),
              projectValue(project, "target"),
              projectValue(project, "framework"),
              projectValue(project, "languageStandard"),
              projectValue(project, "buildSystem"),
+             projectConventions(project),
              projectValue(project, "goal"));
 }
 
