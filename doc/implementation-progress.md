@@ -6,6 +6,7 @@
 
 - 当前开发分支：`feature/blueprint-editor-mvp`
 - 设计基线：`doc/mvp-implementation-plan.md`
+- `doc/multilanguage-development-design.md` 为 MVP 完成后的后续规划，不影响当前 Task 1 至 Task 10。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
 - Task 3「蓝图静态验证」已完成并通过规格与代码质量审查。
@@ -37,7 +38,7 @@
   - 校验项目根、`external` 根和节点目录的最终物理路径。
   - 扫描全部受支持源码，拒绝任一越界符号链接。
 - `e4e6417 docs: allow hybrid-language implementation`
-  - 补充多语言开发设计，明确 C++ 核心与外部语言扩展的边界。
+  - 补充 MVP 完成后的多语言演进设计，明确 C++ 核心与外部语言扩展的边界。
 - `5e87e23 feat: add interactive blueprint canvas`
   - 实现节点、端口、连线、缩放、框选、属性编辑和撤销栈的画布基础能力。
 - `f0e2691 fix: complete blueprint canvas interactions`
@@ -75,11 +76,12 @@
 1. 切换到 `feature/blueprint-editor-mvp`。
 2. 在开始实施文档 Task 5 前切换智能体模式。
 3. 从 Task 5「实现 IR 与提示词编译」开始，继续遵循测试先行流程。
-4. 每个 Task 完成后运行相关测试与全量 CTest，并创建独立提交。
+4. 每个 Task 完成后运行相关测试与全量 CTest，创建独立提交，并同步当前开发分支到远端仓库。
 
 ## 约束提醒
 
 - 每次改动必须同步新增或更新测试。
 - 每个实施任务必须独立提交。
+- 每个 Task 完成后必须同步远端；禁止强制推送或改写远端历史，同步受阻时记录 Issue 和进度说明。
 - 不提交 `build/` 构建产物。
 - API 密钥仅从 `BLUEPRINT_AI_API_KEY` 读取，不写入文件或日志。
