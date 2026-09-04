@@ -15,10 +15,13 @@ class MainWindow final : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = nullptr);
 
+    bool addNodeOfType(NodeType type);
+    const BlueprintDocument &document() const;
+    BlueprintScene *scene() const;
+    QGraphicsView *graphicsView() const;
+
 private:
-    void addNode();
     void deleteSelection();
-    void connectSelection();
     void applyProperties();
     void updatePropertyEditor();
     QString selectedNodeId() const;
@@ -28,4 +31,8 @@ private:
     QGraphicsView *m_view = nullptr;
     QLineEdit *m_nameEdit = nullptr;
     QPlainTextEdit *m_descriptionEdit = nullptr;
+    QPlainTextEdit *m_inputsEdit = nullptr;
+    QPlainTextEdit *m_outputsEdit = nullptr;
+    QPlainTextEdit *m_constraintsEdit = nullptr;
+    QPlainTextEdit *m_acceptanceCriteriaEdit = nullptr;
 };

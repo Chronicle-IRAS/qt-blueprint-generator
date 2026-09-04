@@ -4,6 +4,8 @@
 #include <QPointF>
 #include <QString>
 
+#include "blueprint/blueprint_document.h"
+
 #include <functional>
 
 class QGraphicsSceneMouseEvent;
@@ -17,8 +19,14 @@ public:
     explicit NodeItem(QString nodeId, QString title, QGraphicsItem *parent = nullptr);
 
     QString nodeId() const;
+    const BlueprintNode &node() const;
+    void setNode(const BlueprintNode &node);
     void setTitle(const QString &title);
+    void setPorts(const QVector<PortSpec> &inputs, const QVector<PortSpec> &outputs);
+    QPointF inputAnchor(int index = 0) const;
+    QPointF outputAnchor(int index = 0) const;
     void setPositionChangedHandler(std::function<void(const QString &)> handler);
+    void setClickedHandler(std::function<void(const QString &)> handler);
     void setMoveFinishedHandler(
         std::function<void(const QString &, const QPointF &, const QPointF &)> handler);
 
@@ -35,5 +43,7 @@ private:
     QString m_title;
     QPointF m_dragStart;
     std::function<void(const QString &)> m_positionChangedHandler;
+    std::function<void(const QString &)> m_clickedHandler;
     std::function<void(const QString &, const QPointF &, const QPointF &)> m_moveFinishedHandler;
+    BlueprintNode m_node;
 };

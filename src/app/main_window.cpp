@@ -7,17 +7,116 @@
 #include <QDockWidget>
 #include <QFormLayout>
 #include <QGraphicsView>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
 #include <QPainter>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QStatusBar>
 #include <QToolBar>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
 namespace {
+
+QString nodeTypeName(NodeType type)
+{
+    switch (type) {
+    case NodeType::Start:
+        return QObject::tr("Start");
+    case NodeType::End:
+        return QObject::tr("End");
+    case NodeType::UiPage:
+        return QObject::tr("UI Page");
+    case NodeType::LogicModule:
+        return QObject::tr("Logic Module");
+    case NodeType::Decision:
+        return QObject::tr("Decision");
+    case NodeType::ExternalCode:
+        return QObject::tr("External Code");
+    }
+    return {};
+}
+
+QString portsToText(const QVector<PortSpec> &ports)
+{
+    QJsonArray array;
+    for (const PortSpec &port : ports) {
+        array.append(QJsonObject{{QStringLiteral("name"), port.name},
+                                 {QStringLiteral("type"), port.type},
+                                 {QStringLiteral("description"), port.description}});
+    }
+    return QString::fromUtf8(QJsonDocument(array).toJson(QJsonDocument::Indented));
+}
+
+QString stringsToText(const QStringList &values)
+{
+    QJsonArray array;
+    for (const QString &value : values) {
+        array.append(value);
+    }
+    return QString::fromUtf8(QJsonDocument(array).toJson(QJsonDocument::Indented));
+}
+
+bool parsePorts(const QString &text, QVector<PortSpec> *ports)
+{
+    const QString trimmed = text.trimmed();
+    if (trimmed.isEmpty()) {
+        ports->clear();
+        return true;
+    }
+    QJsonParseError error;
+    const QJsonDocument document = QJsonDocument::fromJson(text.toUtf8(), &error);
+    if (error.error != QJsonParseError::NoError || !document.isArray()) {
+        return false;
+    }
+    QVector<PortSpec> parsed;
+    for (const QJsonValue &value : document.array()) {
+        if (!value.isObject()) {
+            return false;
+        }
+        const QJsonObject object = value.toObject();
+        if (!object.value(QStringLiteral("name")).isString()
+            || !object.value(QStringLiteral("type")).isString()
+            || !object.value(QStringLiteral("description")).isString()) {
+            return false;
+        }
+        parsed.append({object.value(QStringLiteral("name")).toString(),
+                       object.value(QStringLiteral("type")).toString(),
+                       object.value(QStringLiteral("description")).toString()});
+    }
+    *ports = parsed;
+    return true;
+}
+
+bool parseStrings(const QString &text, QStringList *values)
+{
+    const QString trimmed = text.trimmed();
+    if (trimmed.isEmpty()) {
+        values->clear();
+        return true;
+    }
+    QJsonParseError error;
+    const QJsonDocument document = QJsonDocument::fromJson(text.toUtf8(), &error);
+    if (error.error != QJsonParseError::NoError || !document.isArray()) {
+        return false;
+    }
+    QStringList parsed;
+    for (const QJsonValue &value : document.array()) {
+        if (!value.isString()) {
+            return false;
+        }
+        parsed.append(value.toString());
+    }
+    *values = parsed;
+    return true;
+}
 
 class BlueprintView final : public QGraphicsView
 {
@@ -57,9 +156,27 @@ MainWindow::MainWindow(QWidget *parent)
     setCentralWidget(m_view);
 
     auto *toolbar = addToolBar(tr("Blueprint"));
-    QAction *addAction = toolbar->addAction(tr("Add node"));
+    auto *addButton = new QToolButton(toolbar);
+    addButton->setText(tr("Add node"));
+    addButton->setPopupMode(QToolButton::InstantPopup);
+    auto *addMenu = new QMenu(addButton);
+    const QVector<NodeType> nodeTypes{
+        NodeType::Start,
+        NodeType::End,
+        NodeType::UiPage,
+        NodeType::LogicModule,
+        NodeType::Decision,
+        NodeType::ExternalCode,
+    };
+    for (const NodeType type : nodeTypes) {
+        QAction *action = addMenu->addAction(nodeTypeName(type));
+        action->setObjectName(QStringLiteral("add%1NodeAction").arg(nodeTypeName(type).remove(' ')));
+        connect(action, &QAction::triggered, this, [this, type] { addNodeOfType(type); });
+    }
+    addButton->setMenu(addMenu);
+    toolbar->addWidget(addButton);
     QAction *deleteAction = toolbar->addAction(tr("Delete"));
-    QAction *connectAction = toolbar->addAction(tr("Connect selected"));
+    QAction *connectAction = toolbar->addAction(tr("Connect: choose source then target"));
     toolbar->addSeparator();
     toolbar->addAction(m_scene->undoStack()->createUndoAction(this, tr("Undo")));
     toolbar->addAction(m_scene->undoStack()->createRedoAction(this, tr("Redo")));
@@ -73,26 +190,47 @@ MainWindow::MainWindow(QWidget *parent)
     auto *propertyLayout = new QVBoxLayout(propertyWidget);
     auto *form = new QFormLayout;
     m_nameEdit = new QLineEdit(propertyWidget);
+    m_nameEdit->setObjectName(QStringLiteral("nodeNameEdit"));
     m_descriptionEdit = new QPlainTextEdit(propertyWidget);
+    m_descriptionEdit->setObjectName(QStringLiteral("nodeDescriptionEdit"));
     m_descriptionEdit->setPlaceholderText(tr("Description"));
+    m_inputsEdit = new QPlainTextEdit(propertyWidget);
+    m_inputsEdit->setObjectName(QStringLiteral("nodeInputsEdit"));
+    m_outputsEdit = new QPlainTextEdit(propertyWidget);
+    m_outputsEdit->setObjectName(QStringLiteral("nodeOutputsEdit"));
+    m_constraintsEdit = new QPlainTextEdit(propertyWidget);
+    m_constraintsEdit->setObjectName(QStringLiteral("nodeConstraintsEdit"));
+    m_acceptanceCriteriaEdit = new QPlainTextEdit(propertyWidget);
+    m_acceptanceCriteriaEdit->setObjectName(QStringLiteral("nodeAcceptanceCriteriaEdit"));
+    for (QPlainTextEdit *editor : {m_inputsEdit, m_outputsEdit, m_constraintsEdit, m_acceptanceCriteriaEdit}) {
+        editor->setTabChangesFocus(false);
+        editor->setMaximumHeight(90);
+    }
     form->addRow(tr("Name"), m_nameEdit);
     form->addRow(tr("Description"), m_descriptionEdit);
+    form->addRow(tr("Inputs (JSON)"), m_inputsEdit);
+    form->addRow(tr("Outputs (JSON)"), m_outputsEdit);
+    form->addRow(tr("Constraints (JSON)"), m_constraintsEdit);
+    form->addRow(tr("Acceptance criteria (JSON)"), m_acceptanceCriteriaEdit);
     propertyLayout->addLayout(form);
     auto *applyButton = new QPushButton(tr("Apply"), propertyWidget);
+    applyButton->setObjectName(QStringLiteral("applyNodePropertiesButton"));
     propertyLayout->addWidget(applyButton);
     propertyLayout->addStretch();
     properties->setWidget(propertyWidget);
     addDockWidget(Qt::RightDockWidgetArea, properties);
 
-    connect(addAction, &QAction::triggered, this, [this] { addNode(); });
     connect(deleteAction, &QAction::triggered, this, [this] { deleteSelection(); });
-    connect(connectAction, &QAction::triggered, this, [this] { connectSelection(); });
+    connect(connectAction, &QAction::triggered, this, [this] {
+        m_scene->beginConnection();
+        statusBar()->showMessage(tr("Choose source node, then target node"));
+    });
     connect(applyButton, &QPushButton::clicked, this, [this] { applyProperties(); });
     connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] { updatePropertyEditor(); });
     updatePropertyEditor();
 }
 
-void MainWindow::addNode()
+bool MainWindow::addNodeOfType(NodeType type)
 {
     int number = 1;
     QString id;
@@ -102,10 +240,32 @@ void MainWindow::addNode()
 
     BlueprintNode node;
     node.id = id;
-    node.type = NodeType::LogicModule;
-    node.name = tr("New node");
-    const QPointF position = m_view->mapToScene(m_view->viewport()->rect().center());
-    m_scene->addNode(node, position);
+    node.type = type;
+    node.name = nodeTypeName(type);
+    const QPointF center = m_view->mapToScene(m_view->viewport()->rect().center());
+    const qsizetype ordinal = m_document.nodes.size();
+    const QPointF position = center + QPointF((ordinal % 3) * 220.0, (ordinal / 3) * 140.0);
+    const bool added = m_scene->addNode(node, position);
+    if (added) {
+        m_scene->clearSelection();
+        m_scene->nodeItem(id)->setSelected(true);
+    }
+    return added;
+}
+
+const BlueprintDocument &MainWindow::document() const
+{
+    return m_document;
+}
+
+BlueprintScene *MainWindow::scene() const
+{
+    return m_scene;
+}
+
+QGraphicsView *MainWindow::graphicsView() const
+{
+    return m_view;
 }
 
 void MainWindow::deleteSelection()
@@ -121,24 +281,27 @@ void MainWindow::deleteSelection()
     }
 }
 
-void MainWindow::connectSelection()
-{
-    QStringList ids;
-    for (QGraphicsItem *item : m_scene->selectedItems()) {
-        if (auto *node = dynamic_cast<NodeItem *>(item)) {
-            ids.append(node->nodeId());
-        }
-    }
-    if (ids.size() == 2) {
-        m_scene->connectNodes(ids.at(0), ids.at(1));
-    }
-}
-
 void MainWindow::applyProperties()
 {
     const QString id = selectedNodeId();
     if (!id.isEmpty()) {
-        m_scene->editNodeText(id, m_nameEdit->text(), m_descriptionEdit->toPlainText());
+        BlueprintNode updated;
+        for (const BlueprintNode &node : m_document.nodes) {
+            if (node.id == id) {
+                updated = node;
+                break;
+            }
+        }
+        updated.name = m_nameEdit->text();
+        updated.description = m_descriptionEdit->toPlainText();
+        if (!parsePorts(m_inputsEdit->toPlainText(), &updated.inputs)
+            || !parsePorts(m_outputsEdit->toPlainText(), &updated.outputs)
+            || !parseStrings(m_constraintsEdit->toPlainText(), &updated.constraints)
+            || !parseStrings(m_acceptanceCriteriaEdit->toPlainText(), &updated.acceptanceCriteria)) {
+            statusBar()->showMessage(tr("Properties use valid JSON arrays for ports and lists"));
+            return;
+        }
+        m_scene->editNode(id, updated);
     }
 }
 
@@ -148,9 +311,17 @@ void MainWindow::updatePropertyEditor()
     const bool editable = !id.isEmpty();
     m_nameEdit->setEnabled(editable);
     m_descriptionEdit->setEnabled(editable);
+    m_inputsEdit->setEnabled(editable);
+    m_outputsEdit->setEnabled(editable);
+    m_constraintsEdit->setEnabled(editable);
+    m_acceptanceCriteriaEdit->setEnabled(editable);
     if (!editable) {
         m_nameEdit->clear();
         m_descriptionEdit->clear();
+        m_inputsEdit->clear();
+        m_outputsEdit->clear();
+        m_constraintsEdit->clear();
+        m_acceptanceCriteriaEdit->clear();
         return;
     }
 
@@ -158,6 +329,10 @@ void MainWindow::updatePropertyEditor()
         if (node.id == id) {
             m_nameEdit->setText(node.name);
             m_descriptionEdit->setPlainText(node.description);
+            m_inputsEdit->setPlainText(portsToText(node.inputs));
+            m_outputsEdit->setPlainText(portsToText(node.outputs));
+            m_constraintsEdit->setPlainText(stringsToText(node.constraints));
+            m_acceptanceCriteriaEdit->setPlainText(stringsToText(node.acceptanceCriteria));
             return;
         }
     }

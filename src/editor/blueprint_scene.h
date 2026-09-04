@@ -4,6 +4,8 @@
 #include <QHash>
 #include <QUndoStack>
 
+#include <functional>
+
 #include "blueprint/blueprint_document.h"
 
 class EdgeItem;
@@ -19,6 +21,11 @@ public:
     bool moveNode(const QString &nodeId, const QPointF &position);
     bool connectNodes(const QString &sourceId, const QString &targetId, const QString &label = {});
     bool editNodeText(const QString &nodeId, const QString &name, const QString &description);
+    bool editNode(const QString &nodeId, const BlueprintNode &node);
+
+    bool beginConnection();
+    bool chooseConnectionNode(const QString &nodeId);
+    QString connectionSource() const;
 
     NodeItem *nodeItem(const QString &nodeId) const;
     EdgeItem *edgeItem(const QString &edgeId) const;
@@ -43,14 +50,17 @@ private:
     void addEdgeDirect(const BlueprintEdge &edge, qsizetype index);
     void removeEdgeDirect(const QString &edgeId);
     void setNodePositionDirect(const QString &nodeId, const QPointF &position);
-    void setNodeTextDirect(const QString &nodeId, const QString &name, const QString &description);
+    void setNodeDirect(const QString &nodeId, const BlueprintNode &node);
     void updateEdgesForNode(const QString &nodeId);
     void handleItemPositionChanged(const QString &nodeId);
     void handleItemMoveFinished(const QString &nodeId, const QPointF &before, const QPointF &after);
+    void handleNodeClicked(const QString &nodeId);
 
     BlueprintDocument *m_document = nullptr;
     QUndoStack m_undoStack;
     QHash<QString, NodeItem *> m_nodes;
     QHash<QString, EdgeItem *> m_edges;
     QHash<QString, QPointF> m_layout;
+    QString m_connectionSource;
+    bool m_connectionMode = false;
 };

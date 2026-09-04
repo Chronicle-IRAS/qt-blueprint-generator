@@ -116,21 +116,61 @@ bool BlueprintScene::connectNodes(const QString &sourceId, const QString &target
     return true;
 }
 
+bool BlueprintScene::beginConnection()
+{
+    m_connectionMode = true;
+    m_connectionSource.clear();
+    return true;
+}
+
+bool BlueprintScene::chooseConnectionNode(const QString &nodeId)
+{
+    if (!m_connectionMode || !hasNode(nodeId)) {
+        return false;
+    }
+    if (m_connectionSource.isEmpty()) {
+        m_connectionSource = nodeId;
+        return true;
+    }
+    if (m_connectionSource == nodeId) {
+        return false;
+    }
+    const QString source = m_connectionSource;
+    m_connectionSource.clear();
+    m_connectionMode = false;
+    return connectNodes(source, nodeId);
+}
+
+QString BlueprintScene::connectionSource() const
+{
+    return m_connectionSource;
+}
+
 bool BlueprintScene::editNodeText(const QString &nodeId, const QString &name, const QString &description)
 {
     const qsizetype index = nodeIndex(nodeId);
     if (index < 0) {
         return false;
     }
-    const BlueprintNode &node = m_document->nodes.at(index);
-    if (node.name == name && node.description == description) {
+    BlueprintNode updated = m_document->nodes.at(index);
+    updated.name = name;
+    updated.description = description;
+    return editNode(nodeId, updated);
+}
+
+bool BlueprintScene::editNode(const QString &nodeId, const BlueprintNode &updated)
+{
+    const qsizetype index = nodeIndex(nodeId);
+    if (index < 0 || updated.id != nodeId) {
         return false;
     }
-    const QString oldName = node.name;
-    const QString oldDescription = node.description;
+    const BlueprintNode old = m_document->nodes.at(index);
+    if (old == updated) {
+        return false;
+    }
     m_undoStack.push(new SceneCommand(
-        tr("Edit node"), [this, nodeId, name, description] { setNodeTextDirect(nodeId, name, description); },
-        [this, nodeId, oldName, oldDescription] { setNodeTextDirect(nodeId, oldName, oldDescription); }));
+        tr("Edit node"), [this, nodeId, updated] { setNodeDirect(nodeId, updated); },
+        [this, nodeId, old] { setNodeDirect(nodeId, old); }));
     return true;
 }
 
@@ -192,6 +232,8 @@ QString BlueprintScene::nextEdgeId() const
 void BlueprintScene::createNodeItem(const BlueprintNode &node, const QPointF &position)
 {
     auto *item = new NodeItem(node.id, node.name);
+    item->setNode(node);
+    item->setClickedHandler([this](const QString &id) { handleNodeClicked(id); });
     item->setPositionChangedHandler([this](const QString &id) { handleItemPositionChanged(id); });
     item->setMoveFinishedHandler(
         [this](const QString &id, const QPointF &before, const QPointF &after) {
@@ -205,7 +247,8 @@ void BlueprintScene::createNodeItem(const BlueprintNode &node, const QPointF &po
 
 void BlueprintScene::createEdgeItem(const BlueprintEdge &edge)
 {
-    auto *item = new EdgeItem(edge.id, edge.source, edge.target, nodeItem(edge.source), nodeItem(edge.target));
+    auto *item = new EdgeItem(edge.id, edge.source, edge.target, nodeItem(edge.source), nodeItem(edge.target),
+                              edge.label);
     addItem(item);
     m_edges.insert(edge.id, item);
 }
@@ -290,17 +333,15 @@ void BlueprintScene::setNodePositionDirect(const QString &nodeId, const QPointF 
     updateEdgesForNode(nodeId);
 }
 
-void BlueprintScene::setNodeTextDirect(const QString &nodeId, const QString &name, const QString &description)
+void BlueprintScene::setNodeDirect(const QString &nodeId, const BlueprintNode &node)
 {
     const qsizetype index = nodeIndex(nodeId);
-    if (index < 0) {
+    if (index < 0 || node.id != nodeId) {
         return;
     }
-    BlueprintNode &node = m_document->nodes[index];
-    node.name = name;
-    node.description = description;
+    m_document->nodes[index] = node;
     if (NodeItem *item = nodeItem(nodeId)) {
-        item->setTitle(name);
+        item->setNode(node);
     }
 }
 
@@ -329,5 +370,12 @@ void BlueprintScene::handleItemMoveFinished(const QString &nodeId, const QPointF
         m_undoStack.push(new SceneCommand(
             tr("Move node"), [this, nodeId, after] { setNodePositionDirect(nodeId, after); },
             [this, nodeId, before] { setNodePositionDirect(nodeId, before); }));
+    }
+}
+
+void BlueprintScene::handleNodeClicked(const QString &nodeId)
+{
+    if (m_connectionMode) {
+        chooseConnectionNode(nodeId);
     }
 }
