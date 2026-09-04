@@ -11,8 +11,9 @@
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
 - Task 3「蓝图静态验证」已完成并通过规格与代码质量审查。
 - Task 4「实现节点画布」已完成并通过规格与代码质量审查。
-- 已按约定停在 Task 5 开始前，等待切换智能体模式后继续。
-- Task 5 至 Task 10 尚未开始。
+- Task 5「实现 IR 与提示词编译」已完成并通过规格与代码质量审查。
+- 已按约定停在 Task 6 开始前，等待切换 Agent 模式后继续。
+- Task 6 至 Task 10 尚未开始。
 
 ## 已完成提交
 
@@ -49,6 +50,10 @@
   - 修复边坐标刷新、多选拖动、图元边界、撤销后属性同步及不可表示状态处理。
 - `5e00d38 fix: preserve canvas interaction invariants`
   - 加固所有画布变更入口、修复 Ctrl/Shift 拖动撤销语义，并隔离布局变化与属性草稿刷新。
+- `b38117c feat: compile blueprints into generation prompts`
+  - 实现确定性 IR、稳定模块与邻接排序、最小直接邻接上下文，以及项目级和模块级提示词。
+- `44930cd fix: harden IR and prompt contracts`
+  - 生成合法且非保留的 C++ 命名空间，补全 ExternalCode 邻接说明，并收紧提示词上下文。
 
 ## 验证记录
 
@@ -57,13 +62,15 @@
 - 生成器：Ninja
 - CMake 配置：通过。
 - 完整构建：通过。
-- CTest：`4/4 passed`（smoke、blueprint_document、blueprint_validator、blueprint_scene）。
+- CTest：`6/6 passed`（smoke、blueprint_document、blueprint_validator、blueprint_scene、ir_compiler、prompt_compiler）。
+- `ir_compiler` 与 `prompt_compiler`：分别连续重复运行 20 次通过。
 - `blueprint_scene`：连续重复运行 20 次通过。
 - 父进程 `PATH` 不包含 Qt 运行库目录时，CTest 仍可通过。
 - `git diff --check`：通过。
 - Task 3 最终质量复核：Approved（无 Critical、无 Important）。
 - Task 4 规格复核：通过。
 - Task 4 最终质量复核：Approved（无 Critical、无 Important）；剩余 3 项均为 Minor。
+- Task 5 最终代码复核：Ready to merge（无 Critical、无 Important、无 Minor）。
 
 ## Task 4 后续 Minor
 
@@ -74,8 +81,8 @@
 ## 恢复工作
 
 1. 切换到 `feature/blueprint-editor-mvp`。
-2. 在开始实施文档 Task 5 前切换智能体模式。
-3. 从 Task 5「实现 IR 与提示词编译」开始，继续遵循测试先行流程。
+2. 在开始实施文档 Task 6 前切换 Agent 模式。
+3. 从 Task 6「实现 AI 客户端与安全响应解析」开始，继续遵循测试先行流程。
 4. 每个 Task 完成后运行相关测试与全量 CTest，创建独立提交，并同步当前开发分支到远端仓库。
 
 ## 约束提醒
