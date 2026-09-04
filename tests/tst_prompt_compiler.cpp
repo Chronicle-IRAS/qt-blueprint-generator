@@ -95,6 +95,8 @@ void PromptCompilerTest::projectPromptContainsOnlyProjectSummary()
     QVERIFY(prompt.contains(QStringLiteral("Prompt_Demo")));
     QVERIFY(prompt.contains(QStringLiteral("qt6-widgets-cpp17-cmake")));
     QVERIFY(prompt.contains(QStringLiteral("Generate Prompt Demo from the blueprint module contracts.")));
+    QVERIFY(prompt.contains(QStringLiteral("Qt 6 idioms")));
+    QVERIFY(prompt.contains(QStringLiteral("RAII")));
     QVERIFY(!prompt.contains(QStringLiteral("CurrentService")));
     QVERIFY(!prompt.contains(QStringLiteral("DistantSecretModule")));
 }

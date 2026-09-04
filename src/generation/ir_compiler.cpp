@@ -3,6 +3,7 @@
 #include <QHash>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QSet>
 
 #include <algorithm>
 
@@ -70,15 +71,72 @@ QString projectNamespace(const BlueprintDocument &document)
         const ushort code = character.unicode();
         const bool asciiLetter = (code >= 'a' && code <= 'z') || (code >= 'A' && code <= 'Z');
         const bool asciiDigit = code >= '0' && code <= '9';
-        result.append(asciiLetter || asciiDigit || character == QLatin1Char('_')
-                          ? character
-                          : QLatin1Char('_'));
+        if (asciiLetter || asciiDigit) {
+            result.append(character);
+        } else if (!result.isEmpty() && result.back() != QLatin1Char('_')) {
+            result.append(QLatin1Char('_'));
+        }
+    }
+    while (result.endsWith(QLatin1Char('_'))) {
+        result.chop(1);
     }
     if (result.isEmpty()) {
         result = QStringLiteral("GeneratedProject");
     }
     if (result.front().isDigit()) {
-        result.prepend(QLatin1Char('_'));
+        result.prepend(QStringLiteral("Project_"));
+    }
+
+    static const QSet<QString> cppKeywords{
+        QStringLiteral("alignas"),      QStringLiteral("alignof"),
+        QStringLiteral("and"),               QStringLiteral("and_eq"),
+        QStringLiteral("asm"),          QStringLiteral("auto"),
+        QStringLiteral("bitand"),       QStringLiteral("bitor"),
+        QStringLiteral("bool"),         QStringLiteral("break"),
+        QStringLiteral("case"),         QStringLiteral("catch"),
+        QStringLiteral("char"),         QStringLiteral("char16_t"),
+        QStringLiteral("char32_t"),     QStringLiteral("class"),
+        QStringLiteral("compl"),        QStringLiteral("concept"),
+        QStringLiteral("const"),        QStringLiteral("constexpr"),
+        QStringLiteral("const_cast"),   QStringLiteral("continue"),
+        QStringLiteral("co_await"),     QStringLiteral("co_return"),
+        QStringLiteral("co_yield"),     QStringLiteral("decltype"),
+        QStringLiteral("default"),      QStringLiteral("delete"),
+        QStringLiteral("do"),           QStringLiteral("double"),
+        QStringLiteral("dynamic_cast"), QStringLiteral("else"),
+        QStringLiteral("enum"),         QStringLiteral("explicit"),
+        QStringLiteral("export"),       QStringLiteral("extern"),
+        QStringLiteral("false"),        QStringLiteral("float"),
+        QStringLiteral("for"),          QStringLiteral("friend"),
+        QStringLiteral("goto"),         QStringLiteral("if"),
+        QStringLiteral("import"),       QStringLiteral("inline"),
+        QStringLiteral("int"),          QStringLiteral("long"),
+        QStringLiteral("module"),       QStringLiteral("mutable"),
+        QStringLiteral("namespace"),    QStringLiteral("new"),
+        QStringLiteral("noexcept"),     QStringLiteral("not"),
+        QStringLiteral("not_eq"),       QStringLiteral("nullptr"),
+        QStringLiteral("operator"),     QStringLiteral("or"),
+        QStringLiteral("or_eq"),        QStringLiteral("private"),
+        QStringLiteral("protected"),    QStringLiteral("public"),
+        QStringLiteral("register"),     QStringLiteral("reinterpret_cast"),
+        QStringLiteral("requires"),     QStringLiteral("return"),
+        QStringLiteral("short"),        QStringLiteral("signed"),
+        QStringLiteral("sizeof"),       QStringLiteral("static"),
+        QStringLiteral("static_assert"), QStringLiteral("static_cast"),
+        QStringLiteral("struct"),       QStringLiteral("switch"),
+        QStringLiteral("template"),     QStringLiteral("this"),
+        QStringLiteral("thread_local"), QStringLiteral("throw"),
+        QStringLiteral("true"),         QStringLiteral("try"),
+        QStringLiteral("typedef"),      QStringLiteral("typeid"),
+        QStringLiteral("typename"),     QStringLiteral("union"),
+        QStringLiteral("unsigned"),     QStringLiteral("using"),
+        QStringLiteral("virtual"),          QStringLiteral("void"),
+        QStringLiteral("volatile"),     QStringLiteral("wchar_t"),
+        QStringLiteral("while"),        QStringLiteral("xor"),
+        QStringLiteral("xor_eq"),
+    };
+    if (cppKeywords.contains(result)) {
+        result.prepend(QStringLiteral("Project_"));
     }
     return result;
 }
@@ -112,11 +170,11 @@ bool neighborLess(const Neighbor &left, const Neighbor &right)
 QJsonObject upstreamInterface(const Neighbor &neighbor)
 {
     return {
-        {QStringLiteral("edgeId"), neighbor.edge->id},
         {QStringLiteral("label"), neighbor.edge->label},
         {QStringLiteral("id"), neighbor.node->id},
         {QStringLiteral("type"), nodeTypeName(neighbor.node->type)},
         {QStringLiteral("name"), neighbor.node->name},
+        {QStringLiteral("description"), neighbor.node->description},
         {QStringLiteral("outputs"), portsToJson(neighbor.node->outputs)},
     };
 }
@@ -124,11 +182,11 @@ QJsonObject upstreamInterface(const Neighbor &neighbor)
 QJsonObject downstreamInterface(const Neighbor &neighbor)
 {
     return {
-        {QStringLiteral("edgeId"), neighbor.edge->id},
         {QStringLiteral("label"), neighbor.edge->label},
         {QStringLiteral("id"), neighbor.node->id},
         {QStringLiteral("type"), nodeTypeName(neighbor.node->type)},
         {QStringLiteral("name"), neighbor.node->name},
+        {QStringLiteral("description"), neighbor.node->description},
         {QStringLiteral("inputs"), portsToJson(neighbor.node->inputs)},
     };
 }
