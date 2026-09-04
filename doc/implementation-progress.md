@@ -1,6 +1,6 @@
 # 实现进度
 
-更新时间：2026-09-03（Asia/Shanghai）
+更新时间：2026-09-04（Asia/Shanghai）
 
 ## 当前状态
 
@@ -9,8 +9,9 @@
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
 - Task 3「蓝图静态验证」已完成并通过规格与代码质量审查。
-- 已按约定停在 Task 4 开始前，等待切换智能体模式后继续。
-- Task 4 至 Task 10 尚未开始。
+- Task 4「实现节点画布」已完成并通过规格与代码质量审查。
+- 已按约定停在 Task 5 开始前，等待切换智能体模式后继续。
+- Task 5 至 Task 10 尚未开始。
 
 ## 已完成提交
 
@@ -35,6 +36,18 @@
 - `664e51b fix: close external code path escapes`
   - 校验项目根、`external` 根和节点目录的最终物理路径。
   - 扫描全部受支持源码，拒绝任一越界符号链接。
+- `e4e6417 docs: allow hybrid-language implementation`
+  - 补充多语言开发设计，明确 C++ 核心与外部语言扩展的边界。
+- `5e87e23 feat: add interactive blueprint canvas`
+  - 实现节点、端口、连线、缩放、框选、属性编辑和撤销栈的画布基础能力。
+- `f0e2691 fix: complete blueprint canvas interactions`
+  - 补齐六类节点、显式源到目标连线、箭头标签与完整属性字段。
+- `0fcbff7 fix: support labeled canvas connections`
+  - 支持从界面创建带标签的 Decision `true` / `false` 分支。
+- `5838e15 fix: harden blueprint canvas state`
+  - 修复边坐标刷新、多选拖动、图元边界、撤销后属性同步及不可表示状态处理。
+- `5e00d38 fix: preserve canvas interaction invariants`
+  - 加固所有画布变更入口、修复 Ctrl/Shift 拖动撤销语义，并隔离布局变化与属性草稿刷新。
 
 ## 验证记录
 
@@ -43,16 +56,25 @@
 - 生成器：Ninja
 - CMake 配置：通过。
 - 完整构建：通过。
-- CTest：`3/3 passed`（smoke、blueprint_document、blueprint_validator）。
+- CTest：`4/4 passed`（smoke、blueprint_document、blueprint_validator、blueprint_scene）。
+- `blueprint_scene`：连续重复运行 20 次通过。
 - 父进程 `PATH` 不包含 Qt 运行库目录时，CTest 仍可通过。
 - `git diff --check`：通过。
 - Task 3 最终质量复核：Approved（无 Critical、无 Important）。
+- Task 4 规格复核：通过。
+- Task 4 最终质量复核：Approved（无 Critical、无 Important）；剩余 3 项均为 Minor。
+
+## Task 4 后续 Minor
+
+- 让“开始/完成/取消连线”的状态提示与实际连线状态保持同步。
+- 统一画布与 `BlueprintValidator` 对首尾空白 ID 的规范化策略。
+- 加强多选属性禁用、真实框选，以及交错入边/出边删除顺序的 UI 回归测试。
 
 ## 恢复工作
 
 1. 切换到 `feature/blueprint-editor-mvp`。
-2. 在开始实施文档 Task 4 前切换智能体模式。
-3. 从 Task 4「实现节点画布」开始，继续遵循测试先行流程。
+2. 在开始实施文档 Task 5 前切换智能体模式。
+3. 从 Task 5「实现 IR 与提示词编译」开始，继续遵循测试先行流程。
 4. 每个 Task 完成后运行相关测试与全量 CTest，并创建独立提交。
 
 ## 约束提醒
