@@ -207,3 +207,39 @@ set_tests_properties(prompt_compiler PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
 )
+
+set(generation_service_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_generation_service.moc")
+
+add_custom_command(
+    OUTPUT "${generation_service_moc}"
+    COMMAND Qt6::moc -o tst_generation_service.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_generation_service.cpp"
+    DEPENDS tst_generation_service.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM
+)
+
+qt_add_executable(tst_generation_service
+    tst_generation_service.cpp
+    "${generation_service_moc}"
+)
+
+set_target_properties(tst_generation_service PROPERTIES
+    AUTOMOC OFF
+)
+
+target_include_directories(tst_generation_service PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
+target_link_libraries(tst_generation_service PRIVATE
+    BlueprintEditorCore
+    Qt6::Network
+    Qt6::Test
+)
+
+add_test(NAME generation_service COMMAND tst_generation_service)
+
+set_tests_properties(generation_service PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+)
