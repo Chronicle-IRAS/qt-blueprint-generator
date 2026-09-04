@@ -137,3 +137,73 @@ set_tests_properties(blueprint_scene PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
 )
+
+set(ir_compiler_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_ir_compiler.moc")
+
+add_custom_command(
+    OUTPUT "${ir_compiler_moc}"
+    COMMAND Qt6::moc -o tst_ir_compiler.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_ir_compiler.cpp"
+    DEPENDS tst_ir_compiler.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM
+)
+
+qt_add_executable(tst_ir_compiler
+    tst_ir_compiler.cpp
+    "${ir_compiler_moc}"
+)
+
+set_target_properties(tst_ir_compiler PROPERTIES
+    AUTOMOC OFF
+)
+
+target_include_directories(tst_ir_compiler PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
+target_link_libraries(tst_ir_compiler PRIVATE
+    BlueprintEditorCore
+    Qt6::Test
+)
+
+add_test(NAME ir_compiler COMMAND tst_ir_compiler)
+
+set_tests_properties(ir_compiler PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+)
+
+set(prompt_compiler_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_prompt_compiler.moc")
+
+add_custom_command(
+    OUTPUT "${prompt_compiler_moc}"
+    COMMAND Qt6::moc -o tst_prompt_compiler.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_prompt_compiler.cpp"
+    DEPENDS tst_prompt_compiler.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM
+)
+
+qt_add_executable(tst_prompt_compiler
+    tst_prompt_compiler.cpp
+    "${prompt_compiler_moc}"
+)
+
+set_target_properties(tst_prompt_compiler PROPERTIES
+    AUTOMOC OFF
+)
+
+target_include_directories(tst_prompt_compiler PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
+target_link_libraries(tst_prompt_compiler PRIVATE
+    BlueprintEditorCore
+    Qt6::Test
+)
+
+add_test(NAME prompt_compiler COMMAND tst_prompt_compiler)
+
+set_tests_properties(prompt_compiler PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+)

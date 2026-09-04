@@ -25,6 +25,10 @@ qt_add_library(BlueprintEditorCore STATIC
     src/editor/edge_item.h
     src/editor/node_item.cpp
     src/editor/node_item.h
+    src/generation/ir_compiler.cpp
+    src/generation/ir_compiler.h
+    src/generation/prompt_compiler.cpp
+    src/generation/prompt_compiler.h
 )
 
 target_include_directories(BlueprintEditorCore PUBLIC
