@@ -24,6 +24,7 @@ public:
 
 private:
     void deleteSelection();
+    void cancelConnection();
     void applyProperties();
     void updatePropertyEditor();
     QString selectedNodeId() const;

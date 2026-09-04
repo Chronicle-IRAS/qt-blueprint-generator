@@ -141,19 +141,26 @@ QVariant NodeItem::itemChange(GraphicsItemChange change, const QVariant &value)
 void NodeItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     m_dragStart = pos();
-    if (event->button() == Qt::LeftButton && !event->modifiers().testFlag(Qt::ControlModifier)
-        && !event->modifiers().testFlag(Qt::ShiftModifier) && scene() && isSelected()) {
+    m_dragSelectionCollapsed = false;
+    if (event->button() == Qt::LeftButton && m_clickedHandler) {
+        m_clickedHandler(m_nodeId);
+    }
+    QGraphicsItem::mousePressEvent(event);
+}
+
+void NodeItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
+{
+    if (event->buttons().testFlag(Qt::LeftButton) && !m_dragSelectionCollapsed && scene()
+        && isSelected()) {
         const QList<QGraphicsItem *> selected = scene()->selectedItems();
         for (QGraphicsItem *item : selected) {
             if (item != this) {
                 item->setSelected(false);
             }
         }
+        m_dragSelectionCollapsed = true;
     }
-    if (event->button() == Qt::LeftButton && m_clickedHandler) {
-        m_clickedHandler(m_nodeId);
-    }
-    QGraphicsItem::mousePressEvent(event);
+    QGraphicsItem::mouseMoveEvent(event);
 }
 
 void NodeItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)

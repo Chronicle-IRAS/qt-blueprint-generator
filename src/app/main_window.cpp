@@ -11,6 +11,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QKeySequence>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
@@ -184,6 +185,11 @@ MainWindow::MainWindow(QWidget *parent)
     QAction *deleteAction = toolbar->addAction(tr("Delete"));
     QAction *connectAction = toolbar->addAction(tr("Connect: choose source then target"));
     connectAction->setObjectName(QStringLiteral("beginConnectionAction"));
+    auto *cancelAction = new QAction(tr("Cancel connection"), this);
+    cancelAction->setObjectName(QStringLiteral("cancelConnectionAction"));
+    cancelAction->setShortcut(QKeySequence(Qt::Key_Escape));
+    cancelAction->setShortcutContext(Qt::WindowShortcut);
+    toolbar->addAction(cancelAction);
     toolbar->addSeparator();
     toolbar->addAction(m_scene->undoStack()->createUndoAction(this, tr("Undo")));
     toolbar->addAction(m_scene->undoStack()->createRedoAction(this, tr("Redo")));
@@ -232,9 +238,10 @@ MainWindow::MainWindow(QWidget *parent)
         m_scene->beginConnection(m_connectionLabelEdit->text());
         statusBar()->showMessage(tr("Choose source node, then target node"));
     });
+    connect(cancelAction, &QAction::triggered, this, [this] { cancelConnection(); });
     connect(m_applyPropertiesButton, &QPushButton::clicked, this, [this] { applyProperties(); });
     connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] { updatePropertyEditor(); });
-    m_scene->setChangeHandler([this] { updatePropertyEditor(); });
+    m_scene->setSemanticChangeHandler([this] { updatePropertyEditor(); });
     updatePropertyEditor();
 }
 
@@ -242,7 +249,7 @@ MainWindow::~MainWindow()
 {
     if (m_scene) {
         QObject::disconnect(m_scene, nullptr, this, nullptr);
-        m_scene->setChangeHandler({});
+        m_scene->setSemanticChangeHandler({});
     }
 }
 
@@ -318,7 +325,14 @@ void MainWindow::applyProperties()
             return;
         }
         m_scene->editNode(id, updated);
+        statusBar()->clearMessage();
     }
+}
+
+void MainWindow::cancelConnection()
+{
+    m_scene->cancelConnection();
+    statusBar()->clearMessage();
 }
 
 void MainWindow::updatePropertyEditor()

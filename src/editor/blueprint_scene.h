@@ -33,7 +33,7 @@ public:
     EdgeItem *edgeItem(const QString &edgeId) const;
     QPointF nodePosition(const QString &nodeId) const;
     QUndoStack *undoStack();
-    void setChangeHandler(std::function<void()> handler);
+    void setSemanticChangeHandler(std::function<void()> handler);
 
 private:
     struct IndexedEdge {
@@ -58,11 +58,11 @@ private:
     void handleItemPositionChanged(const QString &nodeId);
     void handleItemMoveFinished(const QString &nodeId, const QPointF &before, const QPointF &after);
     void handleNodeClicked(const QString &nodeId);
-    void notifyChanged();
+    void notifySemanticChanged();
 
     BlueprintDocument *m_document = nullptr;
     bool m_representable = true;
-    std::function<void()> m_changeHandler;
+    std::function<void()> m_semanticChangeHandler;
     QUndoStack m_undoStack;
     QHash<QString, NodeItem *> m_nodes;
     QHash<QString, EdgeItem *> m_edges;

@@ -88,6 +88,9 @@ bool BlueprintScene::addNode(const BlueprintNode &node, const QPointF &position)
 
 bool BlueprintScene::deleteNode(const QString &nodeId)
 {
+    if (!m_representable) {
+        return false;
+    }
     const qsizetype index = nodeIndex(nodeId);
     if (index < 0) {
         return false;
@@ -112,7 +115,7 @@ bool BlueprintScene::deleteNode(const QString &nodeId)
 
 bool BlueprintScene::moveNode(const QString &nodeId, const QPointF &position)
 {
-    if (!hasNode(nodeId)) {
+    if (!m_representable || !hasNode(nodeId)) {
         return false;
     }
     const QPointF before = nodePosition(nodeId);
@@ -146,6 +149,10 @@ bool BlueprintScene::connectNodes(const QString &sourceId, const QString &target
 
 bool BlueprintScene::beginConnection(const QString &label)
 {
+    if (!m_representable) {
+        cancelConnection();
+        return false;
+    }
     m_connectionMode = true;
     m_connectionSource.clear();
     m_connectionLabel = label;
@@ -161,7 +168,7 @@ void BlueprintScene::cancelConnection()
 
 bool BlueprintScene::chooseConnectionNode(const QString &nodeId)
 {
-    if (!m_connectionMode || !hasNode(nodeId)) {
+    if (!m_representable || !m_connectionMode || !hasNode(nodeId)) {
         return false;
     }
     if (m_connectionSource.isEmpty()) {
@@ -186,6 +193,9 @@ QString BlueprintScene::connectionSource() const
 
 bool BlueprintScene::editNodeText(const QString &nodeId, const QString &name, const QString &description)
 {
+    if (!m_representable) {
+        return false;
+    }
     const qsizetype index = nodeIndex(nodeId);
     if (index < 0) {
         return false;
@@ -198,6 +208,9 @@ bool BlueprintScene::editNodeText(const QString &nodeId, const QString &name, co
 
 bool BlueprintScene::editNode(const QString &nodeId, const BlueprintNode &updated)
 {
+    if (!m_representable) {
+        return false;
+    }
     const qsizetype index = nodeIndex(nodeId);
     if (index < 0 || updated.id != nodeId) {
         return false;
@@ -237,9 +250,9 @@ QUndoStack *BlueprintScene::undoStack()
     return &m_undoStack;
 }
 
-void BlueprintScene::setChangeHandler(std::function<void()> handler)
+void BlueprintScene::setSemanticChangeHandler(std::function<void()> handler)
 {
-    m_changeHandler = std::move(handler);
+    m_semanticChangeHandler = std::move(handler);
 }
 
 bool BlueprintScene::hasNode(const QString &nodeId) const
@@ -308,7 +321,7 @@ void BlueprintScene::addNodeDirect(const BlueprintNode &node, qsizetype index, c
     }
     m_document->nodes.insert(index, node);
     createNodeItem(node, position);
-    notifyChanged();
+    notifySemanticChanged();
 }
 
 void BlueprintScene::removeNodeDirect(const QString &nodeId, QVector<IndexedEdge> *removedEdges)
@@ -342,7 +355,7 @@ void BlueprintScene::removeNodeDirect(const QString &nodeId, QVector<IndexedEdge
     }
     m_layout.remove(nodeId);
     m_document->nodes.removeAt(index);
-    notifyChanged();
+    notifySemanticChanged();
 }
 
 void BlueprintScene::restoreEdgesDirect(const QVector<IndexedEdge> &edges)
@@ -360,7 +373,6 @@ void BlueprintScene::addEdgeDirect(const BlueprintEdge &edge, qsizetype index)
     }
     m_document->edges.insert(index, edge);
     createEdgeItem(edge);
-    notifyChanged();
 }
 
 void BlueprintScene::removeEdgeDirect(const QString &edgeId)
@@ -375,7 +387,6 @@ void BlueprintScene::removeEdgeDirect(const QString &edgeId)
         delete item;
     }
     m_document->edges.removeAt(index);
-    notifyChanged();
 }
 
 void BlueprintScene::setNodePositionDirect(const QString &nodeId, const QPointF &position)
@@ -387,7 +398,6 @@ void BlueprintScene::setNodePositionDirect(const QString &nodeId, const QPointF 
     m_layout.insert(nodeId, position);
     item->setPos(position);
     updateEdgesForNode(nodeId);
-    notifyChanged();
 }
 
 void BlueprintScene::setNodeDirect(const QString &nodeId, const BlueprintNode &node)
@@ -401,7 +411,7 @@ void BlueprintScene::setNodeDirect(const QString &nodeId, const BlueprintNode &n
         item->setNode(node);
     }
     updateEdgesForNode(nodeId);
-    notifyChanged();
+    notifySemanticChanged();
 }
 
 void BlueprintScene::updateEdgesForNode(const QString &nodeId)
@@ -439,9 +449,9 @@ void BlueprintScene::handleNodeClicked(const QString &nodeId)
     }
 }
 
-void BlueprintScene::notifyChanged()
+void BlueprintScene::notifySemanticChanged()
 {
-    if (m_changeHandler) {
-        m_changeHandler();
+    if (m_semanticChangeHandler) {
+        m_semanticChangeHandler();
     }
 }
