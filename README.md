@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-当前开发分支为 `feature/blueprint-editor-mvp`，已完成 MVP Task 1 至 Task 5：
+项目当前已完成 MVP Task 1 至 Task 5：
 
 - Qt 6 Widgets / C++17 / CMake 工程骨架和 Qt Test 测试环境。
 - 蓝图领域模型及 `blueprint.json` 序列化往返。
