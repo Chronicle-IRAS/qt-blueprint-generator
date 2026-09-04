@@ -1,6 +1,7 @@
 #include <QtTest/QtTest>
 
 #include <QGraphicsView>
+#include <QAction>
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -41,6 +42,7 @@ private slots:
     void mainWindowPropertyEditorPreservesAllFields();
     void mainWindowCreatesEveryNodeType();
     void mainWindowUsesExplicitConnectionDirection();
+    void mainWindowCreatesLabeledConnectionsFromToolbar();
     void mainWindowUsesRubberBandDragAndClampedZoom();
 };
 
@@ -286,6 +288,44 @@ void BlueprintSceneTest::mainWindowUsesExplicitConnectionDirection()
     QCOMPARE(window.document().edges.size(), 1);
     QCOMPARE(window.document().edges.constFirst().source, source);
     QCOMPARE(window.document().edges.constFirst().target, target);
+}
+
+void BlueprintSceneTest::mainWindowCreatesLabeledConnectionsFromToolbar()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    QVERIFY(window.addNodeOfType(NodeType::End));
+    const QString source = window.document().nodes.at(0).id;
+    const QString target = window.document().nodes.at(1).id;
+    auto *labelEdit = window.findChild<QLineEdit *>(QStringLiteral("connectionLabelEdit"));
+    auto *connectionAction = window.findChild<QAction *>(QStringLiteral("beginConnectionAction"));
+    QVERIFY(labelEdit != nullptr);
+    QVERIFY(connectionAction != nullptr);
+
+    QGraphicsView *view = window.graphicsView();
+    const auto clickNode = [&](const QString &id) {
+        const QPoint point = view->mapFromScene(window.scene()->nodeItem(id)->sceneBoundingRect().center());
+        QTest::mouseClick(view->viewport(), Qt::LeftButton, Qt::NoModifier, point);
+    };
+    labelEdit->setText(QStringLiteral("true"));
+    connectionAction->trigger();
+    clickNode(source);
+    clickNode(target);
+    QCOMPARE(window.document().edges.size(), 1);
+    QCOMPARE(window.document().edges.constFirst().source, source);
+    QCOMPARE(window.document().edges.constFirst().target, target);
+    QCOMPARE(window.document().edges.constFirst().label, QStringLiteral("true"));
+    QCOMPARE(window.scene()->edgeItem(window.document().edges.constFirst().id)->label(), QStringLiteral("true"));
+    QVERIFY(window.scene()->connectionSource().isEmpty());
+
+    labelEdit->setText(QStringLiteral("false"));
+    connectionAction->trigger();
+    clickNode(target);
+    clickNode(source);
+    QCOMPARE(window.document().edges.size(), 2);
+    QCOMPARE(window.document().edges.constLast().source, target);
+    QCOMPARE(window.document().edges.constLast().target, source);
+    QCOMPARE(window.document().edges.constLast().label, QStringLiteral("false"));
 }
 
 void BlueprintSceneTest::mainWindowUsesRubberBandDragAndClampedZoom()

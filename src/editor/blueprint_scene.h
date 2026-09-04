@@ -23,7 +23,7 @@ public:
     bool editNodeText(const QString &nodeId, const QString &name, const QString &description);
     bool editNode(const QString &nodeId, const BlueprintNode &node);
 
-    bool beginConnection();
+    bool beginConnection(const QString &label = {});
     bool chooseConnectionNode(const QString &nodeId);
     QString connectionSource() const;
 
@@ -62,5 +62,6 @@ private:
     QHash<QString, EdgeItem *> m_edges;
     QHash<QString, QPointF> m_layout;
     QString m_connectionSource;
+    QString m_connectionLabel;
     bool m_connectionMode = false;
 };

@@ -175,8 +175,15 @@ MainWindow::MainWindow(QWidget *parent)
     }
     addButton->setMenu(addMenu);
     toolbar->addWidget(addButton);
+    m_connectionLabelEdit = new QLineEdit(toolbar);
+    m_connectionLabelEdit->setObjectName(QStringLiteral("connectionLabelEdit"));
+    m_connectionLabelEdit->setPlaceholderText(tr("Edge label (optional)"));
+    m_connectionLabelEdit->setToolTip(tr("Label for the next source-to-target connection"));
+    m_connectionLabelEdit->setMaximumWidth(220);
+    toolbar->addWidget(m_connectionLabelEdit);
     QAction *deleteAction = toolbar->addAction(tr("Delete"));
     QAction *connectAction = toolbar->addAction(tr("Connect: choose source then target"));
+    connectAction->setObjectName(QStringLiteral("beginConnectionAction"));
     toolbar->addSeparator();
     toolbar->addAction(m_scene->undoStack()->createUndoAction(this, tr("Undo")));
     toolbar->addAction(m_scene->undoStack()->createRedoAction(this, tr("Redo")));
@@ -222,7 +229,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(deleteAction, &QAction::triggered, this, [this] { deleteSelection(); });
     connect(connectAction, &QAction::triggered, this, [this] {
-        m_scene->beginConnection();
+        m_scene->beginConnection(m_connectionLabelEdit->text());
         statusBar()->showMessage(tr("Choose source node, then target node"));
     });
     connect(applyButton, &QPushButton::clicked, this, [this] { applyProperties(); });

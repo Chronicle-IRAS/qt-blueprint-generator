@@ -29,6 +29,7 @@ private:
     BlueprintDocument m_document;
     BlueprintScene *m_scene = nullptr;
     QGraphicsView *m_view = nullptr;
+    QLineEdit *m_connectionLabelEdit = nullptr;
     QLineEdit *m_nameEdit = nullptr;
     QPlainTextEdit *m_descriptionEdit = nullptr;
     QPlainTextEdit *m_inputsEdit = nullptr;

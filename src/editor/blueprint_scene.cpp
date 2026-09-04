@@ -116,10 +116,11 @@ bool BlueprintScene::connectNodes(const QString &sourceId, const QString &target
     return true;
 }
 
-bool BlueprintScene::beginConnection()
+bool BlueprintScene::beginConnection(const QString &label)
 {
     m_connectionMode = true;
     m_connectionSource.clear();
+    m_connectionLabel = label;
     return true;
 }
 
@@ -136,9 +137,11 @@ bool BlueprintScene::chooseConnectionNode(const QString &nodeId)
         return false;
     }
     const QString source = m_connectionSource;
+    const QString label = m_connectionLabel;
     m_connectionSource.clear();
+    m_connectionLabel.clear();
     m_connectionMode = false;
-    return connectNodes(source, nodeId);
+    return connectNodes(source, nodeId, label);
 }
 
 QString BlueprintScene::connectionSource() const
