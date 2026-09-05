@@ -309,8 +309,12 @@ GenerationService::GenerationService(IAiClient *client, QObject *parent)
     connect(client, &QObject::destroyed, this, [this]() {
         const QList<QUuid> requestIds = m_pending.keys();
         m_pending.clear();
+        const QPointer<GenerationService> serviceGuard(this);
         for (const QUuid &requestId : requestIds) {
             emit generationFailed(requestId, QStringLiteral("AI client became unavailable"));
+            if (serviceGuard.isNull()) {
+                return;
+            }
         }
     });
 }

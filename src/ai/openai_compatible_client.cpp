@@ -237,7 +237,11 @@ void OpenAiCompatibleClient::failPending(QNetworkReply *reply,
         return;
     }
     if (abortReply) {
+        const QPointer<OpenAiCompatibleClient> clientGuard(this);
         reply->abort();
+        if (clientGuard.isNull()) {
+            return;
+        }
     }
     emit requestFailed(pending.requestId, errorMessage);
 }

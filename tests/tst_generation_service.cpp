@@ -3,6 +3,7 @@
 #include "generation/generation_service.h"
 
 #include <QDir>
+#include <QCoreApplication>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -12,6 +13,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTimer>
@@ -19,6 +21,7 @@
 
 #include <chrono>
 #include <cstring>
+#include <functional>
 #include <utility>
 
 namespace {
@@ -141,6 +144,43 @@ struct StubNetworkResponse
     bool finishes = true;
 };
 
+struct IsolatedProcessResult
+{
+    bool started = false;
+    bool finished = false;
+    QProcess::ExitStatus exitStatus = QProcess::CrashExit;
+    int exitCode = -1;
+    QByteArray diagnostics;
+};
+
+IsolatedProcessResult runIsolatedTest(const QString &testFunction,
+                                      const QString &scenarioVariable)
+{
+    QProcess process;
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    environment.insert(scenarioVariable, QStringLiteral("1"));
+    process.setProcessEnvironment(environment);
+    process.setProgram(QCoreApplication::applicationFilePath());
+    process.setArguments({testFunction});
+    process.start();
+
+    IsolatedProcessResult result;
+    result.started = process.waitForStarted(2000);
+    if (!result.started) {
+        result.diagnostics = process.errorString().toUtf8();
+        return result;
+    }
+    result.finished = process.waitForFinished(5000);
+    if (!result.finished) {
+        process.kill();
+        process.waitForFinished(1000);
+    }
+    result.exitStatus = process.exitStatus();
+    result.exitCode = process.exitCode();
+    result.diagnostics = process.readAllStandardOutput() + process.readAllStandardError();
+    return result;
+}
+
 class StubNetworkReply final : public QNetworkReply
 {
 public:
@@ -228,6 +268,7 @@ public:
 
     QVector<QNetworkRequest> requests;
     QVector<QByteArray> requestBodies;
+    std::function<void()> replyFinishedHandler;
 
 protected:
     QNetworkReply *createRequest(Operation operation,
@@ -241,7 +282,20 @@ protected:
                                                                        QNetworkReply::NoError,
                                                                        false}
                                                  : m_responses.takeFirst();
-        return new StubNetworkReply(operation, request, response, this);
+        auto *reply = new StubNetworkReply(operation, request, response, this);
+        if (replyFinishedHandler) {
+            QObject::connect(reply,
+                             &QNetworkReply::finished,
+                             this,
+                             [this]() {
+                                 const std::function<void()> handler = replyFinishedHandler;
+                                 if (handler) {
+                                     handler();
+                                 }
+                             },
+                             Qt::DirectConnection);
+        }
+        return reply;
     }
 
 private:
@@ -280,6 +334,8 @@ private slots:
     void openAiClientEnforcesWireLimitOffline();
     void openAiClientRejectsInsecureEndpointOffline();
     void openAiClientRejectsRedirectAndInvalidEnvelopeOffline();
+    void generationServiceDeletionDuringClientDestroyedFanoutIsSafe();
+    void openAiClientDeletionDuringAbortIsSafe();
 };
 
 void GenerationServiceTest::initTestCase()
@@ -327,7 +383,7 @@ void GenerationServiceTest::rejectsMalformedResponses_data()
     QTest::newRow("wrong-file-path-type")
         << QByteArray(R"({"nodeId":"node-1","summary":"x","files":[{"path":1,"content":"x"}]})");
     QTest::newRow("unknown-root-field")
-        << QByteArray(R"({"nodeId":"node-1","summary":"x","files":[],"extra":true})");
+        << QByteArray(R"({"nodeId":"node-1","summary":"x","files":[{"path":"x.cpp","content":"x"}],"extra":true})");
     QTest::newRow("unknown-file-field")
         << QByteArray(R"({"nodeId":"node-1","summary":"x","files":[{"path":"x.cpp","content":"x","extra":true}]})");
 }
@@ -801,6 +857,140 @@ void GenerationServiceTest::openAiClientRejectsRedirectAndInvalidEnvelopeOffline
     QVERIFY(failureSpy.at(0).at(1).toString().contains(QStringLiteral("302")));
     QVERIFY(failureSpy.at(1).at(1).toString().contains(QStringLiteral("content"),
                                                        Qt::CaseInsensitive));
+}
+
+void GenerationServiceTest::generationServiceDeletionDuringClientDestroyedFanoutIsSafe()
+{
+    const QString scenarioVariable =
+        QStringLiteral("BLUEPRINT_TEST_SERVICE_DELETE_DURING_CLIENT_DESTROYED");
+    if (qEnvironmentVariableIsSet(qPrintable(scenarioVariable))) {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        auto *client = new ControllableAiClient;
+        auto *service = new GenerationService(client);
+        service->generate(QStringLiteral("first"), QStringLiteral("node-1"), root.path());
+        service->generate(QStringLiteral("second"), QStringLiteral("node-2"), root.path());
+        int failureCount = 0;
+        int replacementFailureCount = 0;
+        bool reusedDeletedAddress = false;
+        GenerationService *replacement = nullptr;
+        QVector<GenerationService *> otherReplacements;
+        QObject::connect(service,
+                         &GenerationService::generationFailed,
+                         [&service,
+                          &failureCount,
+                          &replacementFailureCount,
+                          &reusedDeletedAddress,
+                          &replacement,
+                          &otherReplacements](const QUuid &, const QString &) {
+                             ++failureCount;
+                             GenerationService *deletedService = service;
+                             delete service;
+                             service = nullptr;
+                             for (int attempt = 0; attempt < 4096; ++attempt) {
+                                 GenerationService *candidate = new GenerationService(nullptr);
+                                 if (candidate == deletedService) {
+                                     replacement = candidate;
+                                     reusedDeletedAddress = true;
+                                     break;
+                                 }
+                                 otherReplacements.append(candidate);
+                             }
+                             if (replacement == nullptr) {
+                                 return;
+                             }
+                             QObject::connect(replacement,
+                                              &GenerationService::generationFailed,
+                                              [&replacementFailureCount](const QUuid &,
+                                                                         const QString &) {
+                                                  ++replacementFailureCount;
+                                              });
+                         });
+
+        delete client;
+
+        QCOMPARE(failureCount, 1);
+        QVERIFY(service == nullptr);
+        QVERIFY(reusedDeletedAddress);
+        QCOMPARE(replacementFailureCount, 0);
+        delete replacement;
+        for (GenerationService *otherReplacement : otherReplacements) {
+            delete otherReplacement;
+        }
+        return;
+    }
+
+    const IsolatedProcessResult result =
+        runIsolatedTest(QStringLiteral("generationServiceDeletionDuringClientDestroyedFanoutIsSafe"),
+                        scenarioVariable);
+    QVERIFY2(result.started, result.diagnostics.constData());
+    QVERIFY2(result.finished, result.diagnostics.constData());
+    QVERIFY2(result.exitStatus == QProcess::NormalExit, result.diagnostics.constData());
+    QVERIFY2(result.exitCode == 0, result.diagnostics.constData());
+}
+
+void GenerationServiceTest::openAiClientDeletionDuringAbortIsSafe()
+{
+    const QString scenarioVariable =
+        QStringLiteral("BLUEPRINT_TEST_CLIENT_DELETE_DURING_ABORT");
+    if (qEnvironmentVariableIsSet(qPrintable(scenarioVariable))) {
+        EnvironmentVariableGuard apiKey("BLUEPRINT_AI_API_KEY", "test-secret");
+        StubNetworkAccessManager manager;
+        manager.enqueueResponse({{}, 200, QNetworkReply::NoError, false});
+        OpenAiCompatibleClient *client = nullptr;
+        OpenAiCompatibleClient *replacement = nullptr;
+        QVector<OpenAiCompatibleClient *> otherReplacements;
+        int replacementFailureCount = 0;
+        bool reusedDeletedAddress = false;
+        manager.replyFinishedHandler = [&]() {
+            OpenAiCompatibleClient *deletedClient = client;
+            delete client;
+            client = nullptr;
+            for (int attempt = 0; attempt < 4096; ++attempt) {
+                auto *candidate = new OpenAiCompatibleClient(
+                    QUrl(QStringLiteral("https://example.invalid/v1/chat")),
+                    QStringLiteral("test-model"),
+                    &manager);
+                if (candidate == deletedClient) {
+                    replacement = candidate;
+                    reusedDeletedAddress = true;
+                    break;
+                }
+                otherReplacements.append(candidate);
+            }
+            if (replacement != nullptr) {
+                QObject::connect(replacement,
+                                 &IAiClient::requestFailed,
+                                 [&replacementFailureCount](const QUuid &, const QString &) {
+                                     ++replacementFailureCount;
+                                 });
+            }
+        };
+        client = new OpenAiCompatibleClient(
+            QUrl(QStringLiteral("https://example.invalid/v1/chat")),
+            QStringLiteral("test-model"),
+            &manager,
+            std::chrono::milliseconds(30));
+        client->generate({QUuid::createUuid(), QStringLiteral("prompt"), 1024});
+
+        QTRY_VERIFY_WITH_TIMEOUT(client == nullptr, 500);
+        QVERIFY(reusedDeletedAddress);
+        QCOMPARE(replacementFailureCount, 0);
+        manager.replyFinishedHandler = {};
+        delete replacement;
+        for (OpenAiCompatibleClient *otherReplacement : otherReplacements) {
+            delete otherReplacement;
+        }
+        return;
+    }
+
+    const IsolatedProcessResult result =
+        runIsolatedTest(QStringLiteral("openAiClientDeletionDuringAbortIsSafe"),
+                        scenarioVariable);
+    QVERIFY2(result.started, result.diagnostics.constData());
+    QVERIFY2(result.finished, result.diagnostics.constData());
+    QVERIFY2(result.exitStatus == QProcess::NormalExit, result.diagnostics.constData());
+    QVERIFY2(result.exitCode == 0, result.diagnostics.constData());
 }
 
 QTEST_GUILESS_MAIN(GenerationServiceTest)
