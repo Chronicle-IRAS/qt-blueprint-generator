@@ -10,13 +10,18 @@ bool ProjectScaffolder::create(const BlueprintDocument &document, const QString 
 {
     using namespace WorkspaceIo;
     if (error) error->clear();
-    const QJsonObject ir = IrCompiler::compile(document);
+    QJsonObject ir = IrCompiler::compile(document);
+    QJsonObject project = ir.value("project").toObject();
+    // IR identifiers are valid C++, but may still name Qt classes or macros.
+    // Store the actual scaffold namespace alongside the contracts consumed by callers.
+    const QString ns = "Blueprint_" + project.value("namespace").toString();
+    project["namespace"] = ns;
+    ir["project"] = project;
     const QByteArray canonical = IrCompiler::toCanonicalJson(ir);
     BlueprintDocument sorted = document;
     std::sort(sorted.nodes.begin(), sorted.nodes.end(), [](const BlueprintNode &a, const BlueprintNode &b) { return a.id < b.id; });
     std::sort(sorted.edges.begin(), sorted.edges.end(), [](const BlueprintEdge &a, const BlueprintEdge &b) { return a.id < b.id; });
     const QByteArray sourceBlueprint = BlueprintSerializer::toJson(sorted);
-    const QString ns = ir.value("project").toObject().value("namespace").toString();
     QMap<QString, QByteArray> files;
     files["src/contracts/blueprint.json"] = canonical + '\n';
     files["src/contracts/source-blueprint.json"] = sourceBlueprint;

@@ -8,6 +8,12 @@ qt_add_executable(tst_project_scaffolder tst_project_scaffolder.cpp "${project_s
 set_target_properties(tst_project_scaffolder PROPERTIES AUTOMOC OFF)
 target_include_directories(tst_project_scaffolder PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(tst_project_scaffolder PRIVATE BlueprintEditorCore Qt6::Test)
+target_compile_definitions(tst_project_scaffolder PRIVATE
+    TASK7_CMAKE_COMMAND="${CMAKE_COMMAND}"
+    TASK7_CMAKE_GENERATOR="${CMAKE_GENERATOR}"
+    TASK7_MAKE_PROGRAM="${CMAKE_MAKE_PROGRAM}"
+    TASK7_CXX_COMPILER="${CMAKE_CXX_COMPILER}"
+    TASK7_QT_CMAKE_DIR="${Qt6_DIR}")
 add_test(NAME project_scaffolder COMMAND tst_project_scaffolder)
 set_tests_properties(project_scaffolder PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")

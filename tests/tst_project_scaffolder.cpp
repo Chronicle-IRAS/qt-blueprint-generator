@@ -12,6 +12,12 @@
 #include <QTemporaryDir>
 #include <QtTest>
 #include <algorithm>
+#ifdef Q_OS_WIN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace {
 BlueprintDocument blueprint()
@@ -214,6 +220,63 @@ private slots:
     {
         QVERIFY(!WorkspaceIo::safeId("batch\n"));
         QVERIFY(!WorkspaceIo::safeRelative("src/modules/logic\n/implementation/a.cpp"));
+    }
+    void generatedNamespaceBuildsWithQtIdentifiers_data()
+    {
+        QTest::addColumn<QString>("projectName");
+        QTest::newRow("Qt class") << QString("QWidget");
+        QTest::newRow("Qt macro") << QString("signals");
+    }
+    void generatedNamespaceBuildsWithQtIdentifiers()
+    {
+        QFETCH(QString, projectName);
+        QTemporaryDir dir; QString error; auto d = blueprint(); d.projectName = projectName;
+        QVERIFY2(ProjectScaffolder::create(d, dir.path(), &error), qPrintable(error));
+        const QString source = dir.path() + "/generated-project";
+        const QString binary = dir.path() + "/build";
+        const auto runCmake = [&](const QStringList &arguments) {
+            QProcess process; process.setProcessChannelMode(QProcess::MergedChannels);
+            process.start(QString::fromUtf8(TASK7_CMAKE_COMMAND), arguments);
+            if (!process.waitForStarted(10000)) { error = process.errorString(); return false; }
+            if (!process.waitForFinished(60000)) {
+                process.kill(); process.waitForFinished(5000);
+                error = "CMake subprocess timed out\n" + QString::fromUtf8(process.readAll());
+                return false;
+            }
+            error = QString::fromUtf8(process.readAll());
+            return process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
+        };
+        QVERIFY2(runCmake({"-S", source, "-B", binary, "-G", QString::fromUtf8(TASK7_CMAKE_GENERATOR),
+                            "-DCMAKE_MAKE_PROGRAM=" + QString::fromUtf8(TASK7_MAKE_PROGRAM),
+                            "-DCMAKE_CXX_COMPILER=" + QString::fromUtf8(TASK7_CXX_COMPILER),
+                            "-DQt6_DIR=" + QString::fromUtf8(TASK7_QT_CMAKE_DIR), "-DBUILD_TESTING=ON"}), qPrintable(error));
+        QVERIFY2(runCmake({"--build", binary, "--config", "Debug", "--parallel", "2"}), qPrintable(error));
+        const auto ir = QJsonDocument::fromJson(read(source + "/src/contracts/blueprint.json")).object();
+        const QString actualNamespace = ir.value("project").toObject().value("namespace").toString();
+        QCOMPARE(actualNamespace, "Blueprint_" + projectName);
+        for (const QString &path : {QString("src/contracts/types.h"), QString("src/modules/page/contract.h"),
+                                     QString("src/modules/logic/contract.h"), QString("src/modules/decision/contract.h")})
+            QVERIFY(read(source + '/' + path).contains(("namespace " + actualNamespace + " {").toUtf8()));
+    }
+    void rollsBackEarlierCommitWhenLaterReplacementFails()
+    {
+#ifdef Q_OS_WIN
+        QTemporaryDir dir; QString error;
+        QVERIFY(write(dir.path() + "/a.txt", "original a"));
+        QVERIFY(write(dir.path() + "/z.txt", "original z"));
+        const QString lockedPath = QDir::toNativeSeparators(dir.path() + "/z.txt");
+        const HANDLE handle = CreateFileW(reinterpret_cast<LPCWSTR>(lockedPath.utf16()), GENERIC_READ,
+                                          FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+                                          FILE_ATTRIBUTE_NORMAL, nullptr);
+        QVERIFY(handle != INVALID_HANDLE_VALUE);
+        const auto unlock = qScopeGuard([&] { CloseHandle(handle); });
+        QVERIFY(!WorkspaceIo::transaction(dir.path(), {{"a.txt", "new a"}, {"z.txt", "new z"}}, &error));
+        QCOMPARE(error, QString("Transaction failed; all committed files restored"));
+        QCOMPARE(read(dir.path() + "/a.txt"), QByteArray("original a"));
+        QCOMPARE(read(dir.path() + "/z.txt"), QByteArray("original z"));
+#else
+        QSKIP("Regression requires Windows replacement sharing semantics");
+#endif
     }
 };
 QTEST_GUILESS_MAIN(ProjectScaffolderTest)
