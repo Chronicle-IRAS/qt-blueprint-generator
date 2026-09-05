@@ -51,6 +51,8 @@ public:
                    const QString &absoluteCandidateDirectory,
                    const GenerationLimits &limits = {});
 
+    // Read-only validation against a trusted, caller-selected candidate directory.
+    // Does not create files. Recheck filesystem boundaries immediately before any later write.
     static std::optional<GenerationResult> parseAndValidate(
         const QByteArray &modelResponse,
         const QString &expectedNodeId,
