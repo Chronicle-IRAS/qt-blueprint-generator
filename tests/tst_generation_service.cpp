@@ -12,8 +12,10 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QPointer>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QScopeGuard>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTimer>
@@ -22,6 +24,7 @@
 #include <chrono>
 #include <cstring>
 #include <functional>
+#include <optional>
 #include <utility>
 
 namespace {
@@ -866,40 +869,23 @@ void GenerationServiceTest::generationServiceDeletionDuringClientDestroyedFanout
     if (qEnvironmentVariableIsSet(qPrintable(scenarioVariable))) {
         QTemporaryDir root;
         QVERIFY(root.isValid());
-        auto *client = new ControllableAiClient;
-        auto *service = new GenerationService(client);
-        service->generate(QStringLiteral("first"), QStringLiteral("node-1"), root.path());
-        service->generate(QStringLiteral("second"), QStringLiteral("node-2"), root.path());
         int failureCount = 0;
         int replacementFailureCount = 0;
-        bool reusedDeletedAddress = false;
-        GenerationService *replacement = nullptr;
-        QVector<GenerationService *> otherReplacements;
-        QObject::connect(service,
+        std::optional<ControllableAiClient> client(std::in_place);
+        std::optional<GenerationService> serviceStorage(std::in_place, &*client);
+        const QPointer<GenerationService> service(&*serviceStorage);
+        GenerationService *const originalAddress = service.data();
+        service->generate(QStringLiteral("first"), QStringLiteral("node-1"), root.path());
+        service->generate(QStringLiteral("second"), QStringLiteral("node-2"), root.path());
+        QObject::connect(service.data(),
                          &GenerationService::generationFailed,
-                         [&service,
+                         [&serviceStorage,
                           &failureCount,
-                          &replacementFailureCount,
-                          &reusedDeletedAddress,
-                          &replacement,
-                          &otherReplacements](const QUuid &, const QString &) {
+                          &replacementFailureCount](const QUuid &, const QString &) {
                              ++failureCount;
-                             GenerationService *deletedService = service;
-                             delete service;
-                             service = nullptr;
-                             for (int attempt = 0; attempt < 4096; ++attempt) {
-                                 GenerationService *candidate = new GenerationService(nullptr);
-                                 if (candidate == deletedService) {
-                                     replacement = candidate;
-                                     reusedDeletedAddress = true;
-                                     break;
-                                 }
-                                 otherReplacements.append(candidate);
-                             }
-                             if (replacement == nullptr) {
-                                 return;
-                             }
-                             QObject::connect(replacement,
+                             serviceStorage.reset();
+                             serviceStorage.emplace(nullptr);
+                             QObject::connect(&*serviceStorage,
                                               &GenerationService::generationFailed,
                                               [&replacementFailureCount](const QUuid &,
                                                                          const QString &) {
@@ -907,16 +893,12 @@ void GenerationServiceTest::generationServiceDeletionDuringClientDestroyedFanout
                                               });
                          });
 
-        delete client;
+        client.reset();
 
         QCOMPARE(failureCount, 1);
-        QVERIFY(service == nullptr);
-        QVERIFY(reusedDeletedAddress);
+        QVERIFY(service.isNull());
+        QCOMPARE(&*serviceStorage, originalAddress);
         QCOMPARE(replacementFailureCount, 0);
-        delete replacement;
-        for (GenerationService *otherReplacement : otherReplacements) {
-            delete otherReplacement;
-        }
         return;
     }
 
@@ -937,50 +919,33 @@ void GenerationServiceTest::openAiClientDeletionDuringAbortIsSafe()
         EnvironmentVariableGuard apiKey("BLUEPRINT_AI_API_KEY", "test-secret");
         StubNetworkAccessManager manager;
         manager.enqueueResponse({{}, 200, QNetworkReply::NoError, false});
-        OpenAiCompatibleClient *client = nullptr;
-        OpenAiCompatibleClient *replacement = nullptr;
-        QVector<OpenAiCompatibleClient *> otherReplacements;
         int replacementFailureCount = 0;
-        bool reusedDeletedAddress = false;
-        manager.replyFinishedHandler = [&]() {
-            OpenAiCompatibleClient *deletedClient = client;
-            delete client;
-            client = nullptr;
-            for (int attempt = 0; attempt < 4096; ++attempt) {
-                auto *candidate = new OpenAiCompatibleClient(
-                    QUrl(QStringLiteral("https://example.invalid/v1/chat")),
-                    QStringLiteral("test-model"),
-                    &manager);
-                if (candidate == deletedClient) {
-                    replacement = candidate;
-                    reusedDeletedAddress = true;
-                    break;
-                }
-                otherReplacements.append(candidate);
-            }
-            if (replacement != nullptr) {
-                QObject::connect(replacement,
-                                 &IAiClient::requestFailed,
-                                 [&replacementFailureCount](const QUuid &, const QString &) {
-                                     ++replacementFailureCount;
-                                 });
-            }
-        };
-        client = new OpenAiCompatibleClient(
+        std::optional<OpenAiCompatibleClient> clientStorage(
+            std::in_place,
             QUrl(QStringLiteral("https://example.invalid/v1/chat")),
             QStringLiteral("test-model"),
             &manager,
             std::chrono::milliseconds(30));
+        const QPointer<OpenAiCompatibleClient> client(&*clientStorage);
+        OpenAiCompatibleClient *const originalAddress = client.data();
+        manager.replyFinishedHandler = [&]() {
+            clientStorage.reset();
+            clientStorage.emplace(QUrl(QStringLiteral("https://example.invalid/v1/chat")),
+                                  QStringLiteral("test-model"),
+                                  &manager);
+            QObject::connect(&*clientStorage,
+                             &IAiClient::requestFailed,
+                             [&replacementFailureCount](const QUuid &, const QString &) {
+                                 ++replacementFailureCount;
+                             });
+        };
+        const auto clearReplyFinishedHandler =
+            qScopeGuard([&]() { manager.replyFinishedHandler = {}; });
         client->generate({QUuid::createUuid(), QStringLiteral("prompt"), 1024});
 
-        QTRY_VERIFY_WITH_TIMEOUT(client == nullptr, 500);
-        QVERIFY(reusedDeletedAddress);
+        QTRY_VERIFY_WITH_TIMEOUT(client.isNull(), 500);
+        QCOMPARE(&*clientStorage, originalAddress);
         QCOMPARE(replacementFailureCount, 0);
-        manager.replyFinishedHandler = {};
-        delete replacement;
-        for (OpenAiCompatibleClient *otherReplacement : otherReplacements) {
-            delete otherReplacement;
-        }
         return;
     }
 
