@@ -4,8 +4,8 @@
 
 ## 当前状态
 
-- 当前开发分支：`feature/task6-safe-ai-generation`，直接基于远端 `main` 的 `24ec590`（Task 5 / PR #5）。
-- 当前 worktree：`C:\Users\Lenovo\.config\superpowers\worktrees\project\task6-safe-ai-generation`。
+- 当前开发分支：`feature/task7-scaffold-candidates`，直接基于远端 `main` 的 `a55e5ee`（Task 6 / PR #6）。
+- 当前 worktree：`C:\Users\Lenovo\.config\superpowers\worktrees\project\task7-scaffold-candidates`。
 - 设计基线：`doc/mvp-implementation-plan.md`
 - `doc/multilanguage-development-design.md` 为 MVP 完成后的后续规划，不影响当前 Task 1 至 Task 10。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
@@ -14,8 +14,10 @@
 - Task 4「实现节点画布」已完成并通过规格与代码质量审查。
 - Task 5「实现 IR 与提示词编译」已完成并通过规格与代码质量审查。
 - Task 6「实现 AI 客户端与安全响应解析」已完成并通过规格与代码质量复核。
-- 同步目标：`origin/feature/task6-safe-ai-generation`；通过普通推送和独立 PR 交付。
-- Task 7 至 Task 10 尚未开始。
+- Task 6 的 PR #6 已经用户授权合入 `main`。
+- Task 7「实现确定性工程骨架与候选代码流程」开发中，已完成新工作树的基线构建和 CTest `7/7 passed`。
+- 同步目标：`origin/feature/task7-scaffold-candidates`；通过普通推送和独立 PR 交付。
+- Task 8 至 Task 10 尚未开始。开始 Task 10 前必须暂停并提醒用户切换 Agent 模式。
 
 ## 已完成提交
 
@@ -102,9 +104,9 @@
 
 ## 恢复工作
 
-1. Task 6 的代码与构建位于上述独立 worktree；原项目目录仍可保留 Task 5 分支。
-2. Task 6 合入远端 `main` 后，从最新 `origin/main` 新建 Task 7 独立分支。
-3. 用户要求继续开发时，从 Task 7「实现确定性工程骨架与候选代码流程」开始，遵循测试先行流程。
+1. Task 7 的代码与构建位于上述独立 worktree；原项目目录和 Task 6 worktree 保留不动。
+2. Task 6 已合入远端 `main`；Task 7 分支已从最新 `origin/main` 创建。
+3. 继续 Task 7「实现确定性工程骨架与候选代码流程」，遵循测试先行、规格复核和质量复核流程，不提前开始 Task 8。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 开始 Task 10 前仍须暂停，提醒用户切换智能体模式。
 

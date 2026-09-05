@@ -13,7 +13,7 @@
 - 确定性 IR 编译、合法 C++ 命名空间、最小邻接上下文，以及项目级和模块级提示词模板。
 - 异步 AI 客户端、离线 Fake、OpenAI-compatible HTTPS 请求，以及模型响应的 JSON、路径、扩展名和大小校验。
 
-Task 7 至 Task 10 尚未开始。Task 6 提供核心服务 API，尚未接入生成操作界面；候选结果目前只保存在内存中。候选文件落盘与逐文件接受、工程骨架、构建验证和导出将在后续 Task 实现。
+Task 6 已通过 PR #6 合入 main。Task 7 正在独立分支 `feature/task7-scaffold-candidates` 开发，目标是确定性工程骨架、候选文件落盘、文件哈希和逐文件接受；当前完成状态以实现进度记录为准。Task 8 至 Task 10 尚未开始，Task 10 开始前需暂停并提醒用户切换 Agent 模式。
 
 ## MVP 工作流
 
