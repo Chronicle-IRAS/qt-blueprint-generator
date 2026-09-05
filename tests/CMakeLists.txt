@@ -1,5 +1,17 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
 
+set(project_scaffolder_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_project_scaffolder.moc")
+add_custom_command(OUTPUT "${project_scaffolder_moc}"
+    COMMAND Qt6::moc -o tst_project_scaffolder.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_project_scaffolder.cpp"
+    DEPENDS tst_project_scaffolder.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_project_scaffolder tst_project_scaffolder.cpp "${project_scaffolder_moc}")
+set_target_properties(tst_project_scaffolder PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_project_scaffolder PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_project_scaffolder PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME project_scaffolder COMMAND tst_project_scaffolder)
+set_tests_properties(project_scaffolder PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 add_custom_command(
     OUTPUT "${smoke_moc}"
     COMMAND Qt6::moc -o tst_smoke.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_smoke.cpp"

@@ -490,6 +490,13 @@ std::optional<GenerationResult> GenerationService::parseAndValidate(
                      .arg(generatedFile->relativePath));
             return std::nullopt;
         }
+        for (const QString &previousPath : normalizedPaths) {
+            if (previousPath.startsWith(duplicateKey + QLatin1Char('/'))
+                || duplicateKey.startsWith(previousPath + QLatin1Char('/'))) {
+                fail(errorMessage, QStringLiteral("Generated files contain a file/directory path collision"));
+                return std::nullopt;
+            }
+        }
         normalizedPaths.insert(duplicateKey);
         result.files.append(*generatedFile);
     }

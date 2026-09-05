@@ -36,6 +36,20 @@ struct GenerationLimits
     qint64 maxWireResponseBytes = 2 * 1024 * 1024;
 };
 
+struct CandidatePreview
+{
+    QString generationId;
+    QString nodeId;
+    QString relativePath;
+    std::optional<QByteArray> currentContent;
+    QByteArray candidateContent;
+    QString currentSha256; // Empty means absent, distinct from the hash of an empty file.
+    QString candidateSha256;
+    QString lastGeneratedSha256;
+    QString baselineSha256;
+    bool conflict = false;
+};
+
 Q_DECLARE_METATYPE(GeneratedFile)
 Q_DECLARE_METATYPE(GenerationResult)
 
@@ -45,6 +59,23 @@ class GenerationService final : public QObject
 
 public:
     explicit GenerationService(IAiClient *client, QObject *parent = nullptr);
+
+    // Local single-writer workspace APIs. Candidate data is retained for auditing.
+    static bool persistCandidate(const QString &workspace, const QString &generationId,
+                                 const GenerationResult &result, const QString &model,
+                                 const QString &prompt, QString *errorMessage = nullptr);
+    static std::optional<CandidatePreview> previewCandidate(
+        const QString &workspace, const QString &generationId, const QString &nodeId,
+        const QString &relativePath, QString *errorMessage = nullptr);
+    static bool acceptCandidate(const QString &workspace, const CandidatePreview &preview,
+                                bool confirmOverwrite = false,
+                                const std::optional<QByteArray> &editedContent = std::nullopt,
+                                QString *errorMessage = nullptr);
+    static bool rejectCandidate(const QString &workspace, const QString &generationId,
+                                const QString &nodeId, const QString &relativePath,
+                                QString *errorMessage = nullptr);
+    static bool cancelCandidate(const QString &workspace, const QString &generationId,
+                                const QString &nodeId, QString *errorMessage = nullptr);
 
     QUuid generate(const QString &prompt,
                    const QString &expectedNodeId,
