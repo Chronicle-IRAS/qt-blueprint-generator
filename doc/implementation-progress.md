@@ -4,8 +4,8 @@
 
 ## 当前状态
 
-- 当前开发分支：`feature/task7-scaffold-candidates`，直接基于远端 `main` 的 `a55e5ee`（Task 6 / PR #6）。
-- 当前 worktree：`C:\Users\Lenovo\.config\superpowers\worktrees\project\task7-scaffold-candidates`。
+- 当前开发分支：`feature/task8-external-code`，直接基于远端 `main` 的 `dda7179`（Task 7 / PR #7）。
+- 当前 worktree：`C:\Users\Lenovo\.config\superpowers\worktrees\project\task8-external-code`。
 - 设计基线：`doc/mvp-implementation-plan.md`
 - `doc/multilanguage-development-design.md` 为 MVP 完成后的后续规划，不影响当前 Task 1 至 Task 10。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
@@ -16,8 +16,10 @@
 - Task 6「实现 AI 客户端与安全响应解析」已完成并通过规格与代码质量复核。
 - Task 6 的 PR #6 已经用户授权合入 `main`。
 - Task 7「实现确定性工程骨架与候选代码流程」已完成，通过规格和最终质量复核，完整构建与 CTest `8/8 passed`。
-- 同步目标：`origin/feature/task7-scaffold-candidates`；通过普通推送和独立 PR 交付。
-- Task 8 至 Task 10 尚未开始。开始 Task 10 前必须暂停并提醒用户切换 Agent 模式。
+- Task 7 的 PR #7 已由用户合入 `main`，已拉取并确认合并提交 `dda7179`。
+- Task 8「实现外部代码黑盒导入」开发中；新 worktree 已完成基线配置、构建和 CTest `8/8 passed`（32.90 秒）。
+- 同步目标：`origin/feature/task8-external-code`；完成后通过普通推送和独立 PR 交付。
+- Task 9、Task 10 尚未开始。开始 Task 10 前必须暂停并提醒用户切换 Agent 模式。
 
 ## 已完成提交
 
@@ -126,9 +128,9 @@
 
 ## 恢复工作
 
-1. Task 7 的代码与构建位于上述独立 worktree；原项目目录和 Task 6 worktree 保留不动。
-2. Task 6 已合入远端 `main`；Task 7 在独立分支完成，通过普通推送和 PR 交付，不自动合并或开始 Task 8。
-3. 下一任务为 Task 8「实现外部代码黑盒导入」。开始前先确认 Task 7 已合入 `main`，再从最新 `origin/main` 新建 Task 8 独立分支。
+1. Task 8 的代码与构建位于上述独立 worktree；原项目目录和 Task 6、Task 7 worktree 保留不动。
+2. Task 7 已合入远端 `main`；Task 8 已基于该合并新建分支，当前按测试先行流程开发外部文件导入、SHA-256、接口绑定和候选隔离。
+3. Task 8 完成后通过普通推送和 PR 交付；不自动合并或开始 Task 9。下一 Task 须先确认前序成果已合入最新 `origin/main`，再新建独立分支。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 开始 Task 10 前仍须暂停，提醒用户切换智能体模式。
 

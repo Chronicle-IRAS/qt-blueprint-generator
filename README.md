@@ -14,7 +14,7 @@
 - 异步 AI 客户端、离线 Fake、OpenAI-compatible HTTPS 请求，以及模型响应的 JSON、路径、扩展名和大小校验。
 - 确定性 Qt 工程骨架、公共契约、生成清单与 SHA-256，以及候选保存、预览、逐文件接受/拒绝/取消和人工修改保护。
 
-Task 6 已通过 PR #6 合入 main。Task 7 在独立分支 `feature/task7-scaffold-candidates` 完成，已通过规格与质量复核；完整 CTest 8/8 通过，两个独立生成工程分别通过配置、构建及 2/2 测试。Task 8 至 Task 10 尚未开始，Task 10 开始前需暂停并提醒用户切换 Agent 模式。
+Task 6、Task 7 已分别通过 PR #6、PR #7 合入 main。Task 8 已从最新远端 main（`dda7179`）新建独立分支 `feature/task8-external-code`，正在实现外部代码黑盒导入；新 worktree 基线构建与 CTest 8/8 通过。Task 9、Task 10 尚未开始，Task 10 开始前需暂停并提醒用户切换 Agent 模式。
 
 ## MVP 工作流
 
