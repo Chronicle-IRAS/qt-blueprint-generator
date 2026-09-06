@@ -69,6 +69,28 @@ ctest --test-dir build -C Debug --output-on-failure
 ctest --test-dir build -C Debug -R '^generation_service$' --output-on-failure
 ```
 
+## 工程骨架与候选流程（Task 7）
+
+Task 7 的核心服务按以下顺序使用；生成和审核操作尚未接入窗口界面：
+
+1. 先校验蓝图并准备好本机工作目录，再调用 `ProjectScaffolder::create(document, absoluteWorkspace, &error)`，创建确定性的 Qt 工程骨架和生成记录。相同蓝图可以重复调用；蓝图发生变化时需要选择新工作目录，本阶段不自动迁移已有工程。
+2. 使用 `GenerationService::generate()` 取得已校验的内存结果，再调用 `persistCandidate()` 保存批次、模型名称、提示词 SHA-256 和候选文件。模型密钥不属于这些参数。
+3. 通过 `previewCandidate()` 读取当前文件与候选内容及哈希，供调用者展示差异。
+4. 用户逐文件确认后调用 `acceptCandidate()`；也可传入修改后的候选内容。存在人工修改时默认拒绝覆盖，即使用户明确确认覆盖，也要重新核对预览对应的文件状态。
+5. 使用 `rejectCandidate()` 拒绝单个文件，或 `cancelCandidate()` 取消该节点的剩余候选。候选和处理状态保留作为生成记录，不因拒绝或取消删除当前工程文件。
+
+工作目录中，`generated-project/` 保存当前工程，`candidates/<generation-id>/<node-id>/` 保存候选，`generation-manifest.json` 保存生成记录。AI 文件仅允许写入 `src/modules/<node-id>/implementation/` 或 `tests/<node-id>/` 下的 `.h`、`.hpp`、`.cpp`、`.cc` 文件；确定性骨架、公共契约、其他节点文件和外部代码不能被 AI 候选覆盖。
+
+落盘使用的节点 ID 和批次 ID 必须是 1–80 个 ASCII 字母、数字、下划线或连字符，首字符为字母或数字，且不是 Windows 保留名称。候选路径段只使用 ASCII 字母、数字、下划线、连字符和点，不接受大小写别名、目录链接或 reparse point。显示名称和文字说明仍可使用中文。
+
+调用模型前，调用者需要把生成的公共类型 `src/contracts/types.h` 和本模块 `src/modules/<node-id>/contract.h` 一并提供为只读上下文，并说明上述输出目录。实际 C++ 命名空间在 Task 5 IR 名称前加 `Blueprint_` 前缀，避免与 Qt 类或宏冲突；该实际值记录在生成工程 `src/contracts/blueprint.json` 的 `project.namespace` 中。应使用这份生成 IR 编译提示词，并以具体契约为准，不能再用原始 Task 5 IR 覆盖命名空间。通用提示词编译器尚不自动读取这些骨架文件。
+
+生成骨架使用 `QVariantMap` 表示输入输出，自定义端口类型保留为元数据，不直接拼接进 C++。UiPage、LogicModule 和 Decision 分别提供 QWidget、QObject 和布尔判断接口。应用入口仍是占位窗口，尚未自动连接蓝图业务流程；接受候选也不等于候选已通过编译或满足接口契约。
+
+生成工程中的每个节点测试 `.cpp`/`.cc` 都应自带测试入口；CMake 会将它们注册为独立 CTest 项。Windows 下建议使用较短的构建目录，避免测试目标和自动 MOC 路径触及工具链的路径长度限制。
+
+这些操作面向可信本机、单写入者工作目录。每次操作都会重新检查路径和文件状态，但不把 Qt 的路径式文件操作当作针对其他进程恶意并发替换目录的安全沙箱。多文件写入在普通 I/O 失败时尝试回滚，不提供断电或进程崩溃时的整体原子性保证。生成代码仍须人工审查；写入或接受不会自动执行模型代码。
+
 ## 蓝图模型
 
 MVP 支持以下节点类型：
