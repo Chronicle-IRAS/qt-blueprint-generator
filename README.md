@@ -1,10 +1,10 @@
 # Qt Blueprint Generator
 
-一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统对蓝图执行静态校验，并在后续阶段将其编译为稳定的中间表示和 AI 生成提示词，最终生成、审核、构建并导出 C++17/CMake 项目。
+一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统对蓝图执行静态校验，将其编译为稳定的中间表示和 AI 生成提示词，并提供工程骨架与候选文件审核的核心服务。完整 MVP 将支持生成、审核、构建并导出 C++17/CMake 项目。
 
 ## 当前状态
 
-项目当前已完成 MVP Task 1 至 Task 6：
+项目当前已完成 MVP Task 1 至 Task 7：
 
 - Qt 6 Widgets / C++17 / CMake 工程骨架和 Qt Test 测试环境。
 - 蓝图领域模型及 `blueprint.json` 序列化往返。
@@ -12,8 +12,9 @@
 - 六类节点的交互式画布、端口、有向连线、Decision 标签、属性编辑、缩放、框选及撤销/重做。
 - 确定性 IR 编译、合法 C++ 命名空间、最小邻接上下文，以及项目级和模块级提示词模板。
 - 异步 AI 客户端、离线 Fake、OpenAI-compatible HTTPS 请求，以及模型响应的 JSON、路径、扩展名和大小校验。
+- 确定性 Qt 工程骨架、公共契约、生成清单与 SHA-256，以及候选保存、预览、逐文件接受/拒绝/取消和人工修改保护。
 
-Task 7 至 Task 10 尚未开始。Task 6 提供核心服务 API，尚未接入生成操作界面；候选结果目前只保存在内存中。候选文件落盘与逐文件接受、工程骨架、构建验证和导出将在后续 Task 实现。
+Task 6 已通过 PR #6 合入 main。Task 7 在独立分支 `feature/task7-scaffold-candidates` 完成，已通过规格与质量复核；完整 CTest 8/8 通过，两个独立生成工程分别通过配置、构建及 2/2 测试。Task 8 至 Task 10 尚未开始，Task 10 开始前需暂停并提醒用户切换 Agent 模式。
 
 ## MVP 工作流
 
@@ -61,13 +62,35 @@ ctest --test-dir build -C Debug --output-on-failure
 - `FakeAiClient` 可预设成功响应或错误，用于离线测试与演示。
 - `OpenAiCompatibleClient` 构造时接收完整的 HTTPS Chat Completions 地址和模型名称；每次请求从本机 `BLUEPRINT_AI_API_KEY` 环境变量读取密钥。当前没有设置界面或配置持久化，也尚未进行真实服务商联调。
 - 默认限额：模型 JSON 1 MiB、单文件 UTF-8 内容 256 KiB、总文件内容 1 MiB、最多 32 个文件、HTTP 响应体 2 MiB；默认绝对超时为 30 秒。
-- 允许 `.h`、`.hpp`、`.cpp`、`.cc`，拒绝绝对路径、穿越、重复路径、非法字段及现有目录链接越界。Task 7 写盘前必须再次校验物理目录边界。
+- 允许 `.h`、`.hpp`、`.cpp`、`.cc`，拒绝绝对路径、穿越、重复路径、非法字段及现有目录链接越界。Task 7 的写盘操作会再次校验目录边界和节点归属。
 
-全部自动化测试使用 Fake 或离线网络替身，不需要 API 密钥，也不产生模型调用费用。单独运行：
+AI 相关自动化测试使用 Fake 或离线网络替身，不需要 API 密钥，也不产生模型调用费用。单独运行：
 
 ```powershell
 ctest --test-dir build -C Debug -R '^generation_service$' --output-on-failure
 ```
+
+## 工程骨架与候选流程（Task 7）
+
+Task 7 的核心服务按以下顺序使用；生成和审核操作尚未接入窗口界面：
+
+1. 先校验蓝图并准备好本机工作目录，再调用 `ProjectScaffolder::create(document, absoluteWorkspace, &error)`，创建确定性的 Qt 工程骨架和生成记录。相同蓝图可以重复调用；蓝图发生变化时需要选择新工作目录，本阶段不自动迁移已有工程。
+2. 使用 `GenerationService::generate()` 取得已校验的内存结果，再调用 `persistCandidate()` 保存批次、模型名称、提示词 SHA-256 和候选文件。模型密钥不属于这些参数。
+3. 通过 `previewCandidate()` 读取当前文件与候选内容及哈希，供调用者展示差异。
+4. 用户逐文件确认后调用 `acceptCandidate()`；也可传入修改后的候选内容。存在人工修改时默认拒绝覆盖，即使用户明确确认覆盖，也要重新核对预览对应的文件状态。
+5. 使用 `rejectCandidate()` 拒绝单个文件，或 `cancelCandidate()` 取消该节点的剩余候选。候选和处理状态保留作为生成记录，不因拒绝或取消删除当前工程文件。
+
+工作目录中，`generated-project/` 保存当前工程，`candidates/<generation-id>/<node-id>/` 保存候选，`generation-manifest.json` 保存生成记录。AI 文件仅允许写入 `src/modules/<node-id>/implementation/` 或 `tests/<node-id>/` 下的 `.h`、`.hpp`、`.cpp`、`.cc` 文件；确定性骨架、公共契约、其他节点文件和外部代码不能被 AI 候选覆盖。
+
+落盘使用的节点 ID 和批次 ID 必须是 1–80 个 ASCII 字母、数字、下划线或连字符，首字符为字母或数字，且不是 Windows 保留名称。候选路径段只使用 ASCII 字母、数字、下划线、连字符和点，不接受大小写别名、目录链接或 reparse point。显示名称和文字说明仍可使用中文。
+
+调用模型前，调用者需要把生成的公共类型 `src/contracts/types.h` 和本模块 `src/modules/<node-id>/contract.h` 一并提供为只读上下文，并说明上述输出目录。实际 C++ 命名空间在 Task 5 IR 名称前加 `Blueprint_` 前缀，避免与 Qt 类或宏冲突；该实际值记录在生成工程 `src/contracts/blueprint.json` 的 `project.namespace` 中。应使用这份生成 IR 编译提示词，并以具体契约为准，不能再用原始 Task 5 IR 覆盖命名空间。通用提示词编译器尚不自动读取这些骨架文件。
+
+生成骨架使用 `QVariantMap` 表示输入输出，自定义端口类型保留为元数据，不直接拼接进 C++。UiPage、LogicModule 和 Decision 分别提供 QWidget、QObject 和布尔判断接口。应用入口仍是占位窗口，尚未自动连接蓝图业务流程；接受候选也不等于候选已通过编译或满足接口契约。
+
+生成工程中的每个节点测试 `.cpp`/`.cc` 都应自带测试入口；CMake 会将它们注册为独立 CTest 项。Windows 下建议使用较短的构建目录，避免测试目标和自动 MOC 路径触及工具链的路径长度限制。
+
+这些操作面向可信本机、单写入者工作目录。每次操作都会重新检查路径和文件状态，但不把 Qt 的路径式文件操作当作针对其他进程恶意并发替换目录的安全沙箱。多文件写入在普通 I/O 失败时尝试回滚，不提供断电或进程崩溃时的整体原子性保证。生成代码仍须人工审查；写入或接受不会自动执行模型代码。
 
 ## 蓝图模型
 
@@ -96,7 +119,7 @@ project/
 │  ├─ app/              # 主窗口
 │  ├─ blueprint/        # 领域模型、序列化和校验
 │  ├─ editor/           # 蓝图场景、节点和连线图元
-│  └─ generation/       # IR、提示词编译与安全响应解析
+│  └─ generation/       # IR、提示词、AI 响应校验、工程骨架与候选管理
 └─ tests/               # Qt Test 自动化测试
 ```
 
