@@ -1,10 +1,10 @@
 # Qt Blueprint Generator
 
-一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统对蓝图执行静态校验，并在后续阶段将其编译为稳定的中间表示和 AI 生成提示词，最终生成、审核、构建并导出 C++17/CMake 项目。
+一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统对蓝图执行静态校验，将其编译为稳定的中间表示和 AI 生成提示词，并提供工程骨架与候选文件审核的核心服务。完整 MVP 将支持生成、审核、构建并导出 C++17/CMake 项目。
 
 ## 当前状态
 
-项目当前已完成 MVP Task 1 至 Task 6：
+项目当前已完成 MVP Task 1 至 Task 7：
 
 - Qt 6 Widgets / C++17 / CMake 工程骨架和 Qt Test 测试环境。
 - 蓝图领域模型及 `blueprint.json` 序列化往返。
@@ -12,8 +12,9 @@
 - 六类节点的交互式画布、端口、有向连线、Decision 标签、属性编辑、缩放、框选及撤销/重做。
 - 确定性 IR 编译、合法 C++ 命名空间、最小邻接上下文，以及项目级和模块级提示词模板。
 - 异步 AI 客户端、离线 Fake、OpenAI-compatible HTTPS 请求，以及模型响应的 JSON、路径、扩展名和大小校验。
+- 确定性 Qt 工程骨架、公共契约、生成清单与 SHA-256，以及候选保存、预览、逐文件接受/拒绝/取消和人工修改保护。
 
-Task 6 已通过 PR #6 合入 main。Task 7 正在独立分支 `feature/task7-scaffold-candidates` 开发，目标是确定性工程骨架、候选文件落盘、文件哈希和逐文件接受；当前完成状态以实现进度记录为准。Task 8 至 Task 10 尚未开始，Task 10 开始前需暂停并提醒用户切换 Agent 模式。
+Task 6 已通过 PR #6 合入 main。Task 7 在独立分支 `feature/task7-scaffold-candidates` 完成，已通过规格与质量复核；完整 CTest 8/8 通过，两个独立生成工程分别通过配置、构建及 2/2 测试。Task 8 至 Task 10 尚未开始，Task 10 开始前需暂停并提醒用户切换 Agent 模式。
 
 ## MVP 工作流
 
@@ -61,9 +62,9 @@ ctest --test-dir build -C Debug --output-on-failure
 - `FakeAiClient` 可预设成功响应或错误，用于离线测试与演示。
 - `OpenAiCompatibleClient` 构造时接收完整的 HTTPS Chat Completions 地址和模型名称；每次请求从本机 `BLUEPRINT_AI_API_KEY` 环境变量读取密钥。当前没有设置界面或配置持久化，也尚未进行真实服务商联调。
 - 默认限额：模型 JSON 1 MiB、单文件 UTF-8 内容 256 KiB、总文件内容 1 MiB、最多 32 个文件、HTTP 响应体 2 MiB；默认绝对超时为 30 秒。
-- 允许 `.h`、`.hpp`、`.cpp`、`.cc`，拒绝绝对路径、穿越、重复路径、非法字段及现有目录链接越界。Task 7 写盘前必须再次校验物理目录边界。
+- 允许 `.h`、`.hpp`、`.cpp`、`.cc`，拒绝绝对路径、穿越、重复路径、非法字段及现有目录链接越界。Task 7 的写盘操作会再次校验目录边界和节点归属。
 
-全部自动化测试使用 Fake 或离线网络替身，不需要 API 密钥，也不产生模型调用费用。单独运行：
+AI 相关自动化测试使用 Fake 或离线网络替身，不需要 API 密钥，也不产生模型调用费用。单独运行：
 
 ```powershell
 ctest --test-dir build -C Debug -R '^generation_service$' --output-on-failure
@@ -118,7 +119,7 @@ project/
 │  ├─ app/              # 主窗口
 │  ├─ blueprint/        # 领域模型、序列化和校验
 │  ├─ editor/           # 蓝图场景、节点和连线图元
-│  └─ generation/       # IR、提示词编译与安全响应解析
+│  └─ generation/       # IR、提示词、AI 响应校验、工程骨架与候选管理
 └─ tests/               # Qt Test 自动化测试
 ```
 

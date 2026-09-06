@@ -15,7 +15,7 @@
 - Task 5「实现 IR 与提示词编译」已完成并通过规格与代码质量审查。
 - Task 6「实现 AI 客户端与安全响应解析」已完成并通过规格与代码质量复核。
 - Task 6 的 PR #6 已经用户授权合入 `main`。
-- Task 7「实现确定性工程骨架与候选代码流程」主体实现完成，正在执行边界测试与独立复核。
+- Task 7「实现确定性工程骨架与候选代码流程」已完成，通过规格和最终质量复核，完整构建与 CTest `8/8 passed`。
 - 同步目标：`origin/feature/task7-scaffold-candidates`；通过普通推送和独立 PR 交付。
 - Task 8 至 Task 10 尚未开始。开始 Task 10 前必须暂停并提醒用户切换 Agent 模式。
 
@@ -97,6 +97,7 @@
 - Task 7 规格复核：在 `65bab28` 上 SPEC COMPLIANT；命名空间冲突通过实际 CMake 构建 RED→GREEN 修复。
 - Task 7 回滚验证：Windows 下保持第二个目标文件的无删除共享句柄，使后续提交失败；验证前一文件恢复且两个原文件内容不变。
 - Task 7 最终独立验证：在 `65bab28` 上完整构建、CTest `8/8 passed`（35.71 秒）；`QWidget` 与 `signals` 两个项目分别实际生成并接受源码及 Qt Test，再配置/构建，各自 CTest `2/2 passed`。
+- Task 7 最终质量复核：Ready to merge，Critical 与 Important 均无；已知 Minor 为完整 SHA-256 测试目标名在 Windows 长构建目录中的路径长度警告，README 已说明使用较短构建目录。
 
 ## Task 7 实现与边界
 
@@ -126,8 +127,8 @@
 ## 恢复工作
 
 1. Task 7 的代码与构建位于上述独立 worktree；原项目目录和 Task 6 worktree 保留不动。
-2. Task 6 已合入远端 `main`；Task 7 分支已从最新 `origin/main` 创建。
-3. 继续 Task 7「实现确定性工程骨架与候选代码流程」，遵循测试先行、规格复核和质量复核流程，不提前开始 Task 8。
+2. Task 6 已合入远端 `main`；Task 7 在独立分支完成，通过普通推送和 PR 交付，不自动合并或开始 Task 8。
+3. 下一任务为 Task 8「实现外部代码黑盒导入」。开始前先确认 Task 7 已合入 `main`，再从最新 `origin/main` 新建 Task 8 独立分支。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 开始 Task 10 前仍须暂停，提醒用户切换智能体模式。
 
