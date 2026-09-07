@@ -15,7 +15,7 @@
 - 确定性 Qt 工程骨架、公共契约、生成清单与 SHA-256，以及候选保存、预览、逐文件接受/拒绝/取消和人工修改保护。
 - 外部 C/C++ 文件黑盒导入、接口契约绑定、文件哈希复验，以及与 AI 提示词和候选覆盖流程的隔离。
 
-Task 6、Task 7 已分别通过 PR #6、PR #7 合入 main。Task 8 已从最新远端 main（`dda7179`）新建独立分支 `feature/task8-external-code` 并完成，通过规格与质量复核；完整 CTest 9/9 和独立集成链路均通过。Task 9、Task 10 尚未开始，Task 10 开始前需暂停并提醒用户切换 Agent 模式。
+Task 6 至 Task 8 已分别通过 PR #6 至 PR #8 合入 main。Task 9 已从最新远端 main（`70a3d9f`）新建独立分支 `feature/task9-build-export`，正在实现显式 CMake 构建验证、构建日志面板和原子项目导出；新 worktree 基线构建与 CTest 9/9 通过。Task 10 尚未开始，开始前需暂停并提醒用户切换 Agent 模式。
 
 ## MVP 工作流
 
