@@ -1,5 +1,17 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
 
+set(external_code_importer_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_external_code_importer.moc")
+add_custom_command(OUTPUT "${external_code_importer_moc}"
+    COMMAND Qt6::moc -o tst_external_code_importer.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_external_code_importer.cpp"
+    DEPENDS tst_external_code_importer.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_external_code_importer tst_external_code_importer.cpp "${external_code_importer_moc}")
+set_target_properties(tst_external_code_importer PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_external_code_importer PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_external_code_importer PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME external_code_importer COMMAND tst_external_code_importer)
+set_tests_properties(external_code_importer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 set(project_scaffolder_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_project_scaffolder.moc")
 add_custom_command(OUTPUT "${project_scaffolder_moc}"
     COMMAND Qt6::moc -o tst_project_scaffolder.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_project_scaffolder.cpp"

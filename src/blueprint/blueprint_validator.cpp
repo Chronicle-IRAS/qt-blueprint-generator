@@ -1,4 +1,5 @@
 #include "blueprint/blueprint_validator.h"
+#include "workspace/external_code_importer.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -158,6 +159,16 @@ void validateExternalCode(const BlueprintNode &node,
                       QStringLiteral("external_code.path.invalid"),
                       QStringLiteral("External code directory resolves outside the external directory"),
                       node.id);
+        return;
+    }
+
+    // Imported modules carry an exact file inventory and explicit contract binding.
+    // Keep the original validation path for legacy manually prepared directories.
+    const QFileInfo manifestInfo(QDir(nodeDirectory).filePath(QStringLiteral("import-manifest.json")));
+    if (manifestInfo.exists() || manifestInfo.isSymbolicLink()) {
+        QString error;
+        if (!ExternalCodeImporter::verifyImport(node, QDir(context.projectRoot).absolutePath(), &error))
+            addDiagnostic(diagnostics, QStringLiteral("external_code.import.invalid"), error, node.id);
         return;
     }
 

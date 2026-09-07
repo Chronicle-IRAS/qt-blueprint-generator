@@ -41,6 +41,8 @@ qt_add_library(BlueprintEditorCore STATIC
     src/generation/workspace_io.cpp
     src/generation/workspace_io.h
     src/generation/candidate_store.cpp
+    src/workspace/external_code_importer.cpp
+    src/workspace/external_code_importer.h
 )
 
 target_include_directories(BlueprintEditorCore PUBLIC
