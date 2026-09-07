@@ -2,11 +2,15 @@
 
 #include "editor/blueprint_scene.h"
 #include "editor/node_item.h"
+#include "workspace/build_service.h"
+#include "workspace/project_exporter.h"
 
 #include <QAction>
 #include <QDockWidget>
+#include <QDir>
 #include <QFormLayout>
 #include <QGraphicsView>
+#include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -17,10 +21,12 @@
 #include <QMenuBar>
 #include <QPainter>
 #include <QPlainTextEdit>
+#include <QProcess>
 #include <QPushButton>
 #include <QStatusBar>
 #include <QToolBar>
 #include <QToolButton>
+#include <QTextCursor>
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
@@ -43,6 +49,23 @@ QString nodeTypeName(NodeType type)
         return QObject::tr("External Code");
     }
     return {};
+}
+
+QString buildStageName(BuildStage stage)
+{
+    return stage == BuildStage::Configure ? QObject::tr("configure") : QObject::tr("build");
+}
+
+QString encodeCommandArguments(const QStringList &arguments)
+{
+    QStringList encoded;
+    for (QString argument : arguments) {
+        argument.replace(QLatin1Char('"'), QStringLiteral("\"\"\""));
+        if (argument.isEmpty() || argument.contains(QLatin1Char(' ')) || argument.contains(QLatin1Char('\t')))
+            argument = QLatin1Char('"') + argument + QLatin1Char('"');
+        encoded.append(argument);
+    }
+    return encoded.join(QLatin1Char(' '));
 }
 
 QString portsToText(const QVector<PortSpec> &ports)
@@ -233,6 +256,49 @@ MainWindow::MainWindow(QWidget *parent)
     properties->setWidget(propertyWidget);
     addDockWidget(Qt::RightDockWidgetArea, properties);
 
+    auto *buildDock = new QDockWidget(tr("Build and export"), this);
+    buildDock->setObjectName(QStringLiteral("buildExportDock"));
+    auto *buildWidget = new QWidget(buildDock);
+    auto *buildLayout = new QVBoxLayout(buildWidget);
+    auto *buildForm = new QFormLayout;
+    m_workspacePathEdit = new QLineEdit(QDir::currentPath(), buildWidget);
+    m_workspacePathEdit->setObjectName(QStringLiteral("workspacePathEdit"));
+    m_workspacePathEdit->setToolTip(tr("Workspace root containing generated-project"));
+    m_buildDirectoryEdit = new QLineEdit(QDir(QDir::currentPath()).filePath(QStringLiteral("build/generated-project")), buildWidget);
+    m_buildDirectoryEdit->setObjectName(QStringLiteral("buildDirectoryEdit"));
+    m_exportTargetEdit = new QLineEdit(buildWidget);
+    m_exportTargetEdit->setObjectName(QStringLiteral("exportTargetEdit"));
+    m_cmakeExecutableEdit = new QLineEdit(QStringLiteral("cmake"), buildWidget);
+    m_cmakeExecutableEdit->setObjectName(QStringLiteral("cmakeExecutableEdit"));
+    m_configureArgumentsEdit = new QLineEdit(buildWidget);
+    m_configureArgumentsEdit->setObjectName(QStringLiteral("cmakeConfigureArgumentsEdit"));
+    m_configureArgumentsEdit->setPlaceholderText(tr("For example: -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.x/mingw_64"));
+    buildForm->addRow(tr("Workspace root"), m_workspacePathEdit);
+    buildForm->addRow(tr("Build directory"), m_buildDirectoryEdit);
+    buildForm->addRow(tr("Empty export directory"), m_exportTargetEdit);
+    buildForm->addRow(tr("CMake executable"), m_cmakeExecutableEdit);
+    buildForm->addRow(tr("Configure arguments"), m_configureArgumentsEdit);
+    buildLayout->addLayout(buildForm);
+    auto *buttons = new QHBoxLayout;
+    m_buildProjectButton = new QPushButton(tr("Build"), buildWidget);
+    m_buildProjectButton->setObjectName(QStringLiteral("buildProjectButton"));
+    m_exportProjectButton = new QPushButton(tr("Export"), buildWidget);
+    m_exportProjectButton->setObjectName(QStringLiteral("exportProjectButton"));
+    buttons->addWidget(m_buildProjectButton);
+    buttons->addWidget(m_exportProjectButton);
+    buttons->addStretch();
+    buildLayout->addLayout(buttons);
+    m_buildLog = new QPlainTextEdit(buildWidget);
+    m_buildLog->setObjectName(QStringLiteral("buildLog"));
+    m_buildLog->setReadOnly(true);
+    m_buildLog->setPlaceholderText(tr("Configure, build, and export output appears here."));
+    m_buildLog->setMaximumBlockCount(10000);
+    buildLayout->addWidget(m_buildLog);
+    buildDock->setWidget(buildWidget);
+    addDockWidget(Qt::BottomDockWidgetArea, buildDock);
+
+    m_buildService = new BuildService(this);
+
     connect(deleteAction, &QAction::triggered, this, [this] { deleteSelection(); });
     connect(connectAction, &QAction::triggered, this, [this] {
         m_scene->beginConnection(m_connectionLabelEdit->text());
@@ -240,6 +306,23 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(cancelAction, &QAction::triggered, this, [this] { cancelConnection(); });
     connect(m_applyPropertiesButton, &QPushButton::clicked, this, [this] { applyProperties(); });
+    connect(m_buildProjectButton, &QPushButton::clicked, this, [this] { startBuild(); });
+    connect(m_exportProjectButton, &QPushButton::clicked, this, [this] { exportProject(); });
+    connect(m_buildService, &BuildService::standardOutput, this,
+            [this](BuildStage, const QString &text) { appendBuildLog(text); });
+    connect(m_buildService, &BuildService::standardError, this,
+            [this](BuildStage stage, const QString &text) {
+                appendBuildLog(QStringLiteral("[%1 stderr]\n%2").arg(buildStageName(stage), text));
+            });
+    connect(m_buildService, &BuildService::stageFinished, this,
+            [this](BuildStage stage, int exitCode) {
+                appendBuildLog(tr("[%1] exit code %2\n").arg(buildStageName(stage)).arg(exitCode));
+            });
+    connect(m_buildService, &BuildService::finished, this, [this](const BuildResult &result) {
+        m_buildProjectButton->setEnabled(true);
+        appendBuildLog(result.success ? tr("Build finished successfully.\n")
+                                      : tr("Build failed: %1\n").arg(result.error));
+    });
     connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] { updatePropertyEditor(); });
     m_scene->setSemanticChangeHandler([this] { updatePropertyEditor(); });
     updatePropertyEditor();
@@ -289,6 +372,56 @@ BlueprintScene *MainWindow::scene() const
 QGraphicsView *MainWindow::graphicsView() const
 {
     return m_view;
+}
+
+void MainWindow::setBuildToolConfiguration(const QString &cmakeExecutable,
+                                           const QStringList &configureArguments,
+                                           const QStringList &buildArguments)
+{
+    m_cmakeExecutableEdit->setText(cmakeExecutable);
+    m_configureArgumentsEdit->setText(encodeCommandArguments(configureArguments));
+    m_buildArguments = buildArguments;
+}
+
+void MainWindow::startBuild()
+{
+    BuildRequest request;
+    const QString workspace = m_workspacePathEdit->text().trimmed();
+    request.buildDirectory = m_buildDirectoryEdit->text().trimmed();
+    if (workspace.isEmpty() || request.buildDirectory.isEmpty()) {
+        appendBuildLog(tr("Build request rejected: workspace and build paths must not be empty.\n"));
+        return;
+    }
+    request.sourceDirectory = QDir(workspace)
+                                  .filePath(QStringLiteral("generated-project"));
+    request.cmakeExecutable = m_cmakeExecutableEdit->text().trimmed();
+    request.configureArguments = QProcess::splitCommand(m_configureArgumentsEdit->text());
+    request.buildArguments = m_buildArguments;
+    QString error;
+    appendBuildLog(tr("Starting configure for %1\n").arg(request.sourceDirectory));
+    if (!m_buildService->start(request, &error)) {
+        appendBuildLog(tr("Build request rejected: %1\n").arg(error));
+        return;
+    }
+    m_buildProjectButton->setEnabled(false);
+}
+
+void MainWindow::exportProject()
+{
+    QString error;
+    if (ProjectExporter::exportProject(m_workspacePathEdit->text().trimmed(),
+                                       m_exportTargetEdit->text().trimmed(), &error)) {
+        appendBuildLog(tr("Export finished successfully.\n"));
+        return;
+    }
+    appendBuildLog(tr("Export failed: %1\n").arg(error));
+}
+
+void MainWindow::appendBuildLog(const QString &text)
+{
+    m_buildLog->moveCursor(QTextCursor::End);
+    m_buildLog->insertPlainText(text);
+    m_buildLog->moveCursor(QTextCursor::End);
 }
 
 void MainWindow::deleteSelection()

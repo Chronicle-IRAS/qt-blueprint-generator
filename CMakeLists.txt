@@ -43,6 +43,10 @@ qt_add_library(BlueprintEditorCore STATIC
     src/generation/candidate_store.cpp
     src/workspace/external_code_importer.cpp
     src/workspace/external_code_importer.h
+    src/workspace/build_service.cpp
+    src/workspace/build_service.h
+    src/workspace/project_exporter.cpp
+    src/workspace/project_exporter.h
 )
 
 target_include_directories(BlueprintEditorCore PUBLIC
