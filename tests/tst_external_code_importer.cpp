@@ -81,6 +81,8 @@ private slots:
     void externalContentsNeverEnterGeneration();
     void rejectsDirectoryLinks_data();
     void rejectsDirectoryLinks();
+    void deletedManifestCannotBypassValidation_data();
+    void deletedManifestCannotBypassValidation();
 };
 
 void ExternalCodeImporterTest::preservesSelectedBytesAndRecordsContract()
@@ -266,6 +268,32 @@ void ExternalCodeImporterTest::externalContentsNeverEnterGeneration()
     QVERIFY(!GenerationService::persistCandidate(workspace.path(), "vendor-batch", result, "fake", *prompt, &error));
     QCOMPARE(read(workspace.path(), "external/vendor/api.cpp"), privateBytes);
     QCOMPARE(read(workspace.path(), manifestPath), manifest);
+}
+
+void ExternalCodeImporterTest::deletedManifestCannotBypassValidation_data()
+{
+    QTest::addColumn<bool>("replaceSource");
+    QTest::newRow("manifest-deleted") << false;
+    QTest::newRow("manifest-deleted-source-replaced") << true;
+}
+
+void ExternalCodeImporterTest::deletedManifestCannotBypassValidation()
+{
+    QFETCH(bool, replaceSource);
+    QTemporaryDir source, workspace;
+    const auto node = externalNode();
+    QVERIFY(write(source.path(), "api.h", "original"));
+    QString error;
+    QVERIFY2(ExternalCodeImporter::importFiles(node, source.path(), {"api.h"}, workspace.path(), &error), qPrintable(error));
+    QVERIFY(BlueprintValidator::validate(graph(node), {workspace.path()}).isEmpty());
+    QVERIFY(QFile::remove(workspace.filePath(manifestPath)));
+    if (replaceSource) QVERIFY(write(workspace.path(), "external/vendor/api.h", "replacement"));
+    QVERIFY(!ExternalCodeImporter::verifyImport(node, workspace.path(), &error));
+    const auto diagnostics = BlueprintValidator::validate(graph(node), {workspace.path()});
+    bool importRejected = false;
+    for (const auto &diagnostic : diagnostics)
+        if (diagnostic.code == "external_code.import.invalid" && diagnostic.nodeId == node.id) importRejected = true;
+    QVERIFY2(importRejected, "Deleting an import manifest must not downgrade a verified import to unchecked external source");
 }
 
 void ExternalCodeImporterTest::rejectsDirectoryLinks_data()
