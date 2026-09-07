@@ -6,6 +6,7 @@
 #include <QTemporaryDir>
 
 #include "blueprint/blueprint_validator.h"
+#include "workspace/external_code_importer.h"
 
 namespace {
 
@@ -418,13 +419,18 @@ void BlueprintValidatorTest::validatesExternalCodeFiles()
     textFile.write("not source code");
     textFile.close();
     QVERIFY(hasDiagnostic(BlueprintValidator::validate(document, context),
-                          QStringLiteral("external_code.file.missing"),
+                          QStringLiteral("external_code.import.invalid"),
                           QStringLiteral("external-code")));
 
-    QFile sourceFile(project.filePath(QStringLiteral("external/external-code/implementation.hpp")));
+    QTemporaryDir source;
+    QFile sourceFile(source.filePath(QStringLiteral("implementation.hpp")));
     QVERIFY(sourceFile.open(QIODevice::WriteOnly));
     sourceFile.write("#pragma once\n");
     sourceFile.close();
+    QVERIFY(textFile.remove());
+    QString error;
+    QVERIFY2(ExternalCodeImporter::importFiles(document.nodes[1], source.path(), {"implementation.hpp"},
+                                               project.path(), &error), qPrintable(error));
     QVERIFY(BlueprintValidator::validate(document, context).isEmpty());
 }
 
@@ -543,16 +549,19 @@ void BlueprintValidatorTest::rejectsMixedExternalSourceLinks()
 {
     QTemporaryDir project;
     QTemporaryDir outside;
+    QTemporaryDir source;
     QVERIFY(project.isValid());
     QVERIFY(outside.isValid());
 
     const QString nodeDirectory =
         project.filePath(QStringLiteral("external/external-code"));
-    QVERIFY(QDir().mkpath(nodeDirectory));
-    QFile safeSource(QDir(nodeDirectory).filePath(QStringLiteral("a.cpp")));
+    QFile safeSource(source.filePath(QStringLiteral("a.cpp")));
     QVERIFY(safeSource.open(QIODevice::WriteOnly));
     safeSource.write("// safe\n");
     safeSource.close();
+    QString error;
+    QVERIFY2(ExternalCodeImporter::importFiles(makeNode(NodeType::ExternalCode, "external-code"),
+                                               source.path(), {"a.cpp"}, project.path(), &error), qPrintable(error));
     QFile outsideSource(outside.filePath(QStringLiteral("outside.cpp")));
     QVERIFY(outsideSource.open(QIODevice::WriteOnly));
     outsideSource.write("// outside\n");
@@ -591,7 +600,7 @@ void BlueprintValidatorTest::rejectsMixedExternalSourceLinks()
     };
 
     const bool rejected = hasDiagnostic(BlueprintValidator::validate(document, {project.path()}),
-                                        QStringLiteral("external_code.path.invalid"),
+                                        QStringLiteral("external_code.import.invalid"),
                                         QStringLiteral("external-code"));
     QVERIFY(QFile::remove(linkedSource));
     QVERIFY(rejected);

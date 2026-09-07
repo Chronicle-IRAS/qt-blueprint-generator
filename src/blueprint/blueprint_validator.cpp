@@ -1,4 +1,5 @@
 #include "blueprint/blueprint_validator.h"
+#include "workspace/external_code_importer.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -87,33 +88,6 @@ QString canonicalExistingPath(const QString &path)
 #endif
 }
 
-enum class SourceDirectoryResult {
-    Found,
-    Missing,
-    UnsafePath,
-};
-
-SourceDirectoryResult inspectSourceDirectory(const QString &directoryPath,
-                                             const QString &canonicalDirectoryPath)
-{
-    static const QSet<QString> allowedSuffixes = {
-        QStringLiteral("h"), QStringLiteral("hpp"), QStringLiteral("cpp"), QStringLiteral("cc")};
-    const QFileInfoList files =
-        QDir(directoryPath).entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
-    bool foundAllowedSource = false;
-    for (const QFileInfo &file : files) {
-        if (file.isFile() && allowedSuffixes.contains(file.suffix().toLower())) {
-            const QString canonicalFilePath = canonicalExistingPath(file.absoluteFilePath());
-            if (canonicalFilePath.isEmpty()
-                || !isStrictChildPath(canonicalFilePath, canonicalDirectoryPath)) {
-                return SourceDirectoryResult::UnsafePath;
-            }
-            foundAllowedSource = true;
-        }
-    }
-    return foundAllowedSource ? SourceDirectoryResult::Found : SourceDirectoryResult::Missing;
-}
-
 void validateExternalCode(const BlueprintNode &node,
                           const BlueprintValidationContext &context,
                           QVector<BlueprintDiagnostic> &diagnostics)
@@ -161,19 +135,11 @@ void validateExternalCode(const BlueprintNode &node,
         return;
     }
 
-    const SourceDirectoryResult sourceResult =
-        inspectSourceDirectory(nodeDirectory, canonicalNodeDirectory);
-    if (sourceResult == SourceDirectoryResult::UnsafePath) {
-        addDiagnostic(diagnostics,
-                      QStringLiteral("external_code.path.invalid"),
-                      QStringLiteral("External code source resolves outside its node directory"),
-                      node.id);
-    } else if (sourceResult == SourceDirectoryResult::Missing) {
-        addDiagnostic(diagnostics,
-                      QStringLiteral("external_code.file.missing"),
-                      QStringLiteral("External code directory contains no supported source file"),
-                      node.id);
-    }
+    // Missing metadata must fail closed: source presence alone does not establish
+    // the explicit contract or the hashes bound by a user-approved import.
+    QString error;
+    if (!ExternalCodeImporter::verifyImport(node, QDir(context.projectRoot).absolutePath(), &error))
+        addDiagnostic(diagnostics, QStringLiteral("external_code.import.invalid"), error, node.id);
 }
 
 } // namespace

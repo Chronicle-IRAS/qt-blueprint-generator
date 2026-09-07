@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-项目当前已完成 MVP Task 1 至 Task 7：
+项目当前已完成 MVP Task 1 至 Task 8：
 
 - Qt 6 Widgets / C++17 / CMake 工程骨架和 Qt Test 测试环境。
 - 蓝图领域模型及 `blueprint.json` 序列化往返。
@@ -13,8 +13,9 @@
 - 确定性 IR 编译、合法 C++ 命名空间、最小邻接上下文，以及项目级和模块级提示词模板。
 - 异步 AI 客户端、离线 Fake、OpenAI-compatible HTTPS 请求，以及模型响应的 JSON、路径、扩展名和大小校验。
 - 确定性 Qt 工程骨架、公共契约、生成清单与 SHA-256，以及候选保存、预览、逐文件接受/拒绝/取消和人工修改保护。
+- 外部 C/C++ 文件黑盒导入、接口契约绑定、文件哈希复验，以及与 AI 提示词和候选覆盖流程的隔离。
 
-Task 6 已通过 PR #6 合入 main。Task 7 在独立分支 `feature/task7-scaffold-candidates` 完成，已通过规格与质量复核；完整 CTest 8/8 通过，两个独立生成工程分别通过配置、构建及 2/2 测试。Task 8 至 Task 10 尚未开始，Task 10 开始前需暂停并提醒用户切换 Agent 模式。
+Task 6、Task 7 已分别通过 PR #6、PR #7 合入 main。Task 8 已从最新远端 main（`dda7179`）新建独立分支 `feature/task8-external-code` 并完成，通过规格与质量复核；完整 CTest 9/9 和独立集成链路均通过。Task 9、Task 10 尚未开始，Task 10 开始前需暂停并提醒用户切换 Agent 模式。
 
 ## MVP 工作流
 
@@ -92,6 +93,22 @@ Task 7 的核心服务按以下顺序使用；生成和审核操作尚未接入�
 
 这些操作面向可信本机、单写入者工作目录。每次操作都会重新检查路径和文件状态，但不把 Qt 的路径式文件操作当作针对其他进程恶意并发替换目录的安全沙箱。多文件写入在普通 I/O 失败时尝试回滚，不提供断电或进程崩溃时的整体原子性保证。生成代码仍须人工审查；写入或接受不会自动执行模型代码。
 
+## 外部代码黑盒导入（Task 8）
+
+`ExternalCodeImporter::importFiles()` 接收一个已由用户填写名称、说明和输入输出的 `ExternalCode` 节点、源目录、明确选择的相对文件列表及工作目录。它只复制 `.h`、`.hpp`、`.cpp`、`.cc` 文件，并保留所选文件的嵌套目录和原始字节；未选文件不会被隐式导入。
+
+导入结果位于 `external/<node-id>/`，其中 `import-manifest.json` 保存完整节点契约、契约 SHA-256、逐文件 SHA-256 和 `readOnly` 生成策略。`ExternalCodeImporter::verifyImport()` 会重新检查契约、文件哈希及完整目录清单；文件、清单或契约缺失、替换、篡改时，蓝图校验返回 `external_code.import.invalid`。相同契约和文件可幂等重复导入，但本阶段不提供覆盖、替换或删除 API。
+
+源目录、工作目录和文件路径均需通过目录链接、Windows reparse point、大小写别名、穿越、重复及前缀冲突检查。节点 ID 和相对路径沿用可移植 ASCII 规则。导入是面向可信本机单写入者的文件事务，不修改源文件权限，也不承诺抵御其他进程并发替换路径或断电。
+
+外部节点不会进入可生成 IR 模块或生成清单的模块列表；相邻模块的提示词只包含蓝图中人工填写的外部接口契约，不读取外部源码。AI 候选仍只能写入可生成节点自己的实现和测试目录，不能覆盖 `external/`。构建、导出和窗口界面接入属于后续 Task。
+
+单独运行导入测试：
+
+```powershell
+ctest --test-dir build -C Debug -R '^external_code_importer$' --output-on-failure
+```
+
 ## 蓝图模型
 
 MVP 支持以下节点类型：
@@ -119,11 +136,10 @@ project/
 │  ├─ app/              # 主窗口
 │  ├─ blueprint/        # 领域模型、序列化和校验
 │  ├─ editor/           # 蓝图场景、节点和连线图元
-│  └─ generation/       # IR、提示词、AI 响应校验、工程骨架与候选管理
+│  ├─ generation/       # IR、提示词、AI 响应校验、工程骨架与候选管理
+│  └─ workspace/        # 外部代码导入；后续加入构建与导出服务
 └─ tests/               # Qt Test 自动化测试
 ```
-
-`src/workspace/` 将随后续 MVP Task 逐步加入。
 
 ## 设计文档
 
