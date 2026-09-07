@@ -1,6 +1,6 @@
 # 实现进度
 
-更新时间：2026-09-06（Asia/Shanghai）
+更新时间：2026-09-07（Asia/Shanghai）
 
 ## 当前状态
 
@@ -17,7 +17,7 @@
 - Task 6 的 PR #6 已经用户授权合入 `main`。
 - Task 7「实现确定性工程骨架与候选代码流程」已完成，通过规格和最终质量复核，完整构建与 CTest `8/8 passed`。
 - Task 7 的 PR #7 已由用户合入 `main`，已拉取并确认合并提交 `dda7179`。
-- Task 8「实现外部代码黑盒导入」开发中；新 worktree 已完成基线配置、构建和 CTest `8/8 passed`（32.90 秒）。
+- Task 8「实现外部代码黑盒导入」已完成，通过规格和最终质量复核；完整构建、CTest `9/9 passed` 和独立集成链路均通过。
 - 同步目标：`origin/feature/task8-external-code`；完成后通过普通推送和独立 PR 交付。
 - Task 9、Task 10 尚未开始。开始 Task 10 前必须暂停并提醒用户切换 Agent 模式。
 
@@ -74,6 +74,13 @@
 - `65bab28 fix: isolate scaffold namespaces from Qt identifiers`
   - 实际命名空间加 `Blueprint_` 前缀，并同步写入生成 IR，避免 `QWidget` 类和 `signals` 宏冲突。
   - 增加两个实际生成工程的编译回归，以及后续文件提交失败后的回滚验证。
+- `3fc458b feat: import external code as black-box modules`
+  - 明确选择并复制 `.h`、`.hpp`、`.cpp`、`.cc`，保留嵌套路径和原始字节。
+  - 按节点保存完整人工接口契约、契约 SHA-256、逐文件 SHA-256 和只读生成策略。
+  - 拒绝路径穿越、大小写别名、链接、未跟踪目标、替换及清单篡改；外部节点不进入 AI 候选覆盖范围。
+- `47d346a fix: require verified external import manifests`
+  - 外部节点蓝图校验一律要求有效导入清单，不能通过删除清单降级到无哈希校验。
+  - 增加“删除清单”和“删除清单后替换源码”的 RED→GREEN 回归测试。
 
 ## 验证记录
 
@@ -82,7 +89,7 @@
 - 生成器：Ninja
 - CMake 配置：通过。
 - 完整构建：通过。
-- 当前 CTest：`8/8 passed`（project_scaffolder、smoke、blueprint_document、blueprint_validator、blueprint_scene、ir_compiler、prompt_compiler、generation_service）。
+- 当前 CTest：`9/9 passed`（external_code_importer、project_scaffolder、smoke、blueprint_document、blueprint_validator、blueprint_scene、ir_compiler、prompt_compiler、generation_service）。
 - Task 6：测试先行，接口缺失、客户端销毁、网络管理器销毁、绝对超时、junction 越界及同步重入场景均有 RED→GREEN 记录。
 - `generation_service`：在 `1b135c9` 上连续运行 20 次通过；真实客户端使用离线网络替身测试，未调用外部模型。
 - 固定存储测试调整后，在 `eb6f8b7` 及最终 API 注释上重新完整构建并执行 CTest：`7/7 passed`。
@@ -100,6 +107,20 @@
 - Task 7 回滚验证：Windows 下保持第二个目标文件的无删除共享句柄，使后续提交失败；验证前一文件恢复且两个原文件内容不变。
 - Task 7 最终独立验证：在 `65bab28` 上完整构建、CTest `8/8 passed`（35.71 秒）；`QWidget` 与 `signals` 两个项目分别实际生成并接受源码及 Qt Test，再配置/构建，各自 CTest `2/2 passed`。
 - Task 7 最终质量复核：Ready to merge，Critical 与 Important 均无；已知 Minor 为完整 SHA-256 测试目标名在 Windows 长构建目录中的路径长度警告，README 已说明使用较短构建目录。
+- Task 8 初始 RED：占位接口下导入测试 `2 passed, 25 failed`；初始 GREEN 为 `27/27 passed`，补充六类 Windows junction 后为 `33/33 passed`。
+- Task 8 清单降级回归：删除清单及删除后替换源码初始 `2 passed, 2 failed`，修复后导入测试 `35/35 passed`。
+- Task 8 独立集成验收：导入 → 蓝图校验 → IR/提示词 → 工程骨架 → 普通候选接受完整链路退出码 0，外部源码及导入清单保持不变。
+- Task 8 规格复核：SPEC COMPLIANT；确认缺失清单不再回退到未绑定的直接文件校验。
+- Task 8 最终质量复核：Ready to merge，无 Critical、无 Important；非阻断 Minor 为幂等测试使用文件修改时间，在极粗时间分辨率文件系统上敏感度可能降低。
+
+## Task 8 实现与边界
+
+- `ExternalCodeImporter::importFiles()` 仅复制调用者明确选择的可移植相对路径，接受 `.h`、`.hpp`、`.cpp`、`.cc`，保留嵌套目录及每个文件的原始字节。
+- `external/<node-id>/import-manifest.json` 严格记录完整 `ExternalCode` 节点契约、契约哈希、文件清单与哈希，以及 `readOnly` 生成策略；同内容重复导入不写盘。
+- `verifyImport()` 重新检查绑定契约、全部文件哈希和目录清单。缺失、额外、替换或篡改内容，以及链接、reparse point 和大小写别名都会使蓝图校验失败。
+- Task 8 起外部节点必须由导入器建立并保留有效清单；单独放置源文件不再构成有效外部节点。删除或替换操作由后续调用方显式处理，并须重新导入、重新校验。
+- 外部节点仍不属于可生成模块，AI 提示词只接收蓝图中的人工接口契约。生成候选的节点和路径白名单不会接受外部节点或 `external/` 目标。
+- 当前仅提供核心服务 API，尚未接入窗口；不自动分析外部源码、修改源文件权限、覆盖已有导入，亦不负责 Task 9 的构建和导出。
 
 ## Task 7 实现与边界
 
@@ -129,8 +150,8 @@
 ## 恢复工作
 
 1. Task 8 的代码与构建位于上述独立 worktree；原项目目录和 Task 6、Task 7 worktree 保留不动。
-2. Task 7 已合入远端 `main`；Task 8 已基于该合并新建分支，当前按测试先行流程开发外部文件导入、SHA-256、接口绑定和候选隔离。
-3. Task 8 完成后通过普通推送和 PR 交付；不自动合并或开始 Task 9。下一 Task 须先确认前序成果已合入最新 `origin/main`，再新建独立分支。
+2. Task 7 已合入远端 `main`；Task 8 已基于该合并完成外部文件导入、SHA-256、接口绑定、候选隔离和清单降级修复。
+3. Task 8 通过普通推送和 PR 交付；不自动合并或开始 Task 9。开始 Task 9 前须确认 Task 8 已合入最新 `origin/main`，再新建独立分支。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 开始 Task 10 前仍须暂停，提醒用户切换智能体模式。
 
