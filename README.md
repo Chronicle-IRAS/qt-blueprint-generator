@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-项目当前已完成 MVP Task 1 至 Task 8：
+项目当前已完成 MVP Task 1 至 Task 9：
 
 - Qt 6 Widgets / C++17 / CMake 工程骨架和 Qt Test 测试环境。
 - 蓝图领域模型及 `blueprint.json` 序列化往返。
@@ -14,8 +14,9 @@
 - 异步 AI 客户端、离线 Fake、OpenAI-compatible HTTPS 请求，以及模型响应的 JSON、路径、扩展名和大小校验。
 - 确定性 Qt 工程骨架、公共契约、生成清单与 SHA-256，以及候选保存、预览、逐文件接受/拒绝/取消和人工修改保护。
 - 外部 C/C++ 文件黑盒导入、接口契约绑定、文件哈希复验，以及与 AI 提示词和候选覆盖流程的隔离。
+- 显式异步 CMake 配置与构建、构建日志面板，以及携带外部代码且保留当前文件字节的空目录导出。
 
-Task 6、Task 7 已分别通过 PR #6、PR #7 合入 main。Task 8 已从最新远端 main（`dda7179`）新建独立分支 `feature/task8-external-code` 并完成，通过规格与质量复核；完整 CTest 9/9 和独立集成链路均通过。Task 9、Task 10 尚未开始，Task 10 开始前需暂停并提醒用户切换 Agent 模式。
+Task 6 至 Task 8 已分别通过 PR #6 至 PR #8 合入 main。Task 9 在基于 `70a3d9f` 的独立分支 `feature/task9-build-export` 上完成，最终完整构建与 CTest 10/10 通过，独立导出/构建集成验证通过，规格与代码质量复核通过。Task 10 尚未开始，开始前需暂停并提醒用户切换 Agent 模式。
 
 ## MVP 工作流
 
@@ -101,12 +102,41 @@ Task 7 的核心服务按以下顺序使用；生成和审核操作尚未接入�
 
 源目录、工作目录和文件路径均需通过目录链接、Windows reparse point、大小写别名、穿越、重复及前缀冲突检查。节点 ID 和相对路径沿用可移植 ASCII 规则。导入是面向可信本机单写入者的文件事务，不修改源文件权限，也不承诺抵御其他进程并发替换路径或断电。
 
-外部节点不会进入可生成 IR 模块或生成清单的模块列表；相邻模块的提示词只包含蓝图中人工填写的外部接口契约，不读取外部源码。AI 候选仍只能写入可生成节点自己的实现和测试目录，不能覆盖 `external/`。构建、导出和窗口界面接入属于后续 Task。
+外部节点不会进入可生成 IR 模块或生成清单的模块列表；相邻模块的提示词只包含蓝图中人工填写的外部接口契约，不读取外部源码。AI 候选仍只能写入可生成节点自己的实现和测试目录，不能覆盖 `external/`。Task 9 的导出服务会复验并携带外部代码；导入操作本身尚未接入窗口。
 
 单独运行导入测试：
 
 ```powershell
 ctest --test-dir build -C Debug -R '^external_code_importer$' --output-on-failure
+```
+
+## 构建与导出（Task 9）
+
+窗口底部的 **Build and export** 面板可填写工作目录、独立构建目录、CMake 程序、配置参数及现有空导出目录，然后点击 Build 或 Export。日志面板显示构建输出、各阶段退出码及失败原因。工作目录是包含 `generated-project/` 的目录，不是 `generated-project/` 本身；当前画布不会在点击 Build 时自动保存或生成工程。
+
+本机 MinGW/Ninja 环境的配置参数示例为 `-G Ninja -DCMAKE_PREFIX_PATH=E:/Qt/6.9.3/mingw_64`，CMake 程序可填写 `cmake` 或完整路径。启动编辑器前仍需按上述 PowerShell 示例设置 Qt、MinGW、Ninja 的 `PATH`；路径含空格的配置参数请加双引号。
+
+`BuildService::start()` 接收源码目录、独立构建目录、CMake 程序及配置/构建参数，异步依次执行 CMake 配置和构建。配置失败时不会继续构建；服务提供分阶段 stdout、stderr、退出码和最终结果，拒绝并发启动，不自动运行生成的程序。源码目录必须已存在，构建目录可尚未创建，但二者均须为绝对路径且不能互相包含。源码/构建目录由专用字段控制，配置参数不能再次传入 `-S`、`-B`，也不能使用 `-P`、`-E`、`--build`、`--install` 等切换 CMake 执行模式的选项。
+
+`ProjectExporter::exportProject(workspace, target, &error)` 将当前工作工程复制到一个已存在的空目录。导出布局如下：
+
+| 工作目录中的来源 | 导出位置 |
+|---|---|
+| `generated-project/` 内容 | 导出目录根部 |
+| `generation-manifest.json` | `generation-manifest.json` |
+| `generated-project/src/contracts/source-blueprint.json` | 另存为根部 `blueprint.json` |
+| `external/<node-id>/` | `src/external/<node-id>/` |
+
+导出保留当前工程文件的原始字节，包括人工修改后的实现，不会把它们还原为上次生成版本。外部源码及其导入清单须通过复验；候选目录、工作目录下的构建产物及其他私有文件不在导出映射内。请将构建目录放在 `generated-project/` 之外，且不要在工程源目录内存放密钥或其他不应交付的文件。
+
+复制先在目标目录同级的唯一临时目录中进行，并核对文件哈希；成功后通过目录重命名提交。非空目标、路径重叠、链接、非法路径和映射冲突会被拒绝，普通失败会尝试清理临时副本、恢复空目标。该保证面向可信本机单写入者，不涵盖断电、进程崩溃或恶意并发替换目录。
+
+构建会执行工程中的 CMake 和编译步骤，应先人工审查来源。导出不等于编译或业务验收通过，也不会自动生成外部模块的调用连接。当前导出为同步操作，大工程复制期间界面可能短暂阻塞；尚不提供取消操作。Task 10 的完整端到端验收尚未开始。
+
+单独运行构建与导出测试：
+
+```powershell
+ctest --test-dir build -C Debug -R '^project_exporter$' --output-on-failure
 ```
 
 ## 蓝图模型
@@ -137,7 +167,7 @@ project/
 │  ├─ blueprint/        # 领域模型、序列化和校验
 │  ├─ editor/           # 蓝图场景、节点和连线图元
 │  ├─ generation/       # IR、提示词、AI 响应校验、工程骨架与候选管理
-│  └─ workspace/        # 外部代码导入；后续加入构建与导出服务
+│  └─ workspace/        # 外部代码导入、CMake 构建与项目导出
 └─ tests/               # Qt Test 自动化测试
 ```
 

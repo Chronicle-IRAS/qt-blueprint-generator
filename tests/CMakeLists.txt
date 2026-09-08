@@ -1,5 +1,23 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
 
+set(project_exporter_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_project_exporter.moc")
+add_custom_command(OUTPUT "${project_exporter_moc}"
+    COMMAND Qt6::moc -o tst_project_exporter.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_project_exporter.cpp"
+    DEPENDS tst_project_exporter.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_project_exporter tst_project_exporter.cpp "${project_exporter_moc}")
+set_target_properties(tst_project_exporter PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_project_exporter PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_project_exporter PRIVATE BlueprintEditorCore Qt6::Test)
+target_compile_definitions(tst_project_exporter PRIVATE
+    TASK9_CMAKE_COMMAND="${CMAKE_COMMAND}"
+    TASK9_CMAKE_GENERATOR="${CMAKE_GENERATOR}"
+    TASK9_MAKE_PROGRAM="${CMAKE_MAKE_PROGRAM}"
+    TASK9_CXX_COMPILER="${CMAKE_CXX_COMPILER}"
+    TASK9_QT_CMAKE_DIR="${Qt6_DIR}")
+add_test(NAME project_exporter COMMAND tst_project_exporter)
+set_tests_properties(project_exporter PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 set(external_code_importer_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_external_code_importer.moc")
 add_custom_command(OUTPUT "${external_code_importer_moc}"
     COMMAND Qt6::moc -o tst_external_code_importer.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_external_code_importer.cpp"

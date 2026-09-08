@@ -4,8 +4,8 @@
 
 ## 当前状态
 
-- 当前开发分支：`feature/task8-external-code`，直接基于远端 `main` 的 `dda7179`（Task 7 / PR #7）。
-- 当前 worktree：`C:\Users\Lenovo\.config\superpowers\worktrees\project\task8-external-code`。
+- 当前开发分支：`feature/task9-build-export`，直接基于远端 `main` 的 `70a3d9f`（Task 8 / PR #8）。
+- 当前 worktree：`C:\Users\Lenovo\.config\superpowers\worktrees\project\task9-build-export`。
 - 设计基线：`doc/mvp-implementation-plan.md`
 - `doc/multilanguage-development-design.md` 为 MVP 完成后的后续规划，不影响当前 Task 1 至 Task 10。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
@@ -18,11 +18,24 @@
 - Task 7「实现确定性工程骨架与候选代码流程」已完成，通过规格和最终质量复核，完整构建与 CTest `8/8 passed`。
 - Task 7 的 PR #7 已由用户合入 `main`，已拉取并确认合并提交 `dda7179`。
 - Task 8「实现外部代码黑盒导入」已完成，通过规格和最终质量复核；完整构建、CTest `9/9 passed` 和独立集成链路均通过。
-- 同步目标：`origin/feature/task8-external-code`；完成后通过普通推送和独立 PR 交付。
-- Task 9、Task 10 尚未开始。开始 Task 10 前必须暂停并提醒用户切换 Agent 模式。
+- Task 8 的 PR #8 已由用户合入 `main`，已拉取并确认合并提交 `70a3d9f`。
+- Task 9「实现构建验证与项目导出」已完成；主实现为 `6519955`，质量复核修复为 `4bc109e` 和 `c56c843`，规格与最终质量复核均通过。最终专项 Qt Test `28 passed`，最终完整构建和 CTest `10/10 passed`（45.53 秒），独立导出/构建集成验证退出码 0。
+- 同步目标：`origin/feature/task9-build-export`；完成后通过普通推送和独立 PR 交付。
+- Task 10 尚未开始。开始前必须暂停并提醒用户切换 Agent 模式。
 
 ## 已完成提交
 
+- `eee76c9 docs: record Task 9 kickoff from merged Task 8`
+  - 基于已合并 PR #8 创建 Task 9 独立分支并记录基线。
+- `6519955 feat: build and export generated Qt projects`
+  - 异步 CMake 服务、构建日志面板、工具链参数输入和空目录暂存导出。
+  - 外部源码映射、人工修改保留、路径/清单验证和 Windows 重命名失败清理测试。
+- `4bc109e fix: protect build invocation controls`
+  - 拒绝覆盖服务所有的 CMake 源码/构建目录和切换执行模式的配置参数。
+  - 修复 CMake 程序无法启动时构建按钮被永久禁用，并增加同步失败回归测试。
+- `c56c843 fix: retain failed export recovery artifacts`
+  - 导出恢复失败时保留原空目标备份和已完成导出，并在错误中给出准确恢复路径。
+  - 增加内部恢复状态决策的 RED→GREEN 回归测试。
 - `ee3bf88 chore: scaffold Qt blueprint editor`
   - Qt 6 Widgets / C++17 / CMake 工程骨架。
   - 空 `MainWindow`、应用入口与 Qt Test 烟雾测试。
@@ -112,6 +125,20 @@
 - Task 8 独立集成验收：导入 → 蓝图校验 → IR/提示词 → 工程骨架 → 普通候选接受完整链路退出码 0，外部源码及导入清单保持不变。
 - Task 8 规格复核：SPEC COMPLIANT；确认缺失清单不再回退到未绑定的直接文件校验。
 - Task 8 最终质量复核：Ready to merge，无 Critical、无 Important；非阻断 Minor 为幂等测试使用文件修改时间，在极粗时间分辨率文件系统上敏感度可能降低。
+- Task 9 规格复核：SPEC COMPLIANT；确认构建、日志、导出映射、失败清理和范围边界符合计划。
+- Task 9 质量复核 RED：14 类受保留 CMake 参数被错误接受，且不存在的 CMake 程序同步失败后构建按钮仍被禁用，共 `15` 个预期失败。
+- Task 9 质量修复 GREEN：参数守卫专项 `16 passed`，缺失工具专项 `3 passed`，完整专项二进制 `27 passed, 0 failed, 0 skipped`；完整 CTest `10/10 passed`（46.12 秒）。
+- Task 9 恢复分支 RED→GREEN：恢复失败场景最初错误启用导出副本删除，定向测试 `1 failed`；修复后定向 `3/3 passed`，完整专项 `28 passed, 0 failed, 0 skipped`。
+- Task 9 最终质量复核：Ready to merge，无 Critical、无 Important、无 Minor；交付前重新完整构建并执行 CTest `10/10 passed`（45.53 秒），独立导出工程实际 CMake 构建退出码 0。
+
+## Task 9 实现与边界
+
+- `BuildService` 使用独立 `QProcess` 异步执行 CMake 配置、构建，分别收集 stdout、stderr 和退出码；配置失败不启动构建，同一实例拒绝并发请求，不自动运行生成应用。
+- 主窗口新增构建/导出面板，工作目录指向包含 `generated-project/` 的根目录；构建输出需放在源码树之外。构建是显式执行受信任工程，不是模型代码沙箱。
+- 导出将 `generated-project/` 展平至目标根部，另带生成清单及原始蓝图；经过契约、哈希和目录清单复验的外部代码映射到 `src/external/<node-id>/`。
+- 当前实现文件的人工修改按原始字节保留；生成清单作为历史记录复制，不冒充当前文件全部重新生成或已通过业务验收。候选、工作目录构建产物和其他非映射文件不参与导出。
+- 目标必须是现有空目录，且不得与工作目录重叠。先在同级唯一临时目录复制并验证哈希，再通过目录重命名提交；普通失败清理暂存并尝试恢复目标。可信本机单写入者、非断电原子性边界与既有工作目录服务一致。
+- Task 10 尚未开始；Task 9 交付后必须暂停并提醒用户切换 Agent 模式。
 
 ## Task 8 实现与边界
 
@@ -149,9 +176,9 @@
 
 ## 恢复工作
 
-1. Task 8 的代码与构建位于上述独立 worktree；原项目目录和 Task 6、Task 7 worktree 保留不动。
-2. Task 7 已合入远端 `main`；Task 8 已基于该合并完成外部文件导入、SHA-256、接口绑定、候选隔离和清单降级修复。
-3. Task 8 通过普通推送和 PR 交付；不自动合并或开始 Task 9。开始 Task 9 前须确认 Task 8 已合入最新 `origin/main`，再新建独立分支。
+1. Task 9 的代码与构建位于上述独立 worktree；原项目目录和 Task 6 至 Task 8 worktree 保留不动。
+2. Task 8 已合入远端 `main`；Task 9 已基于该合并新建分支，当前按测试先行流程开发构建服务、构建面板和原子导出。
+3. Task 9 完成后通过普通推送和 PR 交付；不自动合并或开始 Task 10。开始 Task 10 前须确认 Task 9 已合入最新 `origin/main`，并提醒用户切换 Agent 模式。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 开始 Task 10 前仍须暂停，提醒用户切换智能体模式。
 
