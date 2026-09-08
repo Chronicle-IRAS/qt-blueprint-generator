@@ -399,11 +399,12 @@ void MainWindow::startBuild()
     request.buildArguments = m_buildArguments;
     QString error;
     appendBuildLog(tr("Starting configure for %1\n").arg(request.sourceDirectory));
+    m_buildProjectButton->setEnabled(false);
     if (!m_buildService->start(request, &error)) {
+        m_buildProjectButton->setEnabled(true);
         appendBuildLog(tr("Build request rejected: %1\n").arg(error));
         return;
     }
-    m_buildProjectButton->setEnabled(false);
 }
 
 void MainWindow::exportProject()

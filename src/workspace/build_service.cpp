@@ -69,6 +69,33 @@ bool pathsOverlap(const QString &left, const QString &right)
 #endif
     return a == b || a.startsWith(b + QLatin1Char('/')) || b.startsWith(a + QLatin1Char('/'));
 }
+
+bool reservedLongOption(const QString &argument, const QString &option)
+{
+    return argument == option || argument.startsWith(option + QLatin1Char('='));
+}
+
+bool validConfigureArguments(const QStringList &arguments, QString *error)
+{
+    for (const QString &argument : arguments) {
+        const bool ownsShortPath = argument == QStringLiteral("-S")
+            || argument == QStringLiteral("-B") || argument == QStringLiteral("-P")
+            || (argument.size() > 2 && (argument.startsWith(QStringLiteral("-S"))
+                                        || argument.startsWith(QStringLiteral("-B"))
+                                        || argument.startsWith(QStringLiteral("-P"))));
+        const bool ownsLongPath = reservedLongOption(argument, QStringLiteral("--source"))
+            || reservedLongOption(argument, QStringLiteral("--build"));
+        const bool alternateMode = argument == QStringLiteral("-E")
+            || reservedLongOption(argument, QStringLiteral("--install"))
+            || reservedLongOption(argument, QStringLiteral("--open"))
+            || reservedLongOption(argument, QStringLiteral("--workflow"))
+            || reservedLongOption(argument, QStringLiteral("--find-package"));
+        if (ownsShortPath || ownsLongPath || alternateMode)
+            return fail(error, QStringLiteral("Reserved CMake configure argument is not allowed: ")
+                                   + argument);
+    }
+    return true;
+}
 }
 
 BuildService::BuildService(QObject *parent)
@@ -102,6 +129,8 @@ bool BuildService::start(const BuildRequest &request, QString *error)
         return fail(error, QStringLiteral("A build is already running"));
     if (request.cmakeExecutable.trimmed().isEmpty())
         return fail(error, QStringLiteral("CMake executable must not be empty"));
+    if (!validConfigureArguments(request.configureArguments, error))
+        return false;
     if (!safeAbsolutePath(request.sourceDirectory, true, error)
         || !safeAbsolutePath(request.buildDirectory, false, error))
         return false;

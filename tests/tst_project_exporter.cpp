@@ -110,8 +110,11 @@ private slots:
     void commitFailureRemovesStagingAndLeavesTargetEmpty();
     void buildServiceStopsAfterFailedConfigure();
     void buildServiceConfiguresAndBuildsGeneratedProject();
+    void buildServiceRejectsOwnedCmakeArguments_data();
+    void buildServiceRejectsOwnedCmakeArguments();
     void mainWindowReportsBuildInputErrorsAndRestoresButton();
     void mainWindowStreamsFailedConfigureAndPreservesArguments();
+    void mainWindowRestoresBuildButtonWhenCmakeCannotStart();
 };
 
 void ProjectExporterTest::rejectsNonEmptyTarget()
@@ -274,6 +277,8 @@ void ProjectExporterTest::buildServiceConfiguresAndBuildsGeneratedProject()
     QVERIFY(QDir().mkpath(workspace));
     QString error;
     QVERIFY2(ProjectScaffolder::create(blueprint(), workspace, &error), qPrintable(error));
+    const QString toolchain = root.filePath(QStringLiteral("minimal toolchain.cmake"));
+    QVERIFY(writeFile(toolchain, QByteArray{}));
     BuildService service;
     QSignalSpy output(&service, &BuildService::standardOutput);
     QSignalSpy stages(&service, &BuildService::stageFinished);
@@ -282,7 +287,8 @@ void ProjectExporterTest::buildServiceConfiguresAndBuildsGeneratedProject()
     request.sourceDirectory = QDir(workspace).filePath(QStringLiteral("generated-project"));
     request.buildDirectory = build;
     request.cmakeExecutable = QString::fromUtf8(TASK9_CMAKE_COMMAND);
-    request.configureArguments = configureArguments();
+    request.configureArguments = configureArguments()
+        << QStringLiteral("--toolchain") << toolchain;
     request.buildArguments = {QStringLiteral("--config"), QStringLiteral("Debug"),
                               QStringLiteral("--parallel"), QStringLiteral("2")};
     QVERIFY2(service.start(request, &error), qPrintable(error));
@@ -296,6 +302,48 @@ void ProjectExporterTest::buildServiceConfiguresAndBuildsGeneratedProject()
     QVERIFY(result.buildStarted);
     QCOMPARE(stages.size(), 2);
     QVERIFY(!output.isEmpty());
+}
+
+void ProjectExporterTest::buildServiceRejectsOwnedCmakeArguments_data()
+{
+    QTest::addColumn<QStringList>("arguments");
+    QTest::newRow("source separated") << QStringList{QStringLiteral("-S"), QStringLiteral("other")};
+    QTest::newRow("source joined") << QStringList{QStringLiteral("-Sother")};
+    QTest::newRow("source long separated") << QStringList{QStringLiteral("--source"), QStringLiteral("other")};
+    QTest::newRow("source long equals") << QStringList{QStringLiteral("--source=other")};
+    QTest::newRow("binary separated") << QStringList{QStringLiteral("-B"), QStringLiteral("other")};
+    QTest::newRow("binary joined") << QStringList{QStringLiteral("-Bother")};
+    QTest::newRow("build long separated") << QStringList{QStringLiteral("--build"), QStringLiteral("other")};
+    QTest::newRow("build long equals") << QStringList{QStringLiteral("--build=other")};
+    QTest::newRow("script separated") << QStringList{QStringLiteral("-P"), QStringLiteral("script.cmake")};
+    QTest::newRow("script joined") << QStringList{QStringLiteral("-Pscript.cmake")};
+    QTest::newRow("command mode") << QStringList{QStringLiteral("-E"), QStringLiteral("echo"), QStringLiteral("hello")};
+    QTest::newRow("install mode") << QStringList{QStringLiteral("--install"), QStringLiteral("other")};
+    QTest::newRow("open mode") << QStringList{QStringLiteral("--open"), QStringLiteral("other")};
+    QTest::newRow("workflow mode") << QStringList{QStringLiteral("--workflow"), QStringLiteral("--preset"), QStringLiteral("ci")};
+}
+
+void ProjectExporterTest::buildServiceRejectsOwnedCmakeArguments()
+{
+    QFETCH(QStringList, arguments);
+    QTemporaryDir root;
+    const QString source = root.filePath(QStringLiteral("source"));
+    const QString build = root.filePath(QStringLiteral("build"));
+    QVERIFY(QDir().mkpath(source));
+    BuildService service;
+    QSignalSpy finished(&service, &BuildService::finished);
+    BuildRequest request;
+    request.sourceDirectory = source;
+    request.buildDirectory = build;
+    request.cmakeExecutable = QString::fromUtf8(TASK9_CMAKE_COMMAND);
+    request.configureArguments = arguments;
+    QString error;
+
+    QVERIFY(service.start(request, &error) == false);
+    QVERIFY2(error.contains(QStringLiteral("reserved"), Qt::CaseInsensitive), qPrintable(error));
+    QVERIFY(!service.isRunning());
+    QVERIFY(finished.isEmpty());
+    QVERIFY(!QFileInfo::exists(build));
 }
 
 void ProjectExporterTest::mainWindowReportsBuildInputErrorsAndRestoresButton()
@@ -353,6 +401,32 @@ void ProjectExporterTest::mainWindowStreamsFailedConfigureAndPreservesArguments(
     QVERIFY(log->toPlainText().contains(QStringLiteral("[configure stderr]")));
     QVERIFY(log->toPlainText().contains(QStringLiteral("expected UI failure")));
     QVERIFY(!log->toPlainText().contains(QStringLiteral("argument boundary lost")));
+    QVERIFY(log->toPlainText().contains(QStringLiteral("Build failed:")));
+    QVERIFY(button->isEnabled());
+}
+
+void ProjectExporterTest::mainWindowRestoresBuildButtonWhenCmakeCannotStart()
+{
+    QTemporaryDir root;
+    const QString workspacePath = root.filePath(QStringLiteral("workspace"));
+    const QString sourcePath = QDir(workspacePath).filePath(QStringLiteral("generated-project"));
+    const QString buildPath = root.filePath(QStringLiteral("build"));
+    QVERIFY(QDir().mkpath(sourcePath));
+    MainWindow window;
+    window.setBuildToolConfiguration(root.filePath(QStringLiteral("task9_missing_tool.exe")), {});
+    auto *workspace = window.findChild<QLineEdit *>(QStringLiteral("workspacePathEdit"));
+    auto *build = window.findChild<QLineEdit *>(QStringLiteral("buildDirectoryEdit"));
+    auto *button = window.findChild<QPushButton *>(QStringLiteral("buildProjectButton"));
+    auto *log = window.findChild<QPlainTextEdit *>(QStringLiteral("buildLog"));
+    QVERIFY(workspace);
+    QVERIFY(build);
+    QVERIFY(button);
+    QVERIFY(log);
+    workspace->setText(workspacePath);
+    build->setText(buildPath);
+
+    button->click();
+    QTRY_VERIFY_WITH_TIMEOUT(log->toPlainText().contains(QStringLiteral("Could not start CMake")), 10000);
     QVERIFY(log->toPlainText().contains(QStringLiteral("Build failed:")));
     QVERIFY(button->isEnabled());
 }
