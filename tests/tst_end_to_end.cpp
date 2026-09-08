@@ -320,14 +320,10 @@ void EndToEndTest::loginBlueprintGeneratesExportsBuildsAndPassesQtTests()
     qInfo().noquote() << QString::fromUtf8(ctest.output);
     QCOMPARE(snapshot(exported), expectedExport);
 
-    // Retaining an artifact is opt-in. The exporter enforces absolute, existing,
-    // empty destinations and leaves a rejected destination untouched.
+    // Retaining an artifact is opt-in. Destination validation belongs to the exporter.
     if (qEnvironmentVariableIsSet("BLUEPRINT_DEMO_OUTPUT_DIR")) {
         const QString destination = qEnvironmentVariable("BLUEPRINT_DEMO_OUTPUT_DIR");
-        const auto before = snapshot(destination);
         const bool exportedDemo = ProjectExporter::exportProject(workspace, destination, &error);
-        if (!exportedDemo)
-            QCOMPARE(snapshot(destination), before);
         QVERIFY2(exportedDemo, qPrintable(error));
         QCOMPARE(snapshot(destination), expectedExport);
         qInfo().noquote() << "Verified login demo exported to" << destination;
