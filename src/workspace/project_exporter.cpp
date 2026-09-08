@@ -1,4 +1,5 @@
 #include "workspace/project_exporter.h"
+#include "workspace/project_exporter_recovery_p.h"
 
 #include "blueprint/blueprint_serializer.h"
 #include "blueprint/blueprint_validator.h"
@@ -242,6 +243,19 @@ bool removeTree(const QString &path)
 }
 }
 
+ProjectExporterRecovery::Decision ProjectExporterRecovery::decideBackupRemovalFailure(
+    bool moved, bool restored, const QString &targetPath,
+    const QString &backupPath, const QString &rollbackPath)
+{
+    if (restored)
+        return {true, QStringLiteral("Could not remove export backup; target restored")};
+    const QString completedExportPath = moved ? rollbackPath : targetPath;
+    return {false,
+            QStringLiteral("Could not remove export backup and target restoration failed; "
+                           "original empty target retained at %1; completed export retained at %2")
+                .arg(backupPath, completedExportPath)};
+}
+
 bool ProjectExporter::exportProject(const QString &workspacePath, const QString &targetPath,
                                     QString *error)
 {
@@ -370,12 +384,15 @@ bool ProjectExporter::exportProject(const QString &workspacePath, const QString 
     }
     if (!parent.rmdir(backupName)) {
         const QString rollbackName = stageName + QStringLiteral("-rollback");
+        const QString rollbackPath = parent.filePath(rollbackName);
+        const QString backupPath = parent.filePath(backupName);
         const bool moved = parent.rename(targetInfo.fileName(), rollbackName);
         const bool restored = moved && parent.rename(backupName, targetInfo.fileName());
-        if (moved)
-            removeTree(parent.filePath(rollbackName));
-        return fail(error, restored ? QStringLiteral("Could not remove export backup; target restored")
-                                    : QStringLiteral("Could not remove export backup and target restoration failed"));
+        const auto decision = ProjectExporterRecovery::decideBackupRemovalFailure(
+            moved, restored, target, backupPath, rollbackPath);
+        if (decision.removeRollback)
+            removeTree(rollbackPath);
+        return fail(error, decision.error);
     }
     return true;
 }

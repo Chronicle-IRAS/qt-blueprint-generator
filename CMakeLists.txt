@@ -47,6 +47,7 @@ qt_add_library(BlueprintEditorCore STATIC
     src/workspace/build_service.h
     src/workspace/project_exporter.cpp
     src/workspace/project_exporter.h
+    src/workspace/project_exporter_recovery_p.h
 )
 
 target_include_directories(BlueprintEditorCore PUBLIC

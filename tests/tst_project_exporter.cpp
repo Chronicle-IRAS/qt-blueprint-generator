@@ -2,6 +2,7 @@
 #include "workspace/external_code_importer.h"
 #include "workspace/build_service.h"
 #include "workspace/project_exporter.h"
+#include "workspace/project_exporter_recovery_p.h"
 #include "app/main_window.h"
 
 #include <QCryptographicHash>
@@ -108,6 +109,7 @@ private slots:
     void rejectsMalformedInputsAndMappingCollisions();
     void sourceLinkFailureLeavesTargetAndSiblingDirectoryUntouched();
     void commitFailureRemovesStagingAndLeavesTargetEmpty();
+    void failedBackupRestorationRetainsBothRecoveryDirectories();
     void buildServiceStopsAfterFailedConfigure();
     void buildServiceConfiguresAndBuildsGeneratedProject();
     void buildServiceRejectsOwnedCmakeArguments_data();
@@ -242,6 +244,33 @@ void ProjectExporterTest::commitFailureRemovesStagingAndLeavesTargetEmpty()
 #else
     QSKIP("Windows handle sharing regression");
 #endif
+}
+
+void ProjectExporterTest::failedBackupRestorationRetainsBothRecoveryDirectories()
+{
+    const QString target = QStringLiteral("C:/exports/project");
+    const QString backup = QStringLiteral("C:/exports/.project.backup-id");
+    const QString rollback = QStringLiteral("C:/exports/.project.stage-id-rollback");
+
+    const auto decision = ProjectExporterRecovery::decideBackupRemovalFailure(
+        true, false, target, backup, rollback);
+
+    QVERIFY(!decision.removeRollback);
+    QCOMPARE(decision.error,
+             QStringLiteral("Could not remove export backup and target restoration failed; "
+                            "original empty target retained at C:/exports/.project.backup-id; "
+                            "completed export retained at C:/exports/.project.stage-id-rollback"));
+
+    const auto restored = ProjectExporterRecovery::decideBackupRemovalFailure(
+        true, true, target, backup, rollback);
+    QVERIFY(restored.removeRollback);
+    QCOMPARE(restored.error, QStringLiteral("Could not remove export backup; target restored"));
+
+    const auto targetNotMoved = ProjectExporterRecovery::decideBackupRemovalFailure(
+        false, false, target, backup, rollback);
+    QVERIFY(!targetNotMoved.removeRollback);
+    QVERIFY(targetNotMoved.error.contains(backup));
+    QVERIFY(targetNotMoved.error.contains(target));
 }
 
 void ProjectExporterTest::buildServiceStopsAfterFailedConfigure()
