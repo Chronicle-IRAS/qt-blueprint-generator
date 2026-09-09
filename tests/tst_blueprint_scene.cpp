@@ -271,9 +271,12 @@ void BlueprintSceneTest::invalidAndCancelledPortDragsDoNotMutateDocument()
     QTest::keyClick(view.viewport(), Qt::Key_Escape);
     QVERIFY(portConnectionPreview(scene) == nullptr);
     QCOMPARE(targetItem->highlightedInputPort(), -1);
+    QTest::mouseMove(view.viewport(), invalidPoint, 20);
     QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier,
-                        view.mapFromScene(targetItem->inputAnchor(0)));
+                        invalidPoint);
     QCOMPARE(document, before);
+    QCOMPARE(sourceItem->pos(), QPointF(120.0, 80.0));
+    QCOMPARE(scene.undoStack()->count(), commandsBefore);
 
     QTest::mousePress(view.viewport(), Qt::LeftButton, Qt::NoModifier, sourcePoint);
     QTest::mouseMove(view.viewport(), view.mapFromScene(targetItem->inputAnchor(0)), 20);
@@ -282,9 +285,11 @@ void BlueprintSceneTest::invalidAndCancelledPortDragsDoNotMutateDocument()
                       view.mapFromScene(targetItem->inputAnchor(0)));
     QVERIFY(portConnectionPreview(scene) == nullptr);
     QCOMPARE(targetItem->highlightedInputPort(), -1);
+    QTest::mouseMove(view.viewport(), invalidPoint, 20);
     QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier,
-                        view.mapFromScene(targetItem->inputAnchor(0)));
+                        invalidPoint);
     QCOMPARE(document, before);
+    QCOMPARE(sourceItem->pos(), QPointF(120.0, 80.0));
     QCOMPARE(scene.undoStack()->count(), commandsBefore);
 }
 
@@ -313,9 +318,27 @@ void BlueprintSceneTest::portDragPreservesDecisionLabelsAndConnectAction()
     QCOMPARE(window.document().edges.at(1).label, QStringLiteral("false"));
 
     connectAction->trigger();
+    dragPort(view, decision->outputAnchor(), trueTarget->inputAnchor());
+    QCOMPARE(window.document().edges.size(), 3);
+    QVERIFY(window.scene()->connectionSource().isEmpty());
+    QTest::mouseClick(view->viewport(), Qt::LeftButton, Qt::NoModifier,
+                      view->mapFromScene(falseTarget->sceneBoundingRect().center()));
+    QVERIFY(window.scene()->connectionSource().isEmpty());
+    QCOMPARE(window.document().edges.size(), 3);
+
+    const QPoint outputPoint = view->mapFromScene(decision->outputAnchor());
+    const QPointF middle = (decision->outputAnchor() + falseTarget->inputAnchor()) / 2.0;
+    QTest::mousePress(view->viewport(), Qt::LeftButton, Qt::NoModifier, outputPoint);
+    QTest::mouseMove(view->viewport(), view->mapFromScene(middle), 20);
+    QVERIFY(portConnectionPreview(*window.scene()));
+    connectAction->trigger();
+    QVERIFY(portConnectionPreview(*window.scene()) == nullptr);
+    QTest::mouseRelease(view->viewport(), Qt::LeftButton, Qt::NoModifier,
+                        view->mapFromScene(middle));
+
     QVERIFY(window.scene()->chooseConnectionNode(trueTarget->nodeId()));
     QVERIFY(window.scene()->chooseConnectionNode(falseTarget->nodeId()));
-    QCOMPARE(window.document().edges.size(), 3);
+    QCOMPARE(window.document().edges.size(), 4);
 }
 
 void BlueprintSceneTest::editingPortsUpdatesIncidentEdgeAnchorsAndUndo()

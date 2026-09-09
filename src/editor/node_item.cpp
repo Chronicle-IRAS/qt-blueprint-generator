@@ -122,9 +122,13 @@ void NodeItem::setHighlightedInputPort(int index)
 
 void NodeItem::cancelPortDrag()
 {
-    m_portDragActive = false;
-    // A cancelled drag still receives the eventual left-button release because
-    // this item owns the mouse grab. Treat that release as a no-op, not a move.
+    if (m_portDragActive) {
+        m_portDragActive = false;
+        // This item keeps the mouse grab until the initiating left button is
+        // released. Suppress the rest of that gesture so cancellation cannot
+        // fall through to the built-in movable-item behavior.
+        m_suppressPortDragGesture = true;
+    }
     m_dragStart = pos();
 }
 
@@ -200,7 +204,6 @@ QVariant NodeItem::itemChange(GraphicsItemChange change, const QVariant &value)
 void NodeItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     if (event->button() == Qt::RightButton && m_portDragActive) {
-        m_portDragActive = false;
         if (m_portDragCancelledHandler) {
             m_portDragCancelledHandler();
         }
@@ -210,6 +213,7 @@ void NodeItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
     if (event->button() == Qt::LeftButton) {
         const int outputIndex = outputPortAt(event->pos());
         if (outputIndex >= 0 && m_portDragStartedHandler) {
+            m_suppressPortDragGesture = false;
             m_portDragActive = true;
             m_portDragStartedHandler(m_nodeId, outputIndex);
             event->accept();
@@ -226,6 +230,10 @@ void NodeItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 
 void NodeItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
+    if (m_suppressPortDragGesture && event->buttons().testFlag(Qt::LeftButton)) {
+        event->accept();
+        return;
+    }
     if (m_portDragActive && event->buttons().testFlag(Qt::LeftButton)) {
         if (m_portDragMovedHandler) {
             m_portDragMovedHandler(event->scenePos());
@@ -248,6 +256,11 @@ void NodeItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
 void NodeItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
+    if (m_suppressPortDragGesture && event->button() == Qt::LeftButton) {
+        m_suppressPortDragGesture = false;
+        event->accept();
+        return;
+    }
     if (m_portDragActive && event->button() == Qt::LeftButton) {
         m_portDragActive = false;
         if (m_portDragFinishedHandler) {

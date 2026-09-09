@@ -55,6 +55,7 @@ private:
     QPointF m_dragStart;
     bool m_dragSelectionCollapsed = false;
     bool m_portDragActive = false;
+    bool m_suppressPortDragGesture = false;
     int m_highlightedInputPort = -1;
     std::function<void(const QString &)> m_positionChangedHandler;
     std::function<void(const QString &)> m_clickedHandler;
