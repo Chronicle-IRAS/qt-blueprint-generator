@@ -29,7 +29,7 @@
 - 远端 Issue 按依赖、关键程度和更改幅度排序为 #16、#14、#13、#15、#17、#18、#19；均已标记 `enhancement` 和 `ready-for-agent`。
 - #16 已通过 PR #21 合入远端 `main`，合并提交为 `4f0bce6`。
 - #14 已通过独立分支创建 PR #22，标题含 `[feat]` 与 `(#14)`，正文含 `Closes #14`；当前等待用户合并。
-- #13 已从最新远端 `main` 新建独立分支；端口拖拽连线、稳定文档与交付前验收均已完成，完整 CTest `12/12 passed`（75.11 秒），启动、链接和差异检查通过，质量复核无剩余问题；等待推送并创建 PR。
+- #13 已通过独立分支创建 PR #23；标题为 `[feat] Support drag connections between node ports (#13)`，正文含 `Closes #13`，GitHub 判定为 CLEAN / MERGEABLE。完整 CTest `12/12 passed`（75.11 秒），启动、链接和差异检查通过，质量复核无剩余问题；当前等待用户合并。
 
 ## 已完成提交
 

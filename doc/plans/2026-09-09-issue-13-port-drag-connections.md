@@ -56,8 +56,8 @@
 - [x] Update stable user documentation and README for port dragging and cancellation.
 - [x] Run complete build, full CTest, startup probe, link check, and git diff --check.
 - [x] Perform quality review and resolve all Critical, Important, and Minor findings.
-- [ ] Commit each completed change group and normally push the branch.
-- [ ] Create a prefixed PR title containing (#13) and a body containing Closes #13. Do not force-push or auto-merge.
+- [x] Commit each completed change group and normally push the branch.
+- [x] Create a prefixed PR title containing (#13) and a body containing Closes #13. Do not force-push or auto-merge.
 
 ## Self-review checklist
 
