@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-- 当前开发分支：`docs/project-usage-guide`，基于远端 `main` 的 `4e2378e`（中英文界面 PR #12）。
+- 当前开发分支：`feature/issue-14-direct-node-editing`，基于远端 `main` 的 `6e16bac`（项目使用说明 PR #20）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
-- MVP 基线：`doc/mvp-implementation-plan.md`；完整使用说明：`doc/project-usage-guide.md`。
+- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-09-issue-14-direct-node-editing.md`；完整使用说明：`doc/project-usage-guide.md`。
 - `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；当前使用指南只说明已经实现的功能，不把后续规划写成现有能力。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
@@ -27,6 +27,7 @@
 - 中英文界面 PR #12 已合入远端 `main`，合并提交为 `4e2378e`。
 - 项目使用说明任务已新建 `docs/project-usage-guide` 分支：新增面向使用者的完整指南，并把 README 精简为稳定的项目说明，不再保留 Task、分支、PR 或测试耗时等开发过程记录。
 - 分支已普通推送至 `origin/docs/project-usage-guide`，并创建 PR #20；未强推、未自动合并。
+- Issue #14 已在独立分支开始：从画布节点双击进入全字段编辑，保存复用现有撤销命令，取消不修改文档。
 
 ## 已完成提交
 
@@ -124,6 +125,7 @@
 
 ## 验证记录
 
+- #14 基线：全新 ASCII 构建目录配置成功，`blueprint_scene` `1/1 passed`（0.31 秒）。
 - 项目说明任务使用全新纯 ASCII 构建目录完成 CMake 配置和完整构建；CTest `12/12 passed`（83.13 秒）。
 - README 与使用指南的本地 Markdown 链接全部可解析；`git diff --check` 通过。
 - 项目说明最终只读复核结论为 Ready，无 Critical 或 Important；唯一序列化 API 表述 Minor 已修正。
