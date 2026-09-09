@@ -29,10 +29,13 @@
 - 远端 Issue 按依赖、关键程度和更改幅度排序为 #16、#14、#13、#15、#17、#18、#19；均已标记 `enhancement` 和 `ready-for-agent`。
 - #16 已通过 PR #21 合入远端 `main`，合并提交为 `4f0bce6`。
 - #14 已通过独立分支创建 PR #22，标题含 `[feat]` 与 `(#14)`，正文含 `Closes #14`；当前等待用户合并。
-- #13 已从最新远端 `main` 新建独立分支；端口拖拽连线实现及专项测试已转绿，下一步更新稳定文档并执行完整验收。
+- #13 已从最新远端 `main` 新建独立分支；端口拖拽连线、稳定文档与交付前验收均已完成，完整 CTest `12/12 passed`（75.11 秒），启动、链接和差异检查通过，质量复核无剩余问题；等待推送并创建 PR。
 
 ## 已完成提交
 
+- `a6a8bad fix: suppress cancelled port drag gestures`
+  - 取消端口拖拽后抑制同一左键手势余下的移动和释放，避免退化为节点移动并污染撤销栈。
+  - 回归测试覆盖取消后继续移动，以及 Connect 模式与端口拖拽互相接管；复核结果为 Critical、Important、Minor 均无。
 - `293bfd8 feat: add direct port drag connections`
   - 支持从输出端口拖出临时曲线、有效输入端口绿色反馈、有效释放创建 FlowEdge，以及 Esc、右键和无效释放取消。
   - 有效连线复用现有标签和撤销栈；专项测试覆盖 Decision `true`/`false`、旧 Connect 操作、节点移动，以及取消后不产生伪移动命令。
@@ -40,6 +43,7 @@
   - 先建立端口拖拽的失败测试，确认实现前缺少端口命中与高亮接口。
 - `3b23c76 docs: plan issue 13 port drag connections`
   - 记录 Issue #13 的交互范围、测试先行步骤、文档更新和 PR 约束。
+
 - `b31d446 docs: plan issue 16 dock recovery`
   - 记录 #16 的测试先行步骤、实现范围、双语文本和交付约束。
 - `2165f85 feat: restore editor docks from view menu`
