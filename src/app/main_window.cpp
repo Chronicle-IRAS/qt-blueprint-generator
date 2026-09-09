@@ -370,11 +370,19 @@ MainWindow::MainWindow(QWidget *parent)
     m_blueprintToolbar->addSeparator();
     m_toolbarUndoAction = m_blueprintToolbar->addAction(tr("Undo"));
     m_toolbarRedoAction = m_blueprintToolbar->addAction(tr("Redo"));
+    m_blueprintToolbar->addSeparator();
+    m_toolbarBuildAction = m_blueprintToolbar->addAction(tr("Build"));
+    m_toolbarBuildAction->setObjectName(QStringLiteral("toolbarBuildAction"));
+    m_toolbarExportAction = m_blueprintToolbar->addAction(tr("Export"));
+    m_toolbarExportAction->setObjectName(QStringLiteral("toolbarExportAction"));
 
     m_editMenu = menuBar()->addMenu(tr("Edit"));
     m_editMenu->setObjectName(QStringLiteral("editMenu"));
     m_menuUndoAction = m_editMenu->addAction(tr("Undo"));
     m_menuRedoAction = m_editMenu->addAction(tr("Redo"));
+
+    m_viewMenu = menuBar()->addMenu(tr("View"));
+    m_viewMenu->setObjectName(QStringLiteral("viewMenu"));
 
     m_languageMenu = menuBar()->addMenu(tr("Language"));
     m_languageMenu->setObjectName(QStringLiteral("languageMenu"));
@@ -466,6 +474,16 @@ MainWindow::MainWindow(QWidget *parent)
     m_buildDock->setWidget(buildWidget);
     addDockWidget(Qt::BottomDockWidgetArea, m_buildDock);
 
+    m_propertiesDockAction = m_propertiesDock->toggleViewAction();
+    m_propertiesDockAction->setObjectName(QStringLiteral("propertiesDockAction"));
+    m_buildDockAction = m_buildDock->toggleViewAction();
+    m_buildDockAction->setObjectName(QStringLiteral("buildExportDockAction"));
+    m_viewMenu->addAction(m_propertiesDockAction);
+    m_viewMenu->addAction(m_buildDockAction);
+    m_viewMenu->addSeparator();
+    m_resetLayoutAction = m_viewMenu->addAction(tr("Reset Layout"));
+    m_resetLayoutAction->setObjectName(QStringLiteral("resetLayoutAction"));
+
     m_buildService = new BuildService(this);
 
     connect(m_deleteAction, &QAction::triggered, this, [this] { deleteSelection(); });
@@ -497,6 +515,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_applyPropertiesButton, &QPushButton::clicked, this, [this] { applyProperties(); });
     connect(m_buildProjectButton, &QPushButton::clicked, this, [this] { startBuild(); });
     connect(m_exportProjectButton, &QPushButton::clicked, this, [this] { exportProject(); });
+    connect(m_toolbarBuildAction, &QAction::triggered, this, [this] { startBuild(); });
+    connect(m_toolbarExportAction, &QAction::triggered, this, [this] { exportProject(); });
+    connect(m_resetLayoutAction, &QAction::triggered, this, [this] { resetWindowLayout(); });
     connect(m_buildService, &BuildService::standardOutput, this,
             [this](BuildStage, const QString &text) { appendBuildLog(text); });
     connect(m_buildService, &BuildService::standardError, this,
@@ -509,6 +530,7 @@ MainWindow::MainWindow(QWidget *parent)
             });
     connect(m_buildService, &BuildService::finished, this, [this](const BuildResult &result) {
         m_buildProjectButton->setEnabled(true);
+        m_toolbarBuildAction->setEnabled(true);
         appendBuildLog(result.success ? tr("Build finished successfully.\n")
                                       : tr("Build failed: %1\n").arg(result.error));
     });
@@ -641,11 +663,13 @@ void MainWindow::retranslateUi()
     m_editMenu->setTitle(tr("Edit"));
     m_menuUndoAction->setText(tr("Undo"));
     m_menuRedoAction->setText(tr("Redo"));
+    m_viewMenu->setTitle(tr("View"));
     m_languageMenu->setTitle(tr("Language"));
     m_englishLanguageAction->setText(tr("English"));
     m_chineseLanguageAction->setText(tr("Chinese"));
 
     m_propertiesDock->setWindowTitle(tr("Properties"));
+    m_propertiesDockAction->setText(tr("Properties"));
     m_descriptionEdit->setPlaceholderText(tr("Description"));
     setFormLabel(m_propertyForm, m_nameEdit, tr("Name"));
     setFormLabel(m_propertyForm, m_descriptionEdit, tr("Description"));
@@ -656,6 +680,8 @@ void MainWindow::retranslateUi()
     m_applyPropertiesButton->setText(tr("Apply"));
 
     m_buildDock->setWindowTitle(tr("Build and export"));
+    m_buildDockAction->setText(tr("Build and export"));
+    m_resetLayoutAction->setText(tr("Reset Layout"));
     m_workspacePathEdit->setToolTip(tr("Workspace root containing generated-project"));
     m_configureArgumentsEdit->setPlaceholderText(
         tr("For example: -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.x/mingw_64"));
@@ -666,6 +692,8 @@ void MainWindow::retranslateUi()
     setFormLabel(m_buildForm, m_configureArgumentsEdit, tr("Configure arguments"));
     m_buildProjectButton->setText(tr("Build"));
     m_exportProjectButton->setText(tr("Export"));
+    m_toolbarBuildAction->setText(tr("Build"));
+    m_toolbarExportAction->setText(tr("Export"));
     m_buildLog->setPlaceholderText(tr("Configure, build, and export output appears here."));
 
     statusBar()->clearMessage();
@@ -698,8 +726,10 @@ void MainWindow::startBuild()
     QString error;
     appendBuildLog(tr("Starting configure for %1\n").arg(request.sourceDirectory));
     m_buildProjectButton->setEnabled(false);
+    m_toolbarBuildAction->setEnabled(false);
     if (!m_buildService->start(request, &error)) {
         m_buildProjectButton->setEnabled(true);
+        m_toolbarBuildAction->setEnabled(true);
         appendBuildLog(tr("Build request rejected: %1\n").arg(error));
         return;
     }
@@ -714,6 +744,20 @@ void MainWindow::exportProject()
         return;
     }
     appendBuildLog(tr("Export failed: %1\n").arg(error));
+}
+
+void MainWindow::resetWindowLayout()
+{
+    for (QDockWidget *dock : {m_propertiesDock, m_buildDock}) {
+        dock->setFloating(false);
+        removeDockWidget(dock);
+    }
+    addDockWidget(Qt::RightDockWidgetArea, m_propertiesDock);
+    addDockWidget(Qt::BottomDockWidgetArea, m_buildDock);
+    m_propertiesDock->show();
+    m_buildDock->show();
+    resizeDocks({m_propertiesDock}, {300}, Qt::Horizontal);
+    resizeDocks({m_buildDock}, {220}, Qt::Vertical);
 }
 
 void MainWindow::appendBuildLog(const QString &text)

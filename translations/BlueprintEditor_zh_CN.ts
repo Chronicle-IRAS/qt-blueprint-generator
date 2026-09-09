@@ -4,28 +4,28 @@
 <context>
     <name>BlueprintScene</name>
     <message>
-        <location filename="../src/editor/blueprint_scene.cpp" line="83"/>
+        <location filename="../src/editor/blueprint_scene.cpp" line="85"/>
         <source>Add node</source>
         <translation>添加节点</translation>
     </message>
     <message>
-        <location filename="../src/editor/blueprint_scene.cpp" line="108"/>
+        <location filename="../src/editor/blueprint_scene.cpp" line="110"/>
         <source>Delete node</source>
         <translation>删除节点</translation>
     </message>
     <message>
-        <location filename="../src/editor/blueprint_scene.cpp" line="125"/>
-        <location filename="../src/editor/blueprint_scene.cpp" line="445"/>
+        <location filename="../src/editor/blueprint_scene.cpp" line="127"/>
+        <location filename="../src/editor/blueprint_scene.cpp" line="447"/>
         <source>Move node</source>
         <translation>移动节点</translation>
     </message>
     <message>
-        <location filename="../src/editor/blueprint_scene.cpp" line="144"/>
+        <location filename="../src/editor/blueprint_scene.cpp" line="146"/>
         <source>Connect nodes</source>
         <translation>连接节点</translation>
     </message>
     <message>
-        <location filename="../src/editor/blueprint_scene.cpp" line="223"/>
+        <location filename="../src/editor/blueprint_scene.cpp" line="229"/>
         <source>Edit node</source>
         <translation>编辑节点</translation>
     </message>
@@ -33,103 +33,104 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../src/app/main_window.cpp" line="321"/>
-        <location filename="../src/app/main_window.cpp" line="626"/>
+        <location filename="../src/app/main_window.cpp" line="323"/>
+        <location filename="../src/app/main_window.cpp" line="650"/>
         <source>Blueprint Editor</source>
         <translation>蓝图编辑器</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="331"/>
-        <location filename="../src/app/main_window.cpp" line="627"/>
+        <location filename="../src/app/main_window.cpp" line="333"/>
+        <location filename="../src/app/main_window.cpp" line="651"/>
         <source>Blueprint</source>
         <translation>蓝图</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="335"/>
-        <location filename="../src/app/main_window.cpp" line="628"/>
+        <location filename="../src/app/main_window.cpp" line="337"/>
+        <location filename="../src/app/main_window.cpp" line="652"/>
         <source>Add node</source>
         <translation>添加节点</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="356"/>
-        <location filename="../src/app/main_window.cpp" line="632"/>
+        <location filename="../src/app/main_window.cpp" line="358"/>
+        <location filename="../src/app/main_window.cpp" line="656"/>
         <source>Edge label (optional)</source>
         <translation>连线标签（可选）</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="357"/>
-        <location filename="../src/app/main_window.cpp" line="633"/>
+        <location filename="../src/app/main_window.cpp" line="359"/>
+        <location filename="../src/app/main_window.cpp" line="657"/>
         <source>Label for the next source-to-target connection</source>
         <translation>下一条源到目标连线的标签</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="360"/>
-        <location filename="../src/app/main_window.cpp" line="634"/>
+        <location filename="../src/app/main_window.cpp" line="362"/>
+        <location filename="../src/app/main_window.cpp" line="658"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="361"/>
-        <location filename="../src/app/main_window.cpp" line="635"/>
+        <location filename="../src/app/main_window.cpp" line="363"/>
+        <location filename="../src/app/main_window.cpp" line="659"/>
         <source>Connect: choose source then target</source>
         <translation>连接：依次选择来源和目标</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="363"/>
-        <location filename="../src/app/main_window.cpp" line="636"/>
+        <location filename="../src/app/main_window.cpp" line="365"/>
+        <location filename="../src/app/main_window.cpp" line="660"/>
         <source>Cancel connection</source>
         <translation>取消连接</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="369"/>
-        <location filename="../src/app/main_window.cpp" line="374"/>
-        <location filename="../src/app/main_window.cpp" line="637"/>
-        <location filename="../src/app/main_window.cpp" line="640"/>
+        <location filename="../src/app/main_window.cpp" line="371"/>
+        <location filename="../src/app/main_window.cpp" line="381"/>
+        <location filename="../src/app/main_window.cpp" line="661"/>
+        <location filename="../src/app/main_window.cpp" line="664"/>
         <source>Undo</source>
         <translation>撤销</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="370"/>
-        <location filename="../src/app/main_window.cpp" line="375"/>
-        <location filename="../src/app/main_window.cpp" line="638"/>
-        <location filename="../src/app/main_window.cpp" line="641"/>
+        <location filename="../src/app/main_window.cpp" line="372"/>
+        <location filename="../src/app/main_window.cpp" line="382"/>
+        <location filename="../src/app/main_window.cpp" line="662"/>
+        <location filename="../src/app/main_window.cpp" line="665"/>
         <source>Redo</source>
         <translation>重做</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="372"/>
-        <location filename="../src/app/main_window.cpp" line="639"/>
+        <location filename="../src/app/main_window.cpp" line="379"/>
+        <location filename="../src/app/main_window.cpp" line="663"/>
         <source>Edit</source>
         <translation>编辑</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="377"/>
-        <location filename="../src/app/main_window.cpp" line="642"/>
+        <location filename="../src/app/main_window.cpp" line="387"/>
+        <location filename="../src/app/main_window.cpp" line="667"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="381"/>
-        <location filename="../src/app/main_window.cpp" line="643"/>
+        <location filename="../src/app/main_window.cpp" line="391"/>
+        <location filename="../src/app/main_window.cpp" line="668"/>
         <source>English</source>
         <translation>英语</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="385"/>
-        <location filename="../src/app/main_window.cpp" line="644"/>
+        <location filename="../src/app/main_window.cpp" line="395"/>
+        <location filename="../src/app/main_window.cpp" line="669"/>
         <source>Chinese</source>
         <translation>中文</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="390"/>
-        <location filename="../src/app/main_window.cpp" line="646"/>
+        <location filename="../src/app/main_window.cpp" line="400"/>
+        <location filename="../src/app/main_window.cpp" line="671"/>
+        <location filename="../src/app/main_window.cpp" line="672"/>
         <source>Properties</source>
         <translation>属性</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="230"/>
-        <location filename="../src/app/main_window.cpp" line="412"/>
-        <location filename="../src/app/main_window.cpp" line="648"/>
+        <location filename="../src/app/main_window.cpp" line="232"/>
+        <location filename="../src/app/main_window.cpp" line="422"/>
+        <location filename="../src/app/main_window.cpp" line="674"/>
         <source>Name</source>
         <translation>名称</translation>
     </message>
@@ -139,188 +140,205 @@
         <translation>编辑节点</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="231"/>
-        <location filename="../src/app/main_window.cpp" line="399"/>
-        <location filename="../src/app/main_window.cpp" line="413"/>
-        <location filename="../src/app/main_window.cpp" line="647"/>
-        <location filename="../src/app/main_window.cpp" line="649"/>
+        <location filename="../src/app/main_window.cpp" line="233"/>
+        <location filename="../src/app/main_window.cpp" line="409"/>
+        <location filename="../src/app/main_window.cpp" line="423"/>
+        <location filename="../src/app/main_window.cpp" line="673"/>
+        <location filename="../src/app/main_window.cpp" line="675"/>
         <source>Description</source>
         <translation>描述</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="232"/>
-        <location filename="../src/app/main_window.cpp" line="414"/>
-        <location filename="../src/app/main_window.cpp" line="650"/>
+        <location filename="../src/app/main_window.cpp" line="234"/>
+        <location filename="../src/app/main_window.cpp" line="424"/>
+        <location filename="../src/app/main_window.cpp" line="676"/>
         <source>Inputs (JSON)</source>
         <translation>输入（JSON）</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="233"/>
-        <location filename="../src/app/main_window.cpp" line="415"/>
-        <location filename="../src/app/main_window.cpp" line="651"/>
+        <location filename="../src/app/main_window.cpp" line="235"/>
+        <location filename="../src/app/main_window.cpp" line="425"/>
+        <location filename="../src/app/main_window.cpp" line="677"/>
         <source>Outputs (JSON)</source>
         <translation>输出（JSON）</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="234"/>
-        <location filename="../src/app/main_window.cpp" line="416"/>
-        <location filename="../src/app/main_window.cpp" line="652"/>
+        <location filename="../src/app/main_window.cpp" line="236"/>
+        <location filename="../src/app/main_window.cpp" line="426"/>
+        <location filename="../src/app/main_window.cpp" line="678"/>
         <source>Constraints (JSON)</source>
         <translation>约束（JSON）</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="235"/>
-        <location filename="../src/app/main_window.cpp" line="417"/>
-        <location filename="../src/app/main_window.cpp" line="653"/>
+        <location filename="../src/app/main_window.cpp" line="237"/>
+        <location filename="../src/app/main_window.cpp" line="427"/>
+        <location filename="../src/app/main_window.cpp" line="679"/>
         <source>Acceptance criteria (JSON)</source>
         <translation>验收标准（JSON）</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="248"/>
+        <location filename="../src/app/main_window.cpp" line="250"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="251"/>
+        <location filename="../src/app/main_window.cpp" line="253"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="419"/>
-        <location filename="../src/app/main_window.cpp" line="654"/>
+        <location filename="../src/app/main_window.cpp" line="384"/>
+        <location filename="../src/app/main_window.cpp" line="666"/>
+        <source>View</source>
+        <translation>视图</translation>
+    </message>
+    <message>
+        <location filename="../src/app/main_window.cpp" line="429"/>
+        <location filename="../src/app/main_window.cpp" line="680"/>
         <source>Apply</source>
         <translation>应用</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="426"/>
-        <location filename="../src/app/main_window.cpp" line="656"/>
+        <location filename="../src/app/main_window.cpp" line="436"/>
+        <location filename="../src/app/main_window.cpp" line="682"/>
+        <location filename="../src/app/main_window.cpp" line="683"/>
         <source>Build and export</source>
         <translation>构建与导出</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="433"/>
-        <location filename="../src/app/main_window.cpp" line="657"/>
+        <location filename="../src/app/main_window.cpp" line="443"/>
+        <location filename="../src/app/main_window.cpp" line="685"/>
         <source>Workspace root containing generated-project</source>
         <translation>包含 generated-project 的工作区根目录</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="442"/>
-        <location filename="../src/app/main_window.cpp" line="659"/>
+        <location filename="../src/app/main_window.cpp" line="452"/>
+        <location filename="../src/app/main_window.cpp" line="687"/>
         <source>For example: -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.x/mingw_64</source>
         <translation>示例：-G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.x/mingw_64</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="443"/>
-        <location filename="../src/app/main_window.cpp" line="660"/>
+        <location filename="../src/app/main_window.cpp" line="453"/>
+        <location filename="../src/app/main_window.cpp" line="688"/>
         <source>Workspace root</source>
         <translation>工作区根目录</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="444"/>
-        <location filename="../src/app/main_window.cpp" line="661"/>
+        <location filename="../src/app/main_window.cpp" line="454"/>
+        <location filename="../src/app/main_window.cpp" line="689"/>
         <source>Build directory</source>
         <translation>构建目录</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="445"/>
-        <location filename="../src/app/main_window.cpp" line="662"/>
+        <location filename="../src/app/main_window.cpp" line="455"/>
+        <location filename="../src/app/main_window.cpp" line="690"/>
         <source>Empty export directory</source>
         <translation>空导出目录</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="446"/>
-        <location filename="../src/app/main_window.cpp" line="663"/>
+        <location filename="../src/app/main_window.cpp" line="456"/>
+        <location filename="../src/app/main_window.cpp" line="691"/>
         <source>CMake executable</source>
         <translation>CMake 可执行文件</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="447"/>
-        <location filename="../src/app/main_window.cpp" line="664"/>
+        <location filename="../src/app/main_window.cpp" line="457"/>
+        <location filename="../src/app/main_window.cpp" line="692"/>
         <source>Configure arguments</source>
         <translation>配置参数</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="450"/>
-        <location filename="../src/app/main_window.cpp" line="665"/>
+        <location filename="../src/app/main_window.cpp" line="374"/>
+        <location filename="../src/app/main_window.cpp" line="460"/>
+        <location filename="../src/app/main_window.cpp" line="693"/>
+        <location filename="../src/app/main_window.cpp" line="695"/>
         <source>Build</source>
         <translation>构建</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="452"/>
-        <location filename="../src/app/main_window.cpp" line="666"/>
+        <location filename="../src/app/main_window.cpp" line="376"/>
+        <location filename="../src/app/main_window.cpp" line="462"/>
+        <location filename="../src/app/main_window.cpp" line="694"/>
+        <location filename="../src/app/main_window.cpp" line="696"/>
         <source>Export</source>
         <translation>导出</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="461"/>
-        <location filename="../src/app/main_window.cpp" line="667"/>
+        <location filename="../src/app/main_window.cpp" line="471"/>
+        <location filename="../src/app/main_window.cpp" line="697"/>
         <source>Configure, build, and export output appears here.</source>
         <translation>配置、构建和导出的输出显示在这里。</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="472"/>
+        <location filename="../src/app/main_window.cpp" line="484"/>
+        <location filename="../src/app/main_window.cpp" line="684"/>
+        <source>Reset Layout</source>
+        <translation>重置布局</translation>
+    </message>
+    <message>
+        <location filename="../src/app/main_window.cpp" line="492"/>
         <source>Choose source node, then target node</source>
         <translation>选择来源节点，然后选择目标节点</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="506"/>
+        <location filename="../src/app/main_window.cpp" line="529"/>
         <source>[%1] exit code %2
 </source>
         <translation>[%1] 退出码 %2
 </translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="510"/>
+        <location filename="../src/app/main_window.cpp" line="534"/>
         <source>Build finished successfully.
 </source>
         <translation>构建成功完成。
 </translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="511"/>
+        <location filename="../src/app/main_window.cpp" line="535"/>
         <source>Build failed: %1
 </source>
         <translation>构建失败：%1
 </translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="688"/>
+        <location filename="../src/app/main_window.cpp" line="718"/>
         <source>Build request rejected: workspace and build paths must not be empty.
 </source>
         <translation>构建请求被拒绝：工作区和构建路径不能为空。
 </translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="697"/>
+        <location filename="../src/app/main_window.cpp" line="727"/>
         <source>Starting configure for %1
 </source>
         <translation>开始为 %1 执行配置
 </translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="701"/>
+        <location filename="../src/app/main_window.cpp" line="733"/>
         <source>Build request rejected: %1
 </source>
         <translation>构建请求被拒绝：%1
 </translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="711"/>
+        <location filename="../src/app/main_window.cpp" line="743"/>
         <source>Export finished successfully.
 </source>
         <translation>导出成功完成。
 </translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="714"/>
+        <location filename="../src/app/main_window.cpp" line="746"/>
         <source>Export failed: %1
 </source>
         <translation>导出失败：%1
 </translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="260"/>
-        <location filename="../src/app/main_window.cpp" line="772"/>
+        <location filename="../src/app/main_window.cpp" line="262"/>
+        <location filename="../src/app/main_window.cpp" line="818"/>
         <source>Properties use valid JSON arrays for ports and lists</source>
         <translation>端口和列表属性必须使用有效的 JSON 数组</translation>
     </message>
