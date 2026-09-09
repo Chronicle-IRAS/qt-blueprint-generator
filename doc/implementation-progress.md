@@ -4,10 +4,10 @@
 
 ## 当前状态
 
-- 当前开发分支：`docs/project-usage-guide`，基于远端 `main` 的 `4e2378e`（中英文界面 PR #12）。
+- 当前开发分支：`feature/issue-16-dock-recovery`，已合入包含项目使用说明 PR #20 的远端 `main`（`6e16bac`）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
-- MVP 基线：`doc/mvp-implementation-plan.md`；完整使用说明：`doc/project-usage-guide.md`。
-- `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；当前使用指南只说明已经实现的功能，不把后续规划写成现有能力。
+- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-09-issue-16-dock-recovery.md`；完整使用说明：`doc/project-usage-guide.md`。
+- `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；当前任务和使用指南只说明已经实现的功能。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
 - Task 3「蓝图静态验证」已完成并通过规格与代码质量审查。
@@ -25,11 +25,22 @@
 - Task 10 的 PR #11 已于 2026-09-09 合入远端 `main`，合并提交为 `43ecdb3`。
 - 中英文界面切换已在 `feature/bilingual-ui` 实现：运行时切换、选择持久化、稳定控件标识和完整当前界面翻译均通过测试。
 - 中英文界面 PR #12 已合入远端 `main`，合并提交为 `4e2378e`。
-- 项目使用说明任务已新建 `docs/project-usage-guide` 分支：新增面向使用者的完整指南，并把 README 精简为稳定的项目说明，不再保留 Task、分支、PR 或测试耗时等开发过程记录。
-- 分支已普通推送至 `origin/docs/project-usage-guide`，并创建 PR #20；未强推、未自动合并。
+- 项目使用说明 PR #20 已合入远端 `main`，合并提交为 `6e16bac`。
+- 远端 Issue 按依赖、关键程度和更改幅度排序为 #16、#14、#13、#15、#17、#18、#19；均已标记 `enhancement` 和 `ready-for-agent`。
+- 当前开始处理 #16：新增 View 菜单、Dock 恢复、默认布局复位和现有 Build/Export 工具栏入口。
+- #16 主实现已完成：View 菜单复用 Dock toggle action，Reset Layout 恢复默认区域与可见性，Build/Export 工具栏动作复用现有操作。
+- #16 已普通推送至 `origin/feature/issue-16-dock-recovery` 并创建 PR #21；因 PR #20 合入而产生的文档冲突已通过普通 merge 处理，未强制推送、未自动合并。
 
 ## 已完成提交
 
+- `b31d446 docs: plan issue 16 dock recovery`
+  - 记录 #16 的测试先行步骤、实现范围、双语文本和交付约束。
+- `2165f85 feat: restore editor docks from view menu`
+  - 新增 View 菜单、两项 Dock 恢复入口、默认布局复位和 Build/Export 工具栏入口。
+  - Qt Linguist 目录扩展到 60 条完成翻译；GUI 测试覆盖可见性、勾选状态、布局区域、动作复用和中英文切换。
+- `75cc61e test: cover dock reset and toolbar build state`
+  - 补充 Reset Layout 从隐藏/错位状态恢复，以及工具栏 Build 在同步拒绝、异步运行和失败后的状态同步测试。
+  - 突变验证确认删除 Dock `show()` 或异步完成后的 action 恢复都会使测试失败。
 - `b25ef46 docs: add project usage guide`
   - 新增 `doc/project-usage-guide.md`，覆盖环境、构建、启动、画布操作、离线示例、工作目录、AI/外部代码使用边界及常见问题。
   - README 改为稳定项目首页，删除 Task、分支、PR 和测试耗时等开发过程记录。
@@ -124,6 +135,14 @@
 
 ## 验证记录
 
+- #16 基线专项：`language_switch|blueprint_scene` `2/2 passed`（1.84 秒）。
+- #16 RED：新增 View/Dock/Toolbar 断言后两项测试均按预期失败；GREEN：`2/2 passed`（0.49 秒）。
+- #16 Qt Linguist：60 条完成翻译，0 条 unfinished；无 vanished 或 obsolete 条目。
+- #16 初次完整构建通过；CTest `12/12 passed`（79.46 秒）。
+- #16 `BlueprintEditor.exe` 使用 offscreen 平台插件启动并保持运行 2 秒，启动探测退出码 0。
+- #16 质量复核初次结论 Not ready：测试未证明隐藏 Dock 恢复和异步 Build action 状态；补强并完成两项突变验证后，复核结论为 Ready，无剩余 Critical、Important 或 Minor。
+- #16 复核修复后的最终完整构建通过；CTest `12/12 passed`（71.88 秒）。
+- #16 合入项目说明 PR #20 并解决文档冲突后，完整构建通过；CTest `12/12 passed`（68.03 秒）。
 - 项目说明任务使用全新纯 ASCII 构建目录完成 CMake 配置和完整构建；CTest `12/12 passed`（83.13 秒）。
 - README 与使用指南的本地 Markdown 链接全部可解析；`git diff --check` 通过。
 - 项目说明最终只读复核结论为 Ready，无 Critical 或 Important；唯一序列化 API 表述 Minor 已修正。
@@ -225,9 +244,9 @@
 
 ## 恢复工作
 
-1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `docs/project-usage-guide`。
-2. 中英文界面任务已通过 PR #12 合入远端 `main`；本任务以合并提交 `4e2378e` 为基线。
-3. 项目说明任务已通过 `docs/project-usage-guide` 和 PR #20 交付；本任务只调整文档，不修改产品代码。
+1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-16-dock-recovery`。
+2. 项目说明 PR #20 已合入远端 `main`（`6e16bac`）；#16 分支已普通合并该提交并处理文档冲突。
+3. #16 已通过 PR #21 交付，等待用户审阅与合并；后续 Issue 使用各自独立分支。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 
