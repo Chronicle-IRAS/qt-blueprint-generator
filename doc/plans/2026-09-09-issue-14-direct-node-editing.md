@@ -52,9 +52,9 @@
 - Modify: doc/implementation-progress.md
 
 - [x] Update the translation catalog and finish all new Simplified Chinese strings.
-- [ ] Document double-click editing, Save/Cancel behavior, JSON requirements, Inspector synchronization, and Undo/Redo.
-- [ ] Run translation checks, complete build, full CTest, startup probe, and git diff --check.
-- [ ] Perform a quality review and address all Critical, Important, and Minor findings.
+- [x] Document double-click editing, Save/Cancel behavior, JSON requirements, Inspector synchronization, and Undo/Redo.
+- [x] Run translation checks, complete build, full CTest, startup probe, and git diff --check.
+- [x] Perform a quality review and address all Critical, Important, and Minor findings.
 - [ ] Commit each completed change group and normally push the branch.
 - [ ] Create a PR titled with an operation prefix and Issue reference, and include Closes #14 in the body. Do not force-push or auto-merge.
 
@@ -64,5 +64,5 @@
 - Save updates BlueprintDocument once and refreshes the canvas immediately.
 - Cancel and invalid JSON cannot mutate the document or undo stack.
 - Undo/Redo keep the dialog result, canvas, and Properties Dock coherent.
-- Double-click does not accidentally start or complete a connection.
+- Connection mode owns its node clicks, and the same double-click cannot also open the editor.
 - Existing Properties Dock remains an independent Inspector/editing entry.

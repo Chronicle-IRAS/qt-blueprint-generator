@@ -47,6 +47,7 @@ private slots:
     void sceneRejectsMalformedTechnicalDocuments();
     void rejectedScenesAreReadOnly();
     void connectionStateCanBeCancelledAndSelfLoopsAreRejected();
+    void connectionModeDoubleClickDoesNotAlsoRequestEditing();
     void graphicsBoundsContainPaintedPortAndArrowExtents();
     void editingNodeTextUpdatesDocumentAndSupportsUndo();
     void editingAllNodeFieldsIsOneUndoableCommand();
@@ -375,6 +376,41 @@ void BlueprintSceneTest::connectionStateCanBeCancelledAndSelfLoopsAreRejected()
     QVERIFY(scene.connectionSource().isEmpty());
 }
 
+void BlueprintSceneTest::connectionModeDoubleClickDoesNotAlsoRequestEditing()
+{
+    BlueprintDocument document;
+    document.nodes = {node(QStringLiteral("source"), QStringLiteral("Source")),
+                      node(QStringLiteral("target"), QStringLiteral("Target"))};
+    BlueprintScene scene(&document);
+    QGraphicsView view(&scene);
+    view.resize(800, 500);
+    view.show();
+    QApplication::processEvents();
+    QSignalSpy editRequests(&scene, &BlueprintScene::nodeEditRequested);
+    const QPoint sourcePoint = view.mapFromScene(
+        scene.nodeItem(QStringLiteral("source"))->sceneBoundingRect().center());
+    const QPoint targetPoint = view.mapFromScene(
+        scene.nodeItem(QStringLiteral("target"))->sceneBoundingRect().center());
+
+    QVERIFY(scene.beginConnection());
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier, sourcePoint);
+    QCOMPARE(scene.connectionSource(), QStringLiteral("source"));
+    QTest::mouseDClick(view.viewport(), Qt::LeftButton, Qt::NoModifier, sourcePoint);
+    QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier, sourcePoint);
+    QCOMPARE(editRequests.count(), 0);
+    QCOMPARE(scene.connectionSource(), QStringLiteral("source"));
+
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier, targetPoint);
+    QCOMPARE(document.edges.size(), 1);
+    QTest::mouseDClick(view.viewport(), Qt::LeftButton, Qt::NoModifier, targetPoint);
+    QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier, targetPoint);
+    QCOMPARE(editRequests.count(), 0);
+
+    QTest::mouseDClick(view.viewport(), Qt::LeftButton, Qt::NoModifier, targetPoint);
+    QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier, targetPoint);
+    QCOMPARE(editRequests.count(), 1);
+}
+
 void BlueprintSceneTest::graphicsBoundsContainPaintedPortAndArrowExtents()
 {
     BlueprintDocument document;
@@ -464,7 +500,12 @@ void BlueprintSceneTest::directNodeEditorSaveSynchronizesDocumentCanvasInspector
         auto *constraints = dialog->findChild<QPlainTextEdit *>(QStringLiteral("directNodeConstraintsEdit"));
         auto *criteria = dialog->findChild<QPlainTextEdit *>(QStringLiteral("directNodeAcceptanceCriteriaEdit"));
         auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveNodeEditButton"));
-        QVERIFY(name && description && inputs && outputs && constraints && criteria && save);
+        const bool editorComplete = name && description && inputs && outputs && constraints
+            && criteria && save;
+        if (!editorComplete) {
+            dialog->reject();
+        }
+        QVERIFY(editorComplete);
         name->setText(QStringLiteral("Canvas configured"));
         description->setPlainText(QStringLiteral("Edited without leaving the blueprint"));
         inputs->setPlainText(QStringLiteral("[{\"name\":\"request\",\"type\":\"json\",\"description\":\"Request\"}]"));
@@ -472,6 +513,9 @@ void BlueprintSceneTest::directNodeEditorSaveSynchronizesDocumentCanvasInspector
         constraints->setPlainText(QStringLiteral("[\"authenticated\",\"rate limited\"]"));
         criteria->setPlainText(QStringLiteral("[\"returns result\",\"reports errors\"]"));
         QTest::mouseClick(save, Qt::LeftButton);
+        if (dialog->isVisible()) {
+            dialog->reject();
+        }
     });
 
     const QPoint nodeCenter = window.graphicsView()->mapFromScene(
@@ -522,7 +566,11 @@ void BlueprintSceneTest::directNodeEditorCancelAndInvalidJsonDoNotMutateDocument
         auto *error = dialog->findChild<QLabel *>(QStringLiteral("nodeEditValidationMessage"));
         auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveNodeEditButton"));
         auto *cancel = dialog->findChild<QPushButton *>(QStringLiteral("cancelNodeEditButton"));
-        QVERIFY(name && inputs && error && save && cancel);
+        const bool editorComplete = name && inputs && error && save && cancel;
+        if (!editorComplete) {
+            dialog->reject();
+        }
+        QVERIFY(editorComplete);
         name->setText(QStringLiteral("Must not be saved"));
         inputs->setPlainText(QStringLiteral("{}"));
         QTest::mouseClick(save, Qt::LeftButton);
@@ -544,7 +592,11 @@ void BlueprintSceneTest::directNodeEditorCancelAndInvalidJsonDoNotMutateDocument
         QVERIFY(dialog);
         auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("directNodeNameEdit"));
         auto *cancel = dialog->findChild<QPushButton *>(QStringLiteral("cancelNodeEditButton"));
-        QVERIFY(name && cancel);
+        const bool editorComplete = name && cancel;
+        if (!editorComplete) {
+            dialog->reject();
+        }
+        QVERIFY(editorComplete);
         name->setText(QStringLiteral("Also discarded"));
         QTest::mouseClick(cancel, Qt::LeftButton);
     });

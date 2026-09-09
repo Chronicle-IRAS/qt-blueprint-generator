@@ -63,6 +63,7 @@ private:
     void handleItemPositionChanged(const QString &nodeId);
     void handleItemMoveFinished(const QString &nodeId, const QPointF &before, const QPointF &after);
     void handleNodeClicked(const QString &nodeId);
+    void handleNodeDoubleClicked(const QString &nodeId);
     void notifySemanticChanged();
 
     BlueprintDocument *m_document = nullptr;
@@ -74,5 +75,7 @@ private:
     QHash<QString, QPointF> m_layout;
     QString m_connectionSource;
     QString m_connectionLabel;
+    QString m_recentConnectionClickNode;
+    quint64 m_connectionClickToken = 0;
     bool m_connectionMode = false;
 };

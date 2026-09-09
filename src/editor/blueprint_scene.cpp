@@ -3,6 +3,8 @@
 #include "editor/edge_item.h"
 #include "editor/node_item.h"
 
+#include <QApplication>
+#include <QTimer>
 #include <QUndoCommand>
 
 #include <QSet>
@@ -154,6 +156,8 @@ bool BlueprintScene::beginConnection(const QString &label)
         return false;
     }
     m_connectionMode = true;
+    ++m_connectionClickToken;
+    m_recentConnectionClickNode.clear();
     m_connectionSource.clear();
     m_connectionLabel = label;
     return true;
@@ -162,6 +166,8 @@ bool BlueprintScene::beginConnection(const QString &label)
 void BlueprintScene::cancelConnection()
 {
     m_connectionMode = false;
+    ++m_connectionClickToken;
+    m_recentConnectionClickNode.clear();
     m_connectionSource.clear();
     m_connectionLabel.clear();
 }
@@ -295,11 +301,7 @@ void BlueprintScene::createNodeItem(const BlueprintNode &node, const QPointF &po
     auto *item = new NodeItem(node.id, node.name);
     item->setNode(node);
     item->setClickedHandler([this](const QString &id) { handleNodeClicked(id); });
-    item->setDoubleClickedHandler([this](const QString &id) {
-        if (m_representable && hasNode(id)) {
-            emit nodeEditRequested(id);
-        }
-    });
+    item->setDoubleClickedHandler([this](const QString &id) { handleNodeDoubleClicked(id); });
     item->setPositionChangedHandler([this](const QString &id) { handleItemPositionChanged(id); });
     item->setMoveFinishedHandler(
         [this](const QString &id, const QPointF &before, const QPointF &after) {
@@ -451,7 +453,27 @@ void BlueprintScene::handleNodeClicked(const QString &nodeId)
 {
     if (m_connectionMode) {
         chooseConnectionNode(nodeId);
+        m_recentConnectionClickNode = nodeId;
+        const quint64 token = ++m_connectionClickToken;
+        QTimer::singleShot(QApplication::doubleClickInterval(), this, [this, token] {
+            if (token == m_connectionClickToken) {
+                m_recentConnectionClickNode.clear();
+            }
+        });
     }
+}
+
+void BlueprintScene::handleNodeDoubleClicked(const QString &nodeId)
+{
+    if (!m_representable || !hasNode(nodeId)) {
+        return;
+    }
+    if (m_recentConnectionClickNode == nodeId) {
+        ++m_connectionClickToken;
+        m_recentConnectionClickNode.clear();
+        return;
+    }
+    emit nodeEditRequested(nodeId);
 }
 
 void BlueprintScene::notifySemanticChanged()

@@ -28,6 +28,7 @@
 - 项目使用说明任务已新建 `docs/project-usage-guide` 分支：新增面向使用者的完整指南，并把 README 精简为稳定的项目说明，不再保留 Task、分支、PR 或测试耗时等开发过程记录。
 - 分支已普通推送至 `origin/docs/project-usage-guide`，并创建 PR #20；未强推、未自动合并。
 - Issue #14 已在独立分支开始：从画布节点双击进入全字段编辑，保存复用现有撤销命令，取消不修改文档。
+- Issue #14 主实现已完成：直接编辑对话框覆盖全部节点属性，Properties Dock 继续作为同步 Inspector；README 与使用指南已更新稳定用法。
 
 ## 已完成提交
 
@@ -128,6 +129,10 @@
 - #14 基线：全新 ASCII 构建目录配置成功，`blueprint_scene` `1/1 passed`（0.31 秒）。
 - #14 RED：两个直接编辑 GUI 用例因双击节点没有打开 `nodeEditDialog` 按预期失败，证明测试能捕获入口缺失、保存未发生和取消/校验合同缺失。
 - #14 GREEN：`blueprint_scene|language_switch` `2/2 passed`（0.52 秒）；翻译目录 61 条全部完成，直接编辑器保存/取消、非法 JSON、Inspector 同步及 Undo/Redo 均有 GUI 覆盖。
+- #14 初次质量复核发现连接模式的真实双击会叠加连接与编辑动作；现已明确连接模式优先并抑制同次编辑请求，GUI 回归覆盖选择 source、完成连接及恢复普通双击编辑。
+- #14 两项突变验证确认：删除 Save 后的 `editNode()` 调用会使保存用例失败，错误接受非法 JSON 会使校验用例失败；两项突变均已恢复。
+- #14 质量修复后完整构建通过，CTest `12/12 passed`（76.45 秒）；翻译目录无 unfinished/vanished/obsolete，README 与使用指南无失效本地链接，离屏启动探测保持运行 2 秒并安全结束。
+- #14 最终只读质量复核结论 Ready：原连接模式 Important 已关闭，无剩余 Critical、Important 或 Minor。
 - 项目说明任务使用全新纯 ASCII 构建目录完成 CMake 配置和完整构建；CTest `12/12 passed`（83.13 秒）。
 - README 与使用指南的本地 Markdown 链接全部可解析；`git diff --check` 通过。
 - 项目说明最终只读复核结论为 Ready，无 Critical 或 Important；唯一序列化 API 表述 Minor 已修正。

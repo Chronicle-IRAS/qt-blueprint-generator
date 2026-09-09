@@ -217,6 +217,8 @@ public:
         m_nameEdit->setObjectName(QStringLiteral("directNodeNameEdit"));
         m_descriptionEdit = new QPlainTextEdit(node.description, this);
         m_descriptionEdit->setObjectName(QStringLiteral("directNodeDescriptionEdit"));
+        m_descriptionEdit->setTabChangesFocus(false);
+        m_descriptionEdit->setMaximumHeight(100);
         m_inputsEdit = createJsonEditor(QStringLiteral("directNodeInputsEdit"),
                                         portsToText(node.inputs));
         m_outputsEdit = createJsonEditor(QStringLiteral("directNodeOutputsEdit"),
