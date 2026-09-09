@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-- 当前开发分支：`feature/issue-16-dock-recovery`，已合入包含项目使用说明 PR #20 的远端 `main`（`6e16bac`）。
+- 当前开发分支：`feature/issue-13-port-drag-connections`，基于远端 `main` 的 `4f0bce6`（Issue #16 PR #21）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
-- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-09-issue-16-dock-recovery.md`；完整使用说明：`doc/project-usage-guide.md`。
+- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-09-issue-13-port-drag-connections.md`；完整使用说明：`doc/project-usage-guide.md`。
 - `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；当前任务和使用指南只说明已经实现的功能。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
@@ -27,9 +27,9 @@
 - 中英文界面 PR #12 已合入远端 `main`，合并提交为 `4e2378e`。
 - 项目使用说明 PR #20 已合入远端 `main`，合并提交为 `6e16bac`。
 - 远端 Issue 按依赖、关键程度和更改幅度排序为 #16、#14、#13、#15、#17、#18、#19；均已标记 `enhancement` 和 `ready-for-agent`。
-- 当前开始处理 #16：新增 View 菜单、Dock 恢复、默认布局复位和现有 Build/Export 工具栏入口。
-- #16 主实现已完成：View 菜单复用 Dock toggle action，Reset Layout 恢复默认区域与可见性，Build/Export 工具栏动作复用现有操作。
-- #16 已普通推送至 `origin/feature/issue-16-dock-recovery` 并创建 PR #21；因 PR #20 合入而产生的文档冲突已通过普通 merge 处理，未强制推送、未自动合并。
+- #16 已通过 PR #21 合入远端 `main`，合并提交为 `4f0bce6`。
+- #14 已通过独立分支创建 PR #22，标题含 `[feat]` 与 `(#14)`，正文含 `Closes #14`；当前等待用户合并。
+- #13 已从最新远端 `main` 新建独立分支，开始实现从 Output Port 拖拽到 Input Port 的直接连线交互。
 
 ## 已完成提交
 
@@ -135,6 +135,7 @@
 
 ## 验证记录
 
+- #13 基线：全新 ASCII 构建目录配置成功，`blueprint_scene` `1/1 passed`（0.34 秒）。
 - #16 基线专项：`language_switch|blueprint_scene` `2/2 passed`（1.84 秒）。
 - #16 RED：新增 View/Dock/Toolbar 断言后两项测试均按预期失败；GREEN：`2/2 passed`（0.49 秒）。
 - #16 Qt Linguist：60 条完成翻译，0 条 unfinished；无 vanished 或 obsolete 条目。
