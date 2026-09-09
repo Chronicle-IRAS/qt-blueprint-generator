@@ -15,6 +15,7 @@
 **Files:**
 - Modify: `tests/tst_blueprint_scene.cpp`
 - Modify: `tests/tst_language_switch.cpp`
+- Modify: `tests/tst_project_exporter.cpp`
 
 - [x] **Step 1: Write the failing dock recovery test**
 
@@ -33,7 +34,7 @@ QVERIFY(propertiesDock && buildDock && propertiesAction && buildAction && resetA
 
 - [x] **Step 2: Write failing toolbar and translation assertions**
 
-Add `mainWindowExposesBuildAndExportInToolbar()` to `BlueprintSceneTest`. Locate `toolbarBuildAction` and `toolbarExportAction`, trigger them with intentionally incomplete fields, and verify the existing build log receives the corresponding rejection messages.
+Add `mainWindowExposesBuildAndExportInToolbar()` to `BlueprintSceneTest`. Locate `toolbarBuildAction` and `toolbarExportAction`, trigger them with intentionally incomplete fields, and verify the existing build log receives the corresponding rejection messages. Extend the existing MainWindow build tests to prove the dock button and toolbar action are disabled together while an asynchronous configure is running and are both restored after synchronous or asynchronous failure.
 
 Extend `LanguageSwitchTest` to locate `viewMenu`, both dock actions, Reset Layout, toolbar Build, and toolbar Export. Assert the English labels, switch to Chinese, and assert `视图`、`属性`、`构建与导出`、`重置布局`、`构建`、`导出`.
 
