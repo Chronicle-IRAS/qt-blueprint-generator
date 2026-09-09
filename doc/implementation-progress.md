@@ -24,7 +24,7 @@
 - Task 10 离线登录端到端验收已完成，主实现 `42cdd6e`、质量调整 `150c044`；规格与最终质量复核均通过。完整构建与 CTest `11/11 passed`（66.54 秒），导出示例测试 `4/4 passed`；质量调整后的两种导出专项均通过。
 - Task 10 的 PR #11 已于 2026-09-09 合入远端 `main`，合并提交为 `43ecdb3`。
 - 中英文界面切换已在 `feature/bilingual-ui` 实现：运行时切换、选择持久化、稳定控件标识和完整当前界面翻译均通过测试。
-- 同步目标：`origin/feature/bilingual-ui`；完成后通过普通推送和独立 PR 交付。
+- 分支已普通推送至 `origin/feature/bilingual-ui`，并创建 PR #12；未强推、未自动合并。
 
 ## 已完成提交
 
@@ -217,7 +217,7 @@
 
 1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/bilingual-ui`。
 2. Task 10 已通过 PR #11 合入远端 `main`；本任务从合并提交 `43ecdb3` 新建分支。
-3. 中英文界面任务完成后普通推送并创建独立 PR；AI 图形化工作流或 C++/Python 混合演进属于后续独立任务。
+3. 中英文界面任务已通过 `feature/bilingual-ui` 和 PR #12 交付；AI 图形化工作流或 C++/Python 混合演进属于后续独立任务。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 

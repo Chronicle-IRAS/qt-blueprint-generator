@@ -93,7 +93,7 @@ Explain the Language menu, runtime switching, persistence, supported `en`/`zh_CN
 
 Run `git diff --check`, the complete CTest suite, and a GUI smoke check. Commit the feature and final README/progress update without adding `start-blueprint-editor.cmd`.
 
-- [ ] **Step 3: Sync the task branch**
+- [x] **Step 3: Sync the task branch**
 
 Push `feature/bilingual-ui` normally and create a pull request against `main`; do not force-push or auto-merge.
 
