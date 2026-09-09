@@ -50,6 +50,7 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
         QVERIFY(languageMenu && englishAction && chineseAction && propertiesDock && buildButton);
 
         QCOMPARE(window.currentLanguage(), QStringLiteral("en"));
+        QVERIFY(!QSettings().contains(QStringLiteral("ui/language")));
         QCOMPARE(window.windowTitle(), QStringLiteral("Blueprint Editor"));
         QVERIFY(englishAction->isChecked());
 
@@ -83,6 +84,8 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
     QVERIFY(restoredWindow.setLanguage(QStringLiteral("en")));
     QVERIFY(!restoredWindow.setLanguage(QStringLiteral("fr")));
     QCOMPARE(restoredWindow.currentLanguage(), QStringLiteral("en"));
+    QCOMPARE(QSettings().value(QStringLiteral("ui/language")).toString(),
+             QStringLiteral("en"));
 }
 
 QTEST_MAIN(LanguageSwitchTest)

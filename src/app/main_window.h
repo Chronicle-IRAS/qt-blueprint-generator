@@ -45,6 +45,7 @@ protected:
     void changeEvent(QEvent *event) override;
 
 private:
+    bool applyLanguage(const QString &languageCode, bool persist);
     void retranslateUi();
     void updateLanguageActions();
     void deleteSelection();

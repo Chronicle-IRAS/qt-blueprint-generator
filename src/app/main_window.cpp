@@ -398,8 +398,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     const QString savedLanguage = QSettings().value(QStringLiteral("ui/language"),
                                                      QStringLiteral("en")).toString();
-    if (!setLanguage(savedLanguage)) {
-        setLanguage(QStringLiteral("en"));
+    if (!applyLanguage(savedLanguage, false)) {
+        applyLanguage(QStringLiteral("en"), false);
     }
 }
 
@@ -457,6 +457,11 @@ QString MainWindow::currentLanguage() const
 
 bool MainWindow::setLanguage(const QString &languageCode)
 {
+    return applyLanguage(languageCode, true);
+}
+
+bool MainWindow::applyLanguage(const QString &languageCode, bool persist)
+{
     if (languageCode != QStringLiteral("en") && languageCode != QStringLiteral("zh_CN")) {
         return false;
     }
@@ -474,7 +479,9 @@ bool MainWindow::setLanguage(const QString &languageCode)
         }
     }
 
-    QSettings().setValue(QStringLiteral("ui/language"), m_currentLanguage);
+    if (persist) {
+        QSettings().setValue(QStringLiteral("ui/language"), m_currentLanguage);
+    }
     updateLanguageActions();
     retranslateUi();
     return true;
