@@ -37,6 +37,9 @@ public:
     QUndoStack *undoStack();
     void setSemanticChangeHandler(std::function<void()> handler);
 
+signals:
+    void nodeEditRequested(const QString &nodeId);
+
 private:
     struct IndexedEdge {
         BlueprintEdge edge;

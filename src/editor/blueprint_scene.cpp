@@ -295,6 +295,11 @@ void BlueprintScene::createNodeItem(const BlueprintNode &node, const QPointF &po
     auto *item = new NodeItem(node.id, node.name);
     item->setNode(node);
     item->setClickedHandler([this](const QString &id) { handleNodeClicked(id); });
+    item->setDoubleClickedHandler([this](const QString &id) {
+        if (m_representable && hasNode(id)) {
+            emit nodeEditRequested(id);
+        }
+    });
     item->setPositionChangedHandler([this](const QString &id) { handleItemPositionChanged(id); });
     item->setMoveFinishedHandler(
         [this](const QString &id, const QPointF &before, const QPointF &after) {

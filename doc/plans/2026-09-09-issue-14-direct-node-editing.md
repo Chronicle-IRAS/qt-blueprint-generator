@@ -36,12 +36,12 @@
 - Modify: src/app/main_window.h
 - Modify: src/app/main_window.cpp
 
-- [ ] Add a dedicated double-click callback on NodeItem without changing single-click connection behavior.
-- [ ] Emit a BlueprintScene nodeEditRequested signal for representable, existing nodes.
-- [ ] Add a MainWindow modal node editor with stable object names for GUI tests.
-- [ ] Reuse the existing port/list JSON parsers and BlueprintScene::editNode command.
-- [ ] Keep invalid input in the dialog with a visible validation message.
-- [ ] Run the focused test to GREEN and check affected selection, connection, and property regressions.
+- [x] Add a dedicated double-click callback on NodeItem without changing single-click connection behavior.
+- [x] Emit a BlueprintScene nodeEditRequested signal for representable, existing nodes.
+- [x] Add a MainWindow modal node editor with stable object names for GUI tests.
+- [x] Reuse the existing port/list JSON parsers and BlueprintScene::editNode command.
+- [x] Keep invalid input in the dialog with a visible validation message.
+- [x] Run the focused test to GREEN and check affected selection, connection, and property regressions.
 
 ## Task 3: Translate, document, verify, and deliver
 
@@ -51,7 +51,7 @@
 - Modify: doc/project-usage-guide.md
 - Modify: doc/implementation-progress.md
 
-- [ ] Update the translation catalog and finish all new Simplified Chinese strings.
+- [x] Update the translation catalog and finish all new Simplified Chinese strings.
 - [ ] Document double-click editing, Save/Cancel behavior, JSON requirements, Inspector synchronization, and Undo/Redo.
 - [ ] Run translation checks, complete build, full CTest, startup probe, and git diff --check.
 - [ ] Perform a quality review and address all Critical, Important, and Minor findings.
