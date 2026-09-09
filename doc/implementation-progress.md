@@ -4,10 +4,10 @@
 
 ## 当前状态
 
-- 当前开发分支：`feature/task10-end-to-end`，直接基于远端 `main` 的 `b89202c`（Task 9 / PR #10）。
-- 当前 worktree：`C:\Users\Lenovo\.config\superpowers\worktrees\project\task10-end-to-end`。
-- 设计基线：`doc/mvp-implementation-plan.md`
-- `doc/multilanguage-development-design.md` 为 MVP 完成后的后续规划，不影响当前 Task 1 至 Task 10。
+- 当前开发分支：`feature/bilingual-ui`，直接基于远端 `main` 的 `43ecdb3`（Task 10 / PR #11）。
+- 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
+- MVP 基线：`doc/mvp-implementation-plan.md`；中英文界面任务计划：`doc/plans/2026-09-09-bilingual-ui.md`。
+- `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；本任务仅增加编辑器 UI 本地化，不迁移后台语言。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
 - Task 3「蓝图静态验证」已完成并通过规格与代码质量审查。
@@ -22,10 +22,21 @@
 - Task 9「实现构建验证与项目导出」已完成；主实现为 `6519955`，质量复核修复为 `4bc109e` 和 `c56c843`，规格与最终质量复核均通过。最终专项 Qt Test `28 passed`，最终完整构建和 CTest `10/10 passed`（45.53 秒），独立导出/构建集成验证退出码 0。
 - Task 9 的 PR #10 已由用户合并，已确认合并提交 `b89202c`。
 - Task 10 离线登录端到端验收已完成，主实现 `42cdd6e`、质量调整 `150c044`；规格与最终质量复核均通过。完整构建与 CTest `11/11 passed`（66.54 秒），导出示例测试 `4/4 passed`；质量调整后的两种导出专项均通过。
-- 同步目标：`origin/feature/task10-end-to-end`；完成后通过普通推送和独立 PR 交付。
+- Task 10 的 PR #11 已于 2026-09-09 合入远端 `main`，合并提交为 `43ecdb3`。
+- 中英文界面切换已在 `feature/bilingual-ui` 实现：运行时切换、选择持久化、稳定控件标识和完整当前界面翻译均通过测试。
+- 同步目标：`origin/feature/bilingual-ui`；完成后通过普通推送和独立 PR 交付。
 
 ## 已完成提交
 
+- `d1a13c2 docs: plan bilingual UI switching`
+  - 记录中英文运行时切换、持久化、翻译资源、测试和交付范围。
+- `d281bfb feat: add English and Chinese UI switching`
+  - 使用 Qt LinguistTools 和内嵌 `.qm` 资源实现英文与简体中文即时切换。
+  - `QSettings` 保存选择；语言变化只重译界面，不改写现有蓝图数据。
+  - 新增 `language_switch` 测试，覆盖菜单触发、控件刷新、节点数据保持、重启恢复和非法语言拒绝。
+- `676e666 fix: avoid writing default language settings`
+  - 启动时只读取并应用已保存语言，不再把未显式选择的默认英文写入设置。
+  - 回归测试覆盖默认设置缺席，以及非法语言不会覆盖最后一次有效选择。
 - `8456049 docs: record Task 10 acceptance kickoff`
   - 基于 Task 9 合并提交 `b89202c` 建立 Task 10 独立分支并记录基线。
 - `42cdd6e test: verify end-to-end blueprint generation`
@@ -111,7 +122,13 @@
 - 生成器：Ninja
 - CMake 配置：通过。
 - 完整构建：通过。
-- 当前 CTest：`11/11 passed`（66.54 秒），包含新增 end_to_end 与此前 10 项测试。
+- Task 10 交付时 CTest：`11/11 passed`（66.54 秒），包含新增 end_to_end 与此前 10 项测试。
+- 中英文界面任务基线：远端 `main` 完整构建和 CTest `11/11 passed`（83.88 秒）。
+- `language_switch`：RED 阶段因 `MainWindow::currentLanguage()` 与 `setLanguage()` 不存在而编译失败；GREEN 阶段 `1/1 passed`（0.21 秒）。
+- 默认语言设置副作用回归：新增断言后 RED，修复后 `language_switch` `1/1 passed`（0.21 秒）。
+- Qt Linguist 源码扫描：发现 58 条当前界面文本，`58 finished`，无 unfinished、vanished 或 obsolete 条目。
+- 中英文界面任务最终完整构建：通过；CTest `12/12 passed`（81.91 秒）。
+- `BlueprintEditor.exe` 使用 `offscreen` 平台插件启动并保持运行 2 秒，启动探测退出码 0；仅终止本次探测创建的进程。
 - Task 6：测试先行，接口缺失、客户端销毁、网络管理器销毁、绝对超时、junction 越界及同步重入场景均有 RED→GREEN 记录。
 - `generation_service`：在 `1b135c9` 上连续运行 20 次通过；真实客户端使用离线网络替身测试，未调用外部模型。
 - 固定存储测试调整后，在 `eb6f8b7` 及最终 API 注释上重新完整构建并执行 CTest：`7/7 passed`。
@@ -198,9 +215,9 @@
 
 ## 恢复工作
 
-1. Task 10 的代码与构建位于上述独立 worktree，当前分支为 `feature/task10-end-to-end`。
-2. Task 9 已合入远端 `main`，Task 10 基于合并提交 `b89202c` 开发登录示例及端到端验收。
-3. 完成 Task 10 后普通推送并创建独立 PR；后续 UI 完整工作流或多语言演进须另行确定范围。
+1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/bilingual-ui`。
+2. Task 10 已通过 PR #11 合入远端 `main`；本任务从合并提交 `43ecdb3` 新建分支。
+3. 中英文界面任务完成后普通推送并创建独立 PR；AI 图形化工作流或 C++/Python 混合演进属于后续独立任务。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 
