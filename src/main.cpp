@@ -5,6 +5,8 @@
 int main(int argc, char *argv[])
 {
     QApplication application(argc, argv);
+    QCoreApplication::setOrganizationName(QStringLiteral("QtBlueprintGenerator"));
+    QCoreApplication::setApplicationName(QStringLiteral("BlueprintEditor"));
     MainWindow mainWindow;
     mainWindow.show();
 

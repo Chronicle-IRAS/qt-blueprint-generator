@@ -13,6 +13,8 @@ class NodeItem;
 
 class BlueprintScene final : public QGraphicsScene
 {
+    Q_OBJECT
+
 public:
     explicit BlueprintScene(BlueprintDocument *document, QObject *parent = nullptr);
 

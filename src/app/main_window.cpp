@@ -6,8 +6,11 @@
 #include "workspace/project_exporter.h"
 
 #include <QAction>
+#include <QActionGroup>
+#include <QApplication>
 #include <QDockWidget>
 #include <QDir>
+#include <QEvent>
 #include <QFormLayout>
 #include <QGraphicsView>
 #include <QHBoxLayout>
@@ -16,6 +19,7 @@
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QKeySequence>
+#include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
@@ -23,6 +27,7 @@
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
+#include <QSettings>
 #include <QStatusBar>
 #include <QToolBar>
 #include <QToolButton>
@@ -47,6 +52,25 @@ QString nodeTypeName(NodeType type)
         return QObject::tr("Decision");
     case NodeType::ExternalCode:
         return QObject::tr("External Code");
+    }
+    return {};
+}
+
+QString nodeTypeActionObjectName(NodeType type)
+{
+    switch (type) {
+    case NodeType::Start:
+        return QStringLiteral("addStartNodeAction");
+    case NodeType::End:
+        return QStringLiteral("addEndNodeAction");
+    case NodeType::UiPage:
+        return QStringLiteral("addUIPageNodeAction");
+    case NodeType::LogicModule:
+        return QStringLiteral("addLogicModuleNodeAction");
+    case NodeType::Decision:
+        return QStringLiteral("addDecisionNodeAction");
+    case NodeType::ExternalCode:
+        return QStringLiteral("addExternalCodeNodeAction");
     }
     return {};
 }
@@ -142,6 +166,13 @@ bool parseStrings(const QString &text, QStringList *values)
     return true;
 }
 
+void setFormLabel(QFormLayout *form, QWidget *field, const QString &text)
+{
+    if (auto *label = qobject_cast<QLabel *>(form->labelForField(field))) {
+        label->setText(text);
+    }
+}
+
 class BlueprintView final : public QGraphicsView
 {
 public:
@@ -179,11 +210,13 @@ MainWindow::MainWindow(QWidget *parent)
     m_view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
     setCentralWidget(m_view);
 
-    auto *toolbar = addToolBar(tr("Blueprint"));
-    auto *addButton = new QToolButton(toolbar);
-    addButton->setText(tr("Add node"));
-    addButton->setPopupMode(QToolButton::InstantPopup);
-    auto *addMenu = new QMenu(addButton);
+    m_blueprintToolbar = addToolBar(tr("Blueprint"));
+    m_blueprintToolbar->setObjectName(QStringLiteral("blueprintToolbar"));
+    m_addNodeButton = new QToolButton(m_blueprintToolbar);
+    m_addNodeButton->setObjectName(QStringLiteral("addNodeButton"));
+    m_addNodeButton->setText(tr("Add node"));
+    m_addNodeButton->setPopupMode(QToolButton::InstantPopup);
+    m_addNodeMenu = new QMenu(m_addNodeButton);
     const QVector<NodeType> nodeTypes{
         NodeType::Start,
         NodeType::End,
@@ -193,38 +226,54 @@ MainWindow::MainWindow(QWidget *parent)
         NodeType::ExternalCode,
     };
     for (const NodeType type : nodeTypes) {
-        QAction *action = addMenu->addAction(nodeTypeName(type));
-        action->setObjectName(QStringLiteral("add%1NodeAction").arg(nodeTypeName(type).remove(' ')));
+        QAction *action = m_addNodeMenu->addAction(nodeTypeName(type));
+        action->setObjectName(nodeTypeActionObjectName(type));
+        m_addNodeActions.append({type, action});
         connect(action, &QAction::triggered, this, [this, type] { addNodeOfType(type); });
     }
-    addButton->setMenu(addMenu);
-    toolbar->addWidget(addButton);
-    m_connectionLabelEdit = new QLineEdit(toolbar);
+    m_addNodeButton->setMenu(m_addNodeMenu);
+    m_blueprintToolbar->addWidget(m_addNodeButton);
+    m_connectionLabelEdit = new QLineEdit(m_blueprintToolbar);
     m_connectionLabelEdit->setObjectName(QStringLiteral("connectionLabelEdit"));
     m_connectionLabelEdit->setPlaceholderText(tr("Edge label (optional)"));
     m_connectionLabelEdit->setToolTip(tr("Label for the next source-to-target connection"));
     m_connectionLabelEdit->setMaximumWidth(220);
-    toolbar->addWidget(m_connectionLabelEdit);
-    QAction *deleteAction = toolbar->addAction(tr("Delete"));
-    QAction *connectAction = toolbar->addAction(tr("Connect: choose source then target"));
-    connectAction->setObjectName(QStringLiteral("beginConnectionAction"));
-    auto *cancelAction = new QAction(tr("Cancel connection"), this);
-    cancelAction->setObjectName(QStringLiteral("cancelConnectionAction"));
-    cancelAction->setShortcut(QKeySequence(Qt::Key_Escape));
-    cancelAction->setShortcutContext(Qt::WindowShortcut);
-    toolbar->addAction(cancelAction);
-    toolbar->addSeparator();
-    toolbar->addAction(m_scene->undoStack()->createUndoAction(this, tr("Undo")));
-    toolbar->addAction(m_scene->undoStack()->createRedoAction(this, tr("Redo")));
+    m_blueprintToolbar->addWidget(m_connectionLabelEdit);
+    m_deleteAction = m_blueprintToolbar->addAction(tr("Delete"));
+    m_connectAction = m_blueprintToolbar->addAction(tr("Connect: choose source then target"));
+    m_connectAction->setObjectName(QStringLiteral("beginConnectionAction"));
+    m_cancelConnectionAction = new QAction(tr("Cancel connection"), this);
+    m_cancelConnectionAction->setObjectName(QStringLiteral("cancelConnectionAction"));
+    m_cancelConnectionAction->setShortcut(QKeySequence(Qt::Key_Escape));
+    m_cancelConnectionAction->setShortcutContext(Qt::WindowShortcut);
+    m_blueprintToolbar->addAction(m_cancelConnectionAction);
+    m_blueprintToolbar->addSeparator();
+    m_toolbarUndoAction = m_blueprintToolbar->addAction(tr("Undo"));
+    m_toolbarRedoAction = m_blueprintToolbar->addAction(tr("Redo"));
 
-    QMenu *editMenu = menuBar()->addMenu(tr("Edit"));
-    editMenu->addAction(m_scene->undoStack()->createUndoAction(this, tr("Undo")));
-    editMenu->addAction(m_scene->undoStack()->createRedoAction(this, tr("Redo")));
+    m_editMenu = menuBar()->addMenu(tr("Edit"));
+    m_editMenu->setObjectName(QStringLiteral("editMenu"));
+    m_menuUndoAction = m_editMenu->addAction(tr("Undo"));
+    m_menuRedoAction = m_editMenu->addAction(tr("Redo"));
 
-    auto *properties = new QDockWidget(tr("Properties"), this);
-    auto *propertyWidget = new QWidget(properties);
+    m_languageMenu = menuBar()->addMenu(tr("Language"));
+    m_languageMenu->setObjectName(QStringLiteral("languageMenu"));
+    auto *languageGroup = new QActionGroup(this);
+    languageGroup->setExclusive(true);
+    m_englishLanguageAction = m_languageMenu->addAction(tr("English"));
+    m_englishLanguageAction->setObjectName(QStringLiteral("languageEnglishAction"));
+    m_englishLanguageAction->setCheckable(true);
+    languageGroup->addAction(m_englishLanguageAction);
+    m_chineseLanguageAction = m_languageMenu->addAction(tr("Chinese"));
+    m_chineseLanguageAction->setObjectName(QStringLiteral("languageChineseAction"));
+    m_chineseLanguageAction->setCheckable(true);
+    languageGroup->addAction(m_chineseLanguageAction);
+
+    m_propertiesDock = new QDockWidget(tr("Properties"), this);
+    m_propertiesDock->setObjectName(QStringLiteral("propertiesDock"));
+    auto *propertyWidget = new QWidget(m_propertiesDock);
     auto *propertyLayout = new QVBoxLayout(propertyWidget);
-    auto *form = new QFormLayout;
+    m_propertyForm = new QFormLayout;
     m_nameEdit = new QLineEdit(propertyWidget);
     m_nameEdit->setObjectName(QStringLiteral("nodeNameEdit"));
     m_descriptionEdit = new QPlainTextEdit(propertyWidget);
@@ -242,25 +291,25 @@ MainWindow::MainWindow(QWidget *parent)
         editor->setTabChangesFocus(false);
         editor->setMaximumHeight(90);
     }
-    form->addRow(tr("Name"), m_nameEdit);
-    form->addRow(tr("Description"), m_descriptionEdit);
-    form->addRow(tr("Inputs (JSON)"), m_inputsEdit);
-    form->addRow(tr("Outputs (JSON)"), m_outputsEdit);
-    form->addRow(tr("Constraints (JSON)"), m_constraintsEdit);
-    form->addRow(tr("Acceptance criteria (JSON)"), m_acceptanceCriteriaEdit);
-    propertyLayout->addLayout(form);
+    m_propertyForm->addRow(tr("Name"), m_nameEdit);
+    m_propertyForm->addRow(tr("Description"), m_descriptionEdit);
+    m_propertyForm->addRow(tr("Inputs (JSON)"), m_inputsEdit);
+    m_propertyForm->addRow(tr("Outputs (JSON)"), m_outputsEdit);
+    m_propertyForm->addRow(tr("Constraints (JSON)"), m_constraintsEdit);
+    m_propertyForm->addRow(tr("Acceptance criteria (JSON)"), m_acceptanceCriteriaEdit);
+    propertyLayout->addLayout(m_propertyForm);
     m_applyPropertiesButton = new QPushButton(tr("Apply"), propertyWidget);
     m_applyPropertiesButton->setObjectName(QStringLiteral("applyNodePropertiesButton"));
     propertyLayout->addWidget(m_applyPropertiesButton);
     propertyLayout->addStretch();
-    properties->setWidget(propertyWidget);
-    addDockWidget(Qt::RightDockWidgetArea, properties);
+    m_propertiesDock->setWidget(propertyWidget);
+    addDockWidget(Qt::RightDockWidgetArea, m_propertiesDock);
 
-    auto *buildDock = new QDockWidget(tr("Build and export"), this);
-    buildDock->setObjectName(QStringLiteral("buildExportDock"));
-    auto *buildWidget = new QWidget(buildDock);
+    m_buildDock = new QDockWidget(tr("Build and export"), this);
+    m_buildDock->setObjectName(QStringLiteral("buildExportDock"));
+    auto *buildWidget = new QWidget(m_buildDock);
     auto *buildLayout = new QVBoxLayout(buildWidget);
-    auto *buildForm = new QFormLayout;
+    m_buildForm = new QFormLayout;
     m_workspacePathEdit = new QLineEdit(QDir::currentPath(), buildWidget);
     m_workspacePathEdit->setObjectName(QStringLiteral("workspacePathEdit"));
     m_workspacePathEdit->setToolTip(tr("Workspace root containing generated-project"));
@@ -273,12 +322,12 @@ MainWindow::MainWindow(QWidget *parent)
     m_configureArgumentsEdit = new QLineEdit(buildWidget);
     m_configureArgumentsEdit->setObjectName(QStringLiteral("cmakeConfigureArgumentsEdit"));
     m_configureArgumentsEdit->setPlaceholderText(tr("For example: -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.x/mingw_64"));
-    buildForm->addRow(tr("Workspace root"), m_workspacePathEdit);
-    buildForm->addRow(tr("Build directory"), m_buildDirectoryEdit);
-    buildForm->addRow(tr("Empty export directory"), m_exportTargetEdit);
-    buildForm->addRow(tr("CMake executable"), m_cmakeExecutableEdit);
-    buildForm->addRow(tr("Configure arguments"), m_configureArgumentsEdit);
-    buildLayout->addLayout(buildForm);
+    m_buildForm->addRow(tr("Workspace root"), m_workspacePathEdit);
+    m_buildForm->addRow(tr("Build directory"), m_buildDirectoryEdit);
+    m_buildForm->addRow(tr("Empty export directory"), m_exportTargetEdit);
+    m_buildForm->addRow(tr("CMake executable"), m_cmakeExecutableEdit);
+    m_buildForm->addRow(tr("Configure arguments"), m_configureArgumentsEdit);
+    buildLayout->addLayout(m_buildForm);
     auto *buttons = new QHBoxLayout;
     m_buildProjectButton = new QPushButton(tr("Build"), buildWidget);
     m_buildProjectButton->setObjectName(QStringLiteral("buildProjectButton"));
@@ -294,17 +343,37 @@ MainWindow::MainWindow(QWidget *parent)
     m_buildLog->setPlaceholderText(tr("Configure, build, and export output appears here."));
     m_buildLog->setMaximumBlockCount(10000);
     buildLayout->addWidget(m_buildLog);
-    buildDock->setWidget(buildWidget);
-    addDockWidget(Qt::BottomDockWidgetArea, buildDock);
+    m_buildDock->setWidget(buildWidget);
+    addDockWidget(Qt::BottomDockWidgetArea, m_buildDock);
 
     m_buildService = new BuildService(this);
 
-    connect(deleteAction, &QAction::triggered, this, [this] { deleteSelection(); });
-    connect(connectAction, &QAction::triggered, this, [this] {
+    connect(m_deleteAction, &QAction::triggered, this, [this] { deleteSelection(); });
+    connect(m_connectAction, &QAction::triggered, this, [this] {
         m_scene->beginConnection(m_connectionLabelEdit->text());
         statusBar()->showMessage(tr("Choose source node, then target node"));
     });
-    connect(cancelAction, &QAction::triggered, this, [this] { cancelConnection(); });
+    connect(m_cancelConnectionAction, &QAction::triggered, this, [this] { cancelConnection(); });
+    for (QAction *action : {m_toolbarUndoAction, m_menuUndoAction}) {
+        connect(action, &QAction::triggered, m_scene->undoStack(), &QUndoStack::undo);
+        action->setEnabled(m_scene->undoStack()->canUndo());
+    }
+    for (QAction *action : {m_toolbarRedoAction, m_menuRedoAction}) {
+        connect(action, &QAction::triggered, m_scene->undoStack(), &QUndoStack::redo);
+        action->setEnabled(m_scene->undoStack()->canRedo());
+    }
+    connect(m_scene->undoStack(), &QUndoStack::canUndoChanged, this, [this](bool enabled) {
+        m_toolbarUndoAction->setEnabled(enabled);
+        m_menuUndoAction->setEnabled(enabled);
+    });
+    connect(m_scene->undoStack(), &QUndoStack::canRedoChanged, this, [this](bool enabled) {
+        m_toolbarRedoAction->setEnabled(enabled);
+        m_menuRedoAction->setEnabled(enabled);
+    });
+    connect(m_englishLanguageAction, &QAction::triggered, this,
+            [this] { setLanguage(QStringLiteral("en")); });
+    connect(m_chineseLanguageAction, &QAction::triggered, this,
+            [this] { setLanguage(QStringLiteral("zh_CN")); });
     connect(m_applyPropertiesButton, &QPushButton::clicked, this, [this] { applyProperties(); });
     connect(m_buildProjectButton, &QPushButton::clicked, this, [this] { startBuild(); });
     connect(m_exportProjectButton, &QPushButton::clicked, this, [this] { exportProject(); });
@@ -326,10 +395,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] { updatePropertyEditor(); });
     m_scene->setSemanticChangeHandler([this] { updatePropertyEditor(); });
     updatePropertyEditor();
+
+    const QString savedLanguage = QSettings().value(QStringLiteral("ui/language"),
+                                                     QStringLiteral("en")).toString();
+    if (!setLanguage(savedLanguage)) {
+        setLanguage(QStringLiteral("en"));
+    }
 }
 
 MainWindow::~MainWindow()
 {
+    qApp->removeTranslator(&m_translator);
     if (m_scene) {
         QObject::disconnect(m_scene, nullptr, this, nullptr);
         m_scene->setSemanticChangeHandler({});
@@ -372,6 +448,99 @@ BlueprintScene *MainWindow::scene() const
 QGraphicsView *MainWindow::graphicsView() const
 {
     return m_view;
+}
+
+QString MainWindow::currentLanguage() const
+{
+    return m_currentLanguage;
+}
+
+bool MainWindow::setLanguage(const QString &languageCode)
+{
+    if (languageCode != QStringLiteral("en") && languageCode != QStringLiteral("zh_CN")) {
+        return false;
+    }
+
+    if (languageCode != m_currentLanguage) {
+        if (languageCode == QStringLiteral("zh_CN")) {
+            if (!m_translator.load(QStringLiteral(":/i18n/BlueprintEditor_zh_CN.qm"))) {
+                return false;
+            }
+            m_currentLanguage = languageCode;
+            qApp->installTranslator(&m_translator);
+        } else {
+            m_currentLanguage = languageCode;
+            qApp->removeTranslator(&m_translator);
+        }
+    }
+
+    QSettings().setValue(QStringLiteral("ui/language"), m_currentLanguage);
+    updateLanguageActions();
+    retranslateUi();
+    return true;
+}
+
+void MainWindow::changeEvent(QEvent *event)
+{
+    QMainWindow::changeEvent(event);
+    if (event->type() == QEvent::LanguageChange) {
+        retranslateUi();
+    }
+}
+
+void MainWindow::updateLanguageActions()
+{
+    m_englishLanguageAction->setChecked(m_currentLanguage == QStringLiteral("en"));
+    m_chineseLanguageAction->setChecked(m_currentLanguage == QStringLiteral("zh_CN"));
+}
+
+void MainWindow::retranslateUi()
+{
+    setWindowTitle(tr("Blueprint Editor"));
+    m_blueprintToolbar->setWindowTitle(tr("Blueprint"));
+    m_addNodeButton->setText(tr("Add node"));
+    for (const auto &[type, action] : m_addNodeActions) {
+        action->setText(nodeTypeName(type));
+    }
+    m_connectionLabelEdit->setPlaceholderText(tr("Edge label (optional)"));
+    m_connectionLabelEdit->setToolTip(tr("Label for the next source-to-target connection"));
+    m_deleteAction->setText(tr("Delete"));
+    m_connectAction->setText(tr("Connect: choose source then target"));
+    m_cancelConnectionAction->setText(tr("Cancel connection"));
+    m_toolbarUndoAction->setText(tr("Undo"));
+    m_toolbarRedoAction->setText(tr("Redo"));
+    m_editMenu->setTitle(tr("Edit"));
+    m_menuUndoAction->setText(tr("Undo"));
+    m_menuRedoAction->setText(tr("Redo"));
+    m_languageMenu->setTitle(tr("Language"));
+    m_englishLanguageAction->setText(tr("English"));
+    m_chineseLanguageAction->setText(tr("Chinese"));
+
+    m_propertiesDock->setWindowTitle(tr("Properties"));
+    m_descriptionEdit->setPlaceholderText(tr("Description"));
+    setFormLabel(m_propertyForm, m_nameEdit, tr("Name"));
+    setFormLabel(m_propertyForm, m_descriptionEdit, tr("Description"));
+    setFormLabel(m_propertyForm, m_inputsEdit, tr("Inputs (JSON)"));
+    setFormLabel(m_propertyForm, m_outputsEdit, tr("Outputs (JSON)"));
+    setFormLabel(m_propertyForm, m_constraintsEdit, tr("Constraints (JSON)"));
+    setFormLabel(m_propertyForm, m_acceptanceCriteriaEdit, tr("Acceptance criteria (JSON)"));
+    m_applyPropertiesButton->setText(tr("Apply"));
+
+    m_buildDock->setWindowTitle(tr("Build and export"));
+    m_workspacePathEdit->setToolTip(tr("Workspace root containing generated-project"));
+    m_configureArgumentsEdit->setPlaceholderText(
+        tr("For example: -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.x/mingw_64"));
+    setFormLabel(m_buildForm, m_workspacePathEdit, tr("Workspace root"));
+    setFormLabel(m_buildForm, m_buildDirectoryEdit, tr("Build directory"));
+    setFormLabel(m_buildForm, m_exportTargetEdit, tr("Empty export directory"));
+    setFormLabel(m_buildForm, m_cmakeExecutableEdit, tr("CMake executable"));
+    setFormLabel(m_buildForm, m_configureArgumentsEdit, tr("Configure arguments"));
+    m_buildProjectButton->setText(tr("Build"));
+    m_exportProjectButton->setText(tr("Export"));
+    m_buildLog->setPlaceholderText(tr("Configure, build, and export output appears here."));
+
+    statusBar()->clearMessage();
+    m_scene->update();
 }
 
 void MainWindow::setBuildToolConfiguration(const QString &cmakeExecutable,
