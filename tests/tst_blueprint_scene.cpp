@@ -250,6 +250,8 @@ void BlueprintSceneTest::invalidAndCancelledPortDragsDoNotMutateDocument()
     QApplication::processEvents();
     NodeItem *sourceItem = scene.nodeItem(source.id);
     NodeItem *targetItem = scene.nodeItem(target.id);
+    QVERIFY(scene.moveNode(source.id, QPointF(120.0, 80.0)));
+    scene.undoStack()->clear();
     const BlueprintDocument before = document;
     const int commandsBefore = scene.undoStack()->count();
     const QPoint sourcePoint = view.mapFromScene(sourceItem->outputAnchor(0));

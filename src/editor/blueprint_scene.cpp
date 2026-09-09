@@ -3,10 +3,17 @@
 #include "editor/edge_item.h"
 #include "editor/node_item.h"
 
+#include <QGraphicsPathItem>
+#include <QGraphicsSceneMouseEvent>
+#include <QKeyEvent>
+#include <QPainterPath>
+#include <QPen>
 #include <QUndoCommand>
 
 #include <QSet>
 
+#include <algorithm>
+#include <cmath>
 #include <functional>
 
 namespace {
@@ -153,6 +160,7 @@ bool BlueprintScene::beginConnection(const QString &label)
         cancelConnection();
         return false;
     }
+    cancelPortDrag();
     m_connectionMode = true;
     m_connectionSource.clear();
     m_connectionLabel = label;
@@ -164,6 +172,12 @@ void BlueprintScene::cancelConnection()
     m_connectionMode = false;
     m_connectionSource.clear();
     m_connectionLabel.clear();
+    cancelPortDrag();
+}
+
+void BlueprintScene::setDragConnectionLabel(const QString &label)
+{
+    m_dragConnectionLabel = label;
 }
 
 bool BlueprintScene::chooseConnectionNode(const QString &nodeId)
@@ -255,6 +269,26 @@ void BlueprintScene::setSemanticChangeHandler(std::function<void()> handler)
     m_semanticChangeHandler = std::move(handler);
 }
 
+void BlueprintScene::keyPressEvent(QKeyEvent *event)
+{
+    if (event->key() == Qt::Key_Escape && m_temporaryConnection) {
+        cancelPortDrag();
+        event->accept();
+        return;
+    }
+    QGraphicsScene::keyPressEvent(event);
+}
+
+void BlueprintScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
+{
+    if (event->button() == Qt::RightButton && m_temporaryConnection) {
+        cancelPortDrag();
+        event->accept();
+        return;
+    }
+    QGraphicsScene::mousePressEvent(event);
+}
+
 bool BlueprintScene::hasNode(const QString &nodeId) const
 {
     return m_nodes.contains(nodeId);
@@ -295,6 +329,11 @@ void BlueprintScene::createNodeItem(const BlueprintNode &node, const QPointF &po
     auto *item = new NodeItem(node.id, node.name);
     item->setNode(node);
     item->setClickedHandler([this](const QString &id) { handleNodeClicked(id); });
+    item->setPortDragHandlers(
+        [this](const QString &id, int outputIndex) { beginPortDrag(id, outputIndex); },
+        [this](const QPointF &position) { updatePortDrag(position); },
+        [this](const QPointF &position) { finishPortDrag(position); },
+        [this] { cancelPortDrag(); });
     item->setPositionChangedHandler([this](const QString &id) { handleItemPositionChanged(id); });
     item->setMoveFinishedHandler(
         [this](const QString &id, const QPointF &before, const QPointF &after) {
@@ -332,6 +371,10 @@ void BlueprintScene::removeNodeDirect(const QString &nodeId, QVector<IndexedEdge
     }
     if (nodeId == m_connectionSource) {
         cancelConnection();
+    }
+    if (nodeId == m_portDragSource
+        || (m_hoveredInputNode && m_hoveredInputNode->nodeId() == nodeId)) {
+        cancelPortDrag();
     }
 
     QVector<IndexedEdge> localEdges;
@@ -447,6 +490,114 @@ void BlueprintScene::handleNodeClicked(const QString &nodeId)
     if (m_connectionMode) {
         chooseConnectionNode(nodeId);
     }
+}
+
+void BlueprintScene::beginPortDrag(const QString &nodeId, int outputIndex)
+{
+    NodeItem *source = nodeItem(nodeId);
+    if (!m_representable || !source || outputIndex < 0) {
+        return;
+    }
+    cancelConnection();
+    m_portDragSource = nodeId;
+    m_portDragOutput = outputIndex;
+    m_temporaryConnection = addPath(QPainterPath(),
+                                    QPen(QColor(37, 99, 235), 2.0, Qt::DashLine,
+                                         Qt::RoundCap, Qt::RoundJoin));
+    m_temporaryConnection->setData(0, QStringLiteral("portConnectionPreview"));
+    m_temporaryConnection->setZValue(-0.5);
+    updateTemporaryConnection(source->outputAnchor(outputIndex));
+}
+
+void BlueprintScene::updatePortDrag(const QPointF &scenePosition)
+{
+    if (!m_temporaryConnection) {
+        return;
+    }
+    updateTemporaryConnection(scenePosition);
+    int inputIndex = -1;
+    NodeItem *target = inputTargetAt(scenePosition, &inputIndex);
+    setHoveredInput(target, inputIndex);
+}
+
+void BlueprintScene::finishPortDrag(const QPointF &scenePosition)
+{
+    if (!m_temporaryConnection) {
+        return;
+    }
+    updatePortDrag(scenePosition);
+    const QString sourceId = m_portDragSource;
+    const QString targetId = m_hoveredInputNode ? m_hoveredInputNode->nodeId() : QString();
+    const QString label = m_dragConnectionLabel;
+    cancelPortDrag();
+    if (!targetId.isEmpty()) {
+        connectNodes(sourceId, targetId, label);
+    }
+}
+
+void BlueprintScene::cancelPortDrag()
+{
+    if (NodeItem *source = nodeItem(m_portDragSource)) {
+        source->cancelPortDrag();
+    }
+    setHoveredInput(nullptr, -1);
+    if (m_temporaryConnection) {
+        removeItem(m_temporaryConnection);
+        delete m_temporaryConnection;
+        m_temporaryConnection = nullptr;
+    }
+    m_portDragSource.clear();
+    m_portDragOutput = -1;
+}
+
+NodeItem *BlueprintScene::inputTargetAt(const QPointF &scenePosition, int *inputIndex) const
+{
+    for (NodeItem *node : m_nodes) {
+        if (!node || node->nodeId() == m_portDragSource) {
+            continue;
+        }
+        const int index = node->inputPortAt(node->mapFromScene(scenePosition));
+        if (index >= 0) {
+            if (inputIndex) {
+                *inputIndex = index;
+            }
+            return node;
+        }
+    }
+    if (inputIndex) {
+        *inputIndex = -1;
+    }
+    return nullptr;
+}
+
+void BlueprintScene::setHoveredInput(NodeItem *node, int inputIndex)
+{
+    if (m_hoveredInputNode == node && m_hoveredInputPort == inputIndex) {
+        return;
+    }
+    if (m_hoveredInputNode) {
+        m_hoveredInputNode->setHighlightedInputPort(-1);
+    }
+    m_hoveredInputNode = node;
+    m_hoveredInputPort = node ? inputIndex : -1;
+    if (m_hoveredInputNode) {
+        m_hoveredInputNode->setHighlightedInputPort(inputIndex);
+    }
+}
+
+void BlueprintScene::updateTemporaryConnection(const QPointF &endPosition)
+{
+    NodeItem *source = nodeItem(m_portDragSource);
+    if (!source || !m_temporaryConnection) {
+        cancelPortDrag();
+        return;
+    }
+    const QPointF start = source->outputAnchor(m_portDragOutput);
+    const qreal controlDistance = std::max(48.0, std::abs(endPosition.x() - start.x()) * 0.5);
+    QPainterPath path(start);
+    path.cubicTo(start + QPointF(controlDistance, 0.0),
+                 endPosition - QPointF(controlDistance, 0.0), endPosition);
+    m_temporaryConnection->setPath(path);
 }
 
 void BlueprintScene::notifySemanticChanged()

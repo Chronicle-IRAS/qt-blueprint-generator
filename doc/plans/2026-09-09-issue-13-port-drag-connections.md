@@ -38,13 +38,13 @@
 - Modify: src/editor/blueprint_scene.cpp
 - Modify: src/app/main_window.cpp
 
-- [ ] Add port hit testing and highlighted-input state to NodeItem.
-- [ ] Route output-port press/move/release callbacks to BlueprintScene without initiating node movement.
-- [ ] Render and update a dashed temporary connection path.
-- [ ] Detect valid input-port targets and update hover feedback.
-- [ ] Create an existing FlowEdge only after valid release; cleanly cancel all other endings.
-- [ ] Reuse the toolbar Edge label for drag connections and keep button-based connection unchanged.
-- [ ] Run focused tests to GREEN.
+- [x] Add port hit testing and highlighted-input state to NodeItem.
+- [x] Route output-port press/move/release callbacks to BlueprintScene without initiating node movement.
+- [x] Render and update a dashed temporary connection path.
+- [x] Detect valid input-port targets and update hover feedback.
+- [x] Create an existing FlowEdge only after valid release; cleanly cancel all other endings.
+- [x] Reuse the toolbar Edge label for drag connections and keep button-based connection unchanged.
+- [x] Run focused tests to GREEN.
 
 ## Task 3: Document, verify, review, and deliver
 

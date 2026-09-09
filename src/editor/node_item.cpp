@@ -2,6 +2,7 @@
 
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsScene>
+#include <QLineF>
 #include <QObject>
 #include <QPainter>
 #include <QStyleOptionGraphicsItem>
@@ -39,6 +40,9 @@ void NodeItem::setNode(const BlueprintNode &node)
     m_node = node;
     m_nodeId = node.id;
     m_title = node.name;
+    if (m_highlightedInputPort >= std::max(1, static_cast<int>(node.inputs.size()))) {
+        m_highlightedInputPort = -1;
+    }
     setToolTip(node.description);
     update();
 }
@@ -57,6 +61,35 @@ QPointF NodeItem::outputAnchor(int index) const
     return mapToScene(QPointF(NodeWidth, NodeHeight * (clamped + 1.0) / (count + 1.0)));
 }
 
+int NodeItem::inputPortAt(const QPointF &localPosition) const
+{
+    const int count = std::max(1, static_cast<int>(m_node.inputs.size()));
+    for (int index = 0; index < count; ++index) {
+        const QPointF center(0.0, NodeHeight * (index + 1.0) / (count + 1.0));
+        if (QLineF(center, localPosition).length() <= 10.0) {
+            return index;
+        }
+    }
+    return -1;
+}
+
+int NodeItem::outputPortAt(const QPointF &localPosition) const
+{
+    const int count = std::max(1, static_cast<int>(m_node.outputs.size()));
+    for (int index = 0; index < count; ++index) {
+        const QPointF center(NodeWidth, NodeHeight * (index + 1.0) / (count + 1.0));
+        if (QLineF(center, localPosition).length() <= 10.0) {
+            return index;
+        }
+    }
+    return -1;
+}
+
+int NodeItem::highlightedInputPort() const
+{
+    return m_highlightedInputPort;
+}
+
 void NodeItem::setPositionChangedHandler(std::function<void(const QString &)> handler)
 {
     m_positionChangedHandler = std::move(handler);
@@ -65,6 +98,34 @@ void NodeItem::setPositionChangedHandler(std::function<void(const QString &)> ha
 void NodeItem::setClickedHandler(std::function<void(const QString &)> handler)
 {
     m_clickedHandler = std::move(handler);
+}
+
+void NodeItem::setPortDragHandlers(std::function<void(const QString &, int)> started,
+                                   std::function<void(const QPointF &)> moved,
+                                   std::function<void(const QPointF &)> finished,
+                                   std::function<void()> cancelled)
+{
+    m_portDragStartedHandler = std::move(started);
+    m_portDragMovedHandler = std::move(moved);
+    m_portDragFinishedHandler = std::move(finished);
+    m_portDragCancelledHandler = std::move(cancelled);
+}
+
+void NodeItem::setHighlightedInputPort(int index)
+{
+    if (m_highlightedInputPort == index) {
+        return;
+    }
+    m_highlightedInputPort = index;
+    update();
+}
+
+void NodeItem::cancelPortDrag()
+{
+    m_portDragActive = false;
+    // A cancelled drag still receives the eventual left-button release because
+    // this item owns the mouse grab. Treat that release as a no-op, not a move.
+    m_dragStart = pos();
 }
 
 void NodeItem::setMoveFinishedHandler(
@@ -109,23 +170,21 @@ void NodeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, 
                           Qt::AlignRight | Qt::AlignVCenter, m_node.outputs.at(index).name);
     }
 
-    painter->setPen(QPen(QColor(30, 41, 59), 1.0));
-    painter->setBrush(QColor(226, 232, 240));
     const int inputCount = std::max(1, static_cast<int>(m_node.inputs.size()));
-    for (int index = 0; index < m_node.inputs.size(); ++index) {
+    for (int index = 0; index < inputCount; ++index) {
         const qreal y = NodeHeight * (index + 1.0) / (inputCount + 1.0);
+        const bool highlighted = index == m_highlightedInputPort;
+        painter->setPen(QPen(highlighted ? QColor(22, 163, 74) : QColor(30, 41, 59),
+                             highlighted ? 2.5 : 1.0));
+        painter->setBrush(highlighted ? QColor(187, 247, 208) : QColor(226, 232, 240));
         painter->drawEllipse(QPointF(0.0, y), 5.0, 5.0);
     }
-    if (m_node.inputs.isEmpty()) {
-        painter->drawEllipse(QPointF(0.0, NodeHeight / 2.0), 5.0, 5.0);
-    }
+    painter->setPen(QPen(QColor(30, 41, 59), 1.0));
+    painter->setBrush(QColor(226, 232, 240));
     const int outputCount = std::max(1, static_cast<int>(m_node.outputs.size()));
-    for (int index = 0; index < m_node.outputs.size(); ++index) {
+    for (int index = 0; index < outputCount; ++index) {
         const qreal y = NodeHeight * (index + 1.0) / (outputCount + 1.0);
         painter->drawEllipse(QPointF(NodeWidth, y), 5.0, 5.0);
-    }
-    if (m_node.outputs.isEmpty()) {
-        painter->drawEllipse(QPointF(NodeWidth, NodeHeight / 2.0), 5.0, 5.0);
     }
 }
 
@@ -140,6 +199,23 @@ QVariant NodeItem::itemChange(GraphicsItemChange change, const QVariant &value)
 
 void NodeItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
+    if (event->button() == Qt::RightButton && m_portDragActive) {
+        m_portDragActive = false;
+        if (m_portDragCancelledHandler) {
+            m_portDragCancelledHandler();
+        }
+        event->accept();
+        return;
+    }
+    if (event->button() == Qt::LeftButton) {
+        const int outputIndex = outputPortAt(event->pos());
+        if (outputIndex >= 0 && m_portDragStartedHandler) {
+            m_portDragActive = true;
+            m_portDragStartedHandler(m_nodeId, outputIndex);
+            event->accept();
+            return;
+        }
+    }
     m_dragStart = pos();
     m_dragSelectionCollapsed = false;
     if (event->button() == Qt::LeftButton && m_clickedHandler) {
@@ -150,6 +226,13 @@ void NodeItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 
 void NodeItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
+    if (m_portDragActive && event->buttons().testFlag(Qt::LeftButton)) {
+        if (m_portDragMovedHandler) {
+            m_portDragMovedHandler(event->scenePos());
+        }
+        event->accept();
+        return;
+    }
     if (event->buttons().testFlag(Qt::LeftButton) && !m_dragSelectionCollapsed && scene()
         && isSelected()) {
         const QList<QGraphicsItem *> selected = scene()->selectedItems();
@@ -165,6 +248,14 @@ void NodeItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
 void NodeItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
+    if (m_portDragActive && event->button() == Qt::LeftButton) {
+        m_portDragActive = false;
+        if (m_portDragFinishedHandler) {
+            m_portDragFinishedHandler(event->scenePos());
+        }
+        event->accept();
+        return;
+    }
     QGraphicsItem::mouseReleaseEvent(event);
     if (m_dragStart != pos() && m_moveFinishedHandler) {
         m_moveFinishedHandler(m_nodeId, m_dragStart, pos());
