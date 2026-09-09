@@ -29,7 +29,7 @@
 - 远端 Issue 按依赖、关键程度和更改幅度排序为 #16、#14、#13、#15、#17、#18、#19；均已标记 `enhancement` 和 `ready-for-agent`。
 - 当前开始处理 #16：新增 View 菜单、Dock 恢复、默认布局复位和现有 Build/Export 工具栏入口。
 - #16 主实现已完成：View 菜单复用 Dock toggle action，Reset Layout 恢复默认区域与可见性，Build/Export 工具栏动作复用现有操作。
-- 同步目标：`origin/feature/issue-16-dock-recovery`；完成后通过普通推送和独立 PR 交付。
+- #16 已普通推送至 `origin/feature/issue-16-dock-recovery` 并创建 PR #21；GitHub 判定可干净合并，未强制推送、未自动合并。
 
 ## 已完成提交
 
@@ -237,7 +237,7 @@
 
 1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-16-dock-recovery`。
 2. 中英文界面任务已通过 PR #12 合入远端 `main`；#16 以合并提交 `4e2378e` 为基线。
-3. 项目说明 PR #20 尚未合并；#16 不依赖该文档变更，仍独立基于当前最新 `main` 开发。
+3. 项目说明 PR #20 尚未合并；#16 已通过 PR #21 独立交付，两个 PR 均等待用户审阅与合并。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 

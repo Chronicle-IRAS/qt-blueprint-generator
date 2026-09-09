@@ -107,9 +107,11 @@ Document how to reopen Properties and Build/Export through View, how Reset Layou
 
 Run `git diff --check`, a complete build, and the full CTest suite. Start `BlueprintEditor.exe`, confirm it remains running, and stop only the process created by the probe.
 
-- [ ] **Step 4: Commit and synchronize**
+- [x] **Step 4: Commit and synchronize**
 
 Push `feature/issue-16-dock-recovery` normally, create a PR against `main` with `Closes #16`, and do not force-push or auto-merge.
+
+Delivered through PR #21 after a normal push. GitHub reports the PR as mergeable with a clean merge state; it remains open for user review and merge.
 
 ## Self-review
 
