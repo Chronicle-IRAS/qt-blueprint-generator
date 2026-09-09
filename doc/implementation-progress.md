@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-- 当前开发分支：`feature/issue-16-dock-recovery`，已合入包含项目使用说明 PR #20 的远端 `main`（`6e16bac`）。
+- 当前开发分支：`feature/issue-14-direct-node-editing`，已普通合并远端 `main` 的 `4f0bce6`（Issue #16 PR #21）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
-- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-09-issue-16-dock-recovery.md`；完整使用说明：`doc/project-usage-guide.md`。
+- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-09-issue-14-direct-node-editing.md`；完整使用说明：`doc/project-usage-guide.md`。
 - `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；当前任务和使用指南只说明已经实现的功能。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
@@ -27,9 +27,9 @@
 - 中英文界面 PR #12 已合入远端 `main`，合并提交为 `4e2378e`。
 - 项目使用说明 PR #20 已合入远端 `main`，合并提交为 `6e16bac`。
 - 远端 Issue 按依赖、关键程度和更改幅度排序为 #16、#14、#13、#15、#17、#18、#19；均已标记 `enhancement` 和 `ready-for-agent`。
-- 当前开始处理 #16：新增 View 菜单、Dock 恢复、默认布局复位和现有 Build/Export 工具栏入口。
-- #16 主实现已完成：View 菜单复用 Dock toggle action，Reset Layout 恢复默认区域与可见性，Build/Export 工具栏动作复用现有操作。
-- #16 已普通推送至 `origin/feature/issue-16-dock-recovery` 并创建 PR #21；因 PR #20 合入而产生的文档冲突已通过普通 merge 处理，未强制推送、未自动合并。
+- #16 已通过 PR #21 合入远端 `main`，合并提交为 `4f0bce6`。
+- Issue #14 已在独立分支开始：从画布节点双击进入全字段编辑，保存复用现有撤销命令，取消不修改文档。
+- Issue #14 主实现已完成：直接编辑对话框覆盖全部节点属性，Properties Dock 继续作为同步 Inspector；README 与使用指南已更新稳定用法。
 
 ## 已完成提交
 
@@ -135,6 +135,16 @@
 
 ## 验证记录
 
+- #14 基线：全新 ASCII 构建目录配置成功，`blueprint_scene` `1/1 passed`（0.31 秒）。
+- #14 RED：两个直接编辑 GUI 用例因双击节点没有打开 `nodeEditDialog` 按预期失败，证明测试能捕获入口缺失、保存未发生和取消/校验合同缺失。
+- #14 GREEN：`blueprint_scene|language_switch` `2/2 passed`（0.52 秒）；翻译目录 61 条全部完成，直接编辑器保存/取消、非法 JSON、Inspector 同步及 Undo/Redo 均有 GUI 覆盖。
+- #14 初次质量复核发现连接模式的真实双击会叠加连接与编辑动作；现已明确连接模式优先并抑制同次编辑请求，GUI 回归覆盖选择 source、完成连接及恢复普通双击编辑。
+- #14 两项突变验证确认：删除 Save 后的 `editNode()` 调用会使保存用例失败，错误接受非法 JSON 会使校验用例失败；两项突变均已恢复。
+- #14 质量修复后完整构建通过，CTest `12/12 passed`（76.45 秒）；翻译目录无 unfinished/vanished/obsolete，README 与使用指南无失效本地链接，离屏启动探测保持运行 2 秒并安全结束。
+- #14 最终只读质量复核结论 Ready：原连接模式 Important 已关闭，无剩余 Critical、Important 或 Minor。
+- #14 PR #22 已按 `[feat] ... (#14)` 标题与 `Closes #14` 引用创建；远端 #16 合入后，已普通合并 `main` 的 `4f0bce6` 并同时保留两项功能。
+- #14 冲突解决后受影响的 `language_switch|project_exporter|blueprint_scene` `3/3 passed`（15.93 秒），最终完整构建与 CTest `12/12 passed`（68.08 秒）；合并后翻译目录 63 条全部完成。
+- #14 已普通推送至 `origin/feature/issue-14-direct-node-editing`，PR #22 等待用户审阅与合并；未强制推送、未自动合并。
 - #16 基线专项：`language_switch|blueprint_scene` `2/2 passed`（1.84 秒）。
 - #16 RED：新增 View/Dock/Toolbar 断言后两项测试均按预期失败；GREEN：`2/2 passed`（0.49 秒）。
 - #16 Qt Linguist：60 条完成翻译，0 条 unfinished；无 vanished 或 obsolete 条目。
@@ -244,9 +254,9 @@
 
 ## 恢复工作
 
-1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-16-dock-recovery`。
-2. 项目说明 PR #20 已合入远端 `main`（`6e16bac`）；#16 分支已普通合并该提交并处理文档冲突。
-3. #16 已通过 PR #21 交付，等待用户审阅与合并；后续 Issue 使用各自独立分支。
+1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-14-direct-node-editing`。
+2. 项目说明 PR #20 与 Issue #16 PR #21 已合入远端 `main`；当前分支已普通合并最新基线 `4f0bce6`。
+3. Issue #14 已通过 PR #22 交付，等待用户审阅与合并；后续 Issue 使用各自独立分支。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 

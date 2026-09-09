@@ -50,6 +50,7 @@ private:
     void updateLanguageActions();
     void deleteSelection();
     void cancelConnection();
+    void editNodeFromCanvas(const QString &nodeId);
     void applyProperties();
     void updatePropertyEditor();
     void startBuild();

@@ -8,6 +8,8 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDockWidget>
 #include <QDir>
 #include <QEvent>
@@ -34,6 +36,9 @@
 #include <QTextCursor>
 #include <QVBoxLayout>
 #include <QWheelEvent>
+
+#include <algorithm>
+#include <utility>
 
 namespace {
 
@@ -166,12 +171,127 @@ bool parseStrings(const QString &text, QStringList *values)
     return true;
 }
 
+bool updateNodeFromEditors(BlueprintNode *node,
+                           const QLineEdit *nameEdit,
+                           const QPlainTextEdit *descriptionEdit,
+                           const QPlainTextEdit *inputsEdit,
+                           const QPlainTextEdit *outputsEdit,
+                           const QPlainTextEdit *constraintsEdit,
+                           const QPlainTextEdit *acceptanceCriteriaEdit)
+{
+    BlueprintNode updated = *node;
+    updated.name = nameEdit->text();
+    updated.description = descriptionEdit->toPlainText();
+    if (!parsePorts(inputsEdit->toPlainText(), &updated.inputs)
+        || !parsePorts(outputsEdit->toPlainText(), &updated.outputs)
+        || !parseStrings(constraintsEdit->toPlainText(), &updated.constraints)
+        || !parseStrings(acceptanceCriteriaEdit->toPlainText(),
+                         &updated.acceptanceCriteria)) {
+        return false;
+    }
+    *node = std::move(updated);
+    return true;
+}
+
 void setFormLabel(QFormLayout *form, QWidget *field, const QString &text)
 {
     if (auto *label = qobject_cast<QLabel *>(form->labelForField(field))) {
         label->setText(text);
     }
 }
+
+class NodeEditDialog final : public QDialog
+{
+public:
+    explicit NodeEditDialog(const BlueprintNode &node, QWidget *parent = nullptr)
+        : QDialog(parent)
+        , m_node(node)
+    {
+        setObjectName(QStringLiteral("nodeEditDialog"));
+        setWindowTitle(MainWindow::tr("Edit node"));
+        resize(560, 680);
+
+        auto *layout = new QVBoxLayout(this);
+        auto *form = new QFormLayout;
+        m_nameEdit = new QLineEdit(node.name, this);
+        m_nameEdit->setObjectName(QStringLiteral("directNodeNameEdit"));
+        m_descriptionEdit = new QPlainTextEdit(node.description, this);
+        m_descriptionEdit->setObjectName(QStringLiteral("directNodeDescriptionEdit"));
+        m_descriptionEdit->setTabChangesFocus(false);
+        m_descriptionEdit->setMaximumHeight(100);
+        m_inputsEdit = createJsonEditor(QStringLiteral("directNodeInputsEdit"),
+                                        portsToText(node.inputs));
+        m_outputsEdit = createJsonEditor(QStringLiteral("directNodeOutputsEdit"),
+                                         portsToText(node.outputs));
+        m_constraintsEdit = createJsonEditor(QStringLiteral("directNodeConstraintsEdit"),
+                                             stringsToText(node.constraints));
+        m_acceptanceCriteriaEdit = createJsonEditor(
+            QStringLiteral("directNodeAcceptanceCriteriaEdit"),
+            stringsToText(node.acceptanceCriteria));
+
+        form->addRow(MainWindow::tr("Name"), m_nameEdit);
+        form->addRow(MainWindow::tr("Description"), m_descriptionEdit);
+        form->addRow(MainWindow::tr("Inputs (JSON)"), m_inputsEdit);
+        form->addRow(MainWindow::tr("Outputs (JSON)"), m_outputsEdit);
+        form->addRow(MainWindow::tr("Constraints (JSON)"), m_constraintsEdit);
+        form->addRow(MainWindow::tr("Acceptance criteria (JSON)"),
+                     m_acceptanceCriteriaEdit);
+        layout->addLayout(form);
+
+        m_validationMessage = new QLabel(this);
+        m_validationMessage->setObjectName(QStringLiteral("nodeEditValidationMessage"));
+        m_validationMessage->setWordWrap(true);
+        layout->addWidget(m_validationMessage);
+
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel,
+                                             Qt::Horizontal, this);
+        auto *saveButton = buttons->button(QDialogButtonBox::Save);
+        saveButton->setObjectName(QStringLiteral("saveNodeEditButton"));
+        saveButton->setText(MainWindow::tr("Save"));
+        auto *cancelButton = buttons->button(QDialogButtonBox::Cancel);
+        cancelButton->setObjectName(QStringLiteral("cancelNodeEditButton"));
+        cancelButton->setText(MainWindow::tr("Cancel"));
+        layout->addWidget(buttons);
+
+        connect(buttons, &QDialogButtonBox::accepted, this, [this] {
+            BlueprintNode updated = m_node;
+            if (!updateNodeFromEditors(&updated, m_nameEdit, m_descriptionEdit, m_inputsEdit,
+                                       m_outputsEdit, m_constraintsEdit,
+                                       m_acceptanceCriteriaEdit)) {
+                m_validationMessage->setText(
+                    MainWindow::tr("Properties use valid JSON arrays for ports and lists"));
+                return;
+            }
+            m_node = std::move(updated);
+            accept();
+        });
+        connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    }
+
+    const BlueprintNode &node() const
+    {
+        return m_node;
+    }
+
+private:
+    QPlainTextEdit *createJsonEditor(const QString &objectName, const QString &text)
+    {
+        auto *editor = new QPlainTextEdit(text, this);
+        editor->setObjectName(objectName);
+        editor->setTabChangesFocus(false);
+        editor->setMaximumHeight(100);
+        return editor;
+    }
+
+    BlueprintNode m_node;
+    QLineEdit *m_nameEdit = nullptr;
+    QPlainTextEdit *m_descriptionEdit = nullptr;
+    QPlainTextEdit *m_inputsEdit = nullptr;
+    QPlainTextEdit *m_outputsEdit = nullptr;
+    QPlainTextEdit *m_constraintsEdit = nullptr;
+    QPlainTextEdit *m_acceptanceCriteriaEdit = nullptr;
+    QLabel *m_validationMessage = nullptr;
+};
 
 class BlueprintView final : public QGraphicsView
 {
@@ -414,6 +534,8 @@ MainWindow::MainWindow(QWidget *parent)
         appendBuildLog(result.success ? tr("Build finished successfully.\n")
                                       : tr("Build failed: %1\n").arg(result.error));
     });
+    connect(m_scene, &BlueprintScene::nodeEditRequested, this,
+            [this](const QString &nodeId) { editNodeFromCanvas(nodeId); });
     connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] { updatePropertyEditor(); });
     m_scene->setSemanticChangeHandler([this] { updatePropertyEditor(); });
     updatePropertyEditor();
@@ -658,6 +780,27 @@ void MainWindow::deleteSelection()
     }
 }
 
+void MainWindow::editNodeFromCanvas(const QString &nodeId)
+{
+    const auto iterator = std::find_if(m_document.nodes.cbegin(), m_document.nodes.cend(),
+                                       [&nodeId](const BlueprintNode &node) {
+                                           return node.id == nodeId;
+                                       });
+    if (iterator == m_document.nodes.cend()) {
+        return;
+    }
+
+    m_scene->clearSelection();
+    if (NodeItem *item = m_scene->nodeItem(nodeId)) {
+        item->setSelected(true);
+    }
+    NodeEditDialog dialog(*iterator, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        m_scene->editNode(nodeId, dialog.node());
+        statusBar()->clearMessage();
+    }
+}
+
 void MainWindow::applyProperties()
 {
     const QString id = selectedNodeId();
@@ -669,12 +812,9 @@ void MainWindow::applyProperties()
                 break;
             }
         }
-        updated.name = m_nameEdit->text();
-        updated.description = m_descriptionEdit->toPlainText();
-        if (!parsePorts(m_inputsEdit->toPlainText(), &updated.inputs)
-            || !parsePorts(m_outputsEdit->toPlainText(), &updated.outputs)
-            || !parseStrings(m_constraintsEdit->toPlainText(), &updated.constraints)
-            || !parseStrings(m_acceptanceCriteriaEdit->toPlainText(), &updated.acceptanceCriteria)) {
+        if (!updateNodeFromEditors(&updated, m_nameEdit, m_descriptionEdit, m_inputsEdit,
+                                   m_outputsEdit, m_constraintsEdit,
+                                   m_acceptanceCriteriaEdit)) {
             statusBar()->showMessage(tr("Properties use valid JSON arrays for ports and lists"));
             return;
         }
