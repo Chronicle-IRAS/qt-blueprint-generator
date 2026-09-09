@@ -20,11 +20,11 @@
 **Files:**
 - Modify: tests/tst_blueprint_scene.cpp
 
-- [ ] Add a test that double-clicks a node, fills every dialog field, saves, and verifies the document, node title, Properties Dock, and one undo command.
-- [ ] Extend the test through Undo and Redo to verify document, canvas, and Properties Dock synchronization.
-- [ ] Add a Cancel test proving every document field and undo-stack count remain unchanged.
-- [ ] Add an invalid-JSON test proving Save keeps the dialog open and does not change the document.
-- [ ] Run the blueprint_scene test and record the expected RED result before production implementation.
+- [x] Add a test that double-clicks a node, fills every dialog field, saves, and verifies the document, node title, Properties Dock, and one undo command.
+- [x] Extend the test through Undo and Redo to verify document, canvas, and Properties Dock synchronization.
+- [x] Add a Cancel test proving every document field and undo-stack count remain unchanged.
+- [x] Add an invalid-JSON test proving Save keeps the dialog open and does not change the document.
+- [x] Run the blueprint_scene test and record the expected RED result before production implementation.
 
 ## Task 2: Implement the direct editor
 

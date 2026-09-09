@@ -126,6 +126,7 @@
 ## 验证记录
 
 - #14 基线：全新 ASCII 构建目录配置成功，`blueprint_scene` `1/1 passed`（0.31 秒）。
+- #14 RED：两个直接编辑 GUI 用例因双击节点没有打开 `nodeEditDialog` 按预期失败，证明测试能捕获入口缺失、保存未发生和取消/校验合同缺失。
 - 项目说明任务使用全新纯 ASCII 构建目录完成 CMake 配置和完整构建；CTest `12/12 passed`（83.13 秒）。
 - README 与使用指南的本地 Markdown 链接全部可解析；`git diff --check` 通过。
 - 项目说明最终只读复核结论为 Ready，无 Critical 或 Important；唯一序列化 API 表述 Minor 已修正。

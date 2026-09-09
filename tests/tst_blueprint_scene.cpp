@@ -1,11 +1,14 @@
 #include <QtTest/QtTest>
 
+#include <QDialog>
 #include <QGraphicsView>
 #include <QAction>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QStatusBar>
+#include <QTimer>
 #include <QWheelEvent>
 
 #include "app/main_window.h"
@@ -47,6 +50,8 @@ private slots:
     void graphicsBoundsContainPaintedPortAndArrowExtents();
     void editingNodeTextUpdatesDocumentAndSupportsUndo();
     void editingAllNodeFieldsIsOneUndoableCommand();
+    void directNodeEditorSaveSynchronizesDocumentCanvasInspectorAndUndo();
+    void directNodeEditorCancelAndInvalidJsonDoNotMutateDocument();
     void mainWindowPropertyEditorPreservesAllFields();
     void propertyDockIsDisabledForMultiSelection();
     void propertyTextSurvivesLayoutAndInvalidJsonIsRejected();
@@ -432,6 +437,122 @@ void BlueprintSceneTest::editingAllNodeFieldsIsOneUndoableCommand()
     scene.undoStack()->redo();
     QCOMPARE(document.nodes.constFirst(), edited);
     QCOMPARE(scene.nodeItem(QStringLiteral("first"))->node(), edited);
+}
+
+void BlueprintSceneTest::directNodeEditorSaveSynchronizesDocumentCanvasInspectorAndUndo()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::LogicModule));
+    window.show();
+    QApplication::processEvents();
+
+    const QString id = window.document().nodes.constFirst().id;
+    const BlueprintNode original = window.document().nodes.constFirst();
+    const int commandsBeforeEdit = window.scene()->undoStack()->count();
+    auto *inspectorName = window.findChild<QLineEdit *>(QStringLiteral("nodeNameEdit"));
+    auto *inspectorInputs = window.findChild<QPlainTextEdit *>(QStringLiteral("nodeInputsEdit"));
+    QVERIFY(inspectorName && inspectorInputs);
+
+    QTimer::singleShot(0, &window, [&window] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        QCOMPARE(dialog->objectName(), QStringLiteral("nodeEditDialog"));
+        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("directNodeNameEdit"));
+        auto *description = dialog->findChild<QPlainTextEdit *>(QStringLiteral("directNodeDescriptionEdit"));
+        auto *inputs = dialog->findChild<QPlainTextEdit *>(QStringLiteral("directNodeInputsEdit"));
+        auto *outputs = dialog->findChild<QPlainTextEdit *>(QStringLiteral("directNodeOutputsEdit"));
+        auto *constraints = dialog->findChild<QPlainTextEdit *>(QStringLiteral("directNodeConstraintsEdit"));
+        auto *criteria = dialog->findChild<QPlainTextEdit *>(QStringLiteral("directNodeAcceptanceCriteriaEdit"));
+        auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveNodeEditButton"));
+        QVERIFY(name && description && inputs && outputs && constraints && criteria && save);
+        name->setText(QStringLiteral("Canvas configured"));
+        description->setPlainText(QStringLiteral("Edited without leaving the blueprint"));
+        inputs->setPlainText(QStringLiteral("[{\"name\":\"request\",\"type\":\"json\",\"description\":\"Request\"}]"));
+        outputs->setPlainText(QStringLiteral("[{\"name\":\"result\",\"type\":\"bool\",\"description\":\"Result\"}]"));
+        constraints->setPlainText(QStringLiteral("[\"authenticated\",\"rate limited\"]"));
+        criteria->setPlainText(QStringLiteral("[\"returns result\",\"reports errors\"]"));
+        QTest::mouseClick(save, Qt::LeftButton);
+    });
+
+    const QPoint nodeCenter = window.graphicsView()->mapFromScene(
+        window.scene()->nodeItem(id)->sceneBoundingRect().center());
+    QTest::mouseDClick(window.graphicsView()->viewport(), Qt::LeftButton, Qt::NoModifier,
+                       nodeCenter);
+    QApplication::processEvents();
+
+    const BlueprintNode edited = window.document().nodes.constFirst();
+    QCOMPARE(edited.name, QStringLiteral("Canvas configured"));
+    QCOMPARE(edited.description, QStringLiteral("Edited without leaving the blueprint"));
+    QCOMPARE(edited.inputs.constFirst().name, QStringLiteral("request"));
+    QCOMPARE(edited.outputs.constFirst().type, QStringLiteral("bool"));
+    QCOMPARE(edited.constraints,
+             QStringList({QStringLiteral("authenticated"), QStringLiteral("rate limited")}));
+    QCOMPARE(edited.acceptanceCriteria,
+             QStringList({QStringLiteral("returns result"), QStringLiteral("reports errors")}));
+    QCOMPARE(window.scene()->nodeItem(id)->node(), edited);
+    QCOMPARE(inspectorName->text(), edited.name);
+    QVERIFY(inspectorInputs->toPlainText().contains(QStringLiteral("request")));
+    QCOMPARE(window.scene()->undoStack()->count(), commandsBeforeEdit + 1);
+
+    window.scene()->undoStack()->undo();
+    QCOMPARE(window.document().nodes.constFirst(), original);
+    QCOMPARE(window.scene()->nodeItem(id)->node(), original);
+    QCOMPARE(inspectorName->text(), original.name);
+    window.scene()->undoStack()->redo();
+    QCOMPARE(window.document().nodes.constFirst(), edited);
+    QCOMPARE(window.scene()->nodeItem(id)->node(), edited);
+    QCOMPARE(inspectorName->text(), edited.name);
+}
+
+void BlueprintSceneTest::directNodeEditorCancelAndInvalidJsonDoNotMutateDocument()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::LogicModule));
+    window.show();
+    QApplication::processEvents();
+
+    const QString id = window.document().nodes.constFirst().id;
+    const BlueprintDocument before = window.document();
+    const int commandsBefore = window.scene()->undoStack()->count();
+    QTimer::singleShot(0, &window, [&window] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("directNodeNameEdit"));
+        auto *inputs = dialog->findChild<QPlainTextEdit *>(QStringLiteral("directNodeInputsEdit"));
+        auto *error = dialog->findChild<QLabel *>(QStringLiteral("nodeEditValidationMessage"));
+        auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveNodeEditButton"));
+        auto *cancel = dialog->findChild<QPushButton *>(QStringLiteral("cancelNodeEditButton"));
+        QVERIFY(name && inputs && error && save && cancel);
+        name->setText(QStringLiteral("Must not be saved"));
+        inputs->setPlainText(QStringLiteral("{}"));
+        QTest::mouseClick(save, Qt::LeftButton);
+        QVERIFY(dialog->isVisible());
+        QVERIFY(!error->text().isEmpty());
+        QTest::mouseClick(cancel, Qt::LeftButton);
+    });
+
+    const QPoint nodeCenter = window.graphicsView()->mapFromScene(
+        window.scene()->nodeItem(id)->sceneBoundingRect().center());
+    QTest::mouseDClick(window.graphicsView()->viewport(), Qt::LeftButton, Qt::NoModifier,
+                       nodeCenter);
+    QApplication::processEvents();
+    QCOMPARE(window.document(), before);
+    QCOMPARE(window.scene()->undoStack()->count(), commandsBefore);
+
+    QTimer::singleShot(0, &window, [&window] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("directNodeNameEdit"));
+        auto *cancel = dialog->findChild<QPushButton *>(QStringLiteral("cancelNodeEditButton"));
+        QVERIFY(name && cancel);
+        name->setText(QStringLiteral("Also discarded"));
+        QTest::mouseClick(cancel, Qt::LeftButton);
+    });
+    QTest::mouseDClick(window.graphicsView()->viewport(), Qt::LeftButton, Qt::NoModifier,
+                       nodeCenter);
+    QApplication::processEvents();
+    QCOMPARE(window.document(), before);
+    QCOMPARE(window.scene()->undoStack()->count(), commandsBefore);
 }
 
 void BlueprintSceneTest::mainWindowPropertyEditorPreservesAllFields()
