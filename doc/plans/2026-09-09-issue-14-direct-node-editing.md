@@ -55,8 +55,8 @@
 - [x] Document double-click editing, Save/Cancel behavior, JSON requirements, Inspector synchronization, and Undo/Redo.
 - [x] Run translation checks, complete build, full CTest, startup probe, and git diff --check.
 - [x] Perform a quality review and address all Critical, Important, and Minor findings.
-- [ ] Commit each completed change group and normally push the branch.
-- [ ] Create a PR titled with an operation prefix and Issue reference, and include Closes #14 in the body. Do not force-push or auto-merge.
+- [x] Commit each completed change group and normally push the branch.
+- [x] Create a PR titled with an operation prefix and Issue reference, and include Closes #14 in the body. Do not force-push or auto-merge.
 
 ## Self-review checklist
 
