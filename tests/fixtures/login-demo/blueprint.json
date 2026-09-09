@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "projectId": "login-demo",
+  "projectName": "Login Demo",
+  "target": "qt6-widgets-cpp17-cmake",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "Start",
+      "name": "Start",
+      "description": "Begin the login flow",
+      "inputs": [],
+      "outputs": [],
+      "constraints": [],
+      "acceptanceCriteria": []
+    },
+    {
+      "id": "login_page",
+      "type": "UiPage",
+      "name": "Login page",
+      "description": "Collect a user name and masked password.",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "username",
+          "type": "QString",
+          "description": "User name"
+        },
+        {
+          "name": "password",
+          "type": "QString",
+          "description": "Password"
+        }
+      ],
+      "constraints": [
+        "Use Qt 6 Widgets; name the fields username and password.",
+        "Never display the password as plain text."
+      ],
+      "acceptanceCriteria": [
+        "Password uses QLineEdit::Password echo mode.",
+        "execute returns the current username and password, including empty input."
+      ]
+    },
+    {
+      "id": "authenticate",
+      "type": "LogicModule",
+      "name": "Authenticate",
+      "description": "Compare credentials with the offline demo account.",
+      "inputs": [
+        {
+          "name": "username",
+          "type": "QString",
+          "description": "User name"
+        },
+        {
+          "name": "password",
+          "type": "QString",
+          "description": "Password"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "authenticated",
+          "type": "bool",
+          "description": "Whether the demo credentials match"
+        },
+        {
+          "name": "message",
+          "type": "QString",
+          "description": "User-facing result"
+        }
+      ],
+      "constraints": [
+        "Offline demonstration only: demo / secret; no network or credential storage."
+      ],
+      "acceptanceCriteria": [
+        "demo / secret succeeds with Welcome, demo.",
+        "Wrong or empty credentials fail with Invalid credentials."
+      ]
+    },
+    {
+      "id": "authenticated",
+      "type": "Decision",
+      "name": "Authenticated?",
+      "description": "Select the success or failure terminal from the authentication result.",
+      "inputs": [
+        {
+          "name": "authenticated",
+          "type": "bool",
+          "description": "Whether the demo credentials match"
+        },
+        {
+          "name": "message",
+          "type": "QString",
+          "description": "User-facing result"
+        }
+      ],
+      "outputs": [],
+      "constraints": [
+        "Missing authenticated value is false."
+      ],
+      "acceptanceCriteria": [
+        "true routes to success; false routes to failure."
+      ]
+    },
+    {
+      "id": "success",
+      "type": "End",
+      "name": "Success",
+      "description": "Authenticated terminal",
+      "inputs": [],
+      "outputs": [],
+      "constraints": [],
+      "acceptanceCriteria": []
+    },
+    {
+      "id": "failure",
+      "type": "End",
+      "name": "Failure",
+      "description": "Rejected terminal",
+      "inputs": [],
+      "outputs": [],
+      "constraints": [],
+      "acceptanceCriteria": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "start",
+      "target": "login_page",
+      "label": ""
+    },
+    {
+      "id": "e2",
+      "source": "login_page",
+      "target": "authenticate",
+      "label": ""
+    },
+    {
+      "id": "e3",
+      "source": "authenticate",
+      "target": "authenticated",
+      "label": ""
+    },
+    {
+      "id": "e4",
+      "source": "authenticated",
+      "target": "success",
+      "label": "true"
+    },
+    {
+      "id": "e5",
+      "source": "authenticated",
+      "target": "failure",
+      "label": "false"
+    }
+  ]
+}

@@ -1,11 +1,11 @@
 # 实现进度
 
-更新时间：2026-09-07（Asia/Shanghai）
+更新时间：2026-09-09（Asia/Shanghai）
 
 ## 当前状态
 
-- 当前开发分支：`feature/task9-build-export`，直接基于远端 `main` 的 `70a3d9f`（Task 8 / PR #8）。
-- 当前 worktree：`C:\Users\Lenovo\.config\superpowers\worktrees\project\task9-build-export`。
+- 当前开发分支：`feature/task10-end-to-end`，直接基于远端 `main` 的 `b89202c`（Task 9 / PR #10）。
+- 当前 worktree：`C:\Users\Lenovo\.config\superpowers\worktrees\project\task10-end-to-end`。
 - 设计基线：`doc/mvp-implementation-plan.md`
 - `doc/multilanguage-development-design.md` 为 MVP 完成后的后续规划，不影响当前 Task 1 至 Task 10。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
@@ -20,11 +20,20 @@
 - Task 8「实现外部代码黑盒导入」已完成，通过规格和最终质量复核；完整构建、CTest `9/9 passed` 和独立集成链路均通过。
 - Task 8 的 PR #8 已由用户合入 `main`，已拉取并确认合并提交 `70a3d9f`。
 - Task 9「实现构建验证与项目导出」已完成；主实现为 `6519955`，质量复核修复为 `4bc109e` 和 `c56c843`，规格与最终质量复核均通过。最终专项 Qt Test `28 passed`，最终完整构建和 CTest `10/10 passed`（45.53 秒），独立导出/构建集成验证退出码 0。
-- 同步目标：`origin/feature/task9-build-export`；完成后通过普通推送和独立 PR 交付。
-- Task 10 尚未开始。开始前必须暂停并提醒用户切换 Agent 模式。
+- Task 9 的 PR #10 已由用户合并，已确认合并提交 `b89202c`。
+- Task 10 离线登录端到端验收已完成，主实现 `42cdd6e`、质量调整 `150c044`；规格与最终质量复核均通过。完整构建与 CTest `11/11 passed`（66.54 秒），导出示例测试 `4/4 passed`；质量调整后的两种导出专项均通过。
+- 同步目标：`origin/feature/task10-end-to-end`；完成后通过普通推送和独立 PR 交付。
 
 ## 已完成提交
 
+- `8456049 docs: record Task 10 acceptance kickoff`
+  - 基于 Task 9 合并提交 `b89202c` 建立 Task 10 独立分支并记录基线。
+- `42cdd6e test: verify end-to-end blueprint generation`
+  - 新增六节点登录蓝图、三模块 Fake 响应和真实构建/测试的端到端验收。
+  - 覆盖模型失败不写盘、人工修改默认覆盖拒绝，以及可选的演示导出目录。
+- `150c044 test: avoid inspecting rejected demo export destinations`
+  - 可选演示导出先由导出器校验目标，不再提前遍历可能被拒绝的目录；成功导出后仍核对全部文件字节。
+  - 默认临时导出专项 `1/1 passed`（20.50 秒），指定新空目录导出专项 `1/1 passed`（21.83 秒）。
 - `eee76c9 docs: record Task 9 kickoff from merged Task 8`
   - 基于已合并 PR #8 创建 Task 9 独立分支并记录基线。
 - `6519955 feat: build and export generated Qt projects`
@@ -102,7 +111,7 @@
 - 生成器：Ninja
 - CMake 配置：通过。
 - 完整构建：通过。
-- 当前 CTest：`9/9 passed`（external_code_importer、project_scaffolder、smoke、blueprint_document、blueprint_validator、blueprint_scene、ir_compiler、prompt_compiler、generation_service）。
+- 当前 CTest：`11/11 passed`（66.54 秒），包含新增 end_to_end 与此前 10 项测试。
 - Task 6：测试先行，接口缺失、客户端销毁、网络管理器销毁、绝对超时、junction 越界及同步重入场景均有 RED→GREEN 记录。
 - `generation_service`：在 `1b135c9` 上连续运行 20 次通过；真实客户端使用离线网络替身测试，未调用外部模型。
 - 固定存储测试调整后，在 `eb6f8b7` 及最终 API 注释上重新完整构建并执行 CTest：`7/7 passed`。
@@ -131,6 +140,19 @@
 - Task 9 恢复分支 RED→GREEN：恢复失败场景最初错误启用导出副本删除，定向测试 `1 failed`；修复后定向 `3/3 passed`，完整专项 `28 passed, 0 failed, 0 skipped`。
 - Task 9 最终质量复核：Ready to merge，无 Critical、无 Important、无 Minor；交付前重新完整构建并执行 CTest `10/10 passed`（45.53 秒），独立导出工程实际 CMake 构建退出码 0。
 
+## Task 10 验收记录与边界
+
+- 新 worktree 基线：`b89202c`；完整配置、构建和 CTest `10/10 passed`（46.52 秒）。
+- Task 10 专项 Qt Test：3 个业务用例与 init/cleanup 共 `5 passed`，无失败、无跳过；XML 证据位于 `build/task10-end-to-end-results.xml`。
+- 实际执行加载 → 校验 → IR/契约提示词 → Fake 异步生成 → 预览 → 逐文件接受 → 导出 → CMake 配置/构建 → 导出项目 CTest；准确发现 3 项模块 Qt Test 和 1 项骨架测试，全部通过。
+- 全量构建与 CTest `11/11 passed`（66.54 秒）。设置 `BLUEPRINT_DEMO_OUTPUT_DIR` 后保留的导出位于 `build/login-demo-export`；再次导出到该非空目录得到预期拒绝，24 个文件的 SHA-256 均不变，负向测试日志位于 `build/task10-nonempty-results.xml`。
+- 随后的 `150c044` 仅移除测试在目标校验前的多余目录快照；重新构建成功，默认临时导出与指定空目录 `build/task10-reviewed-export` 的两次专项测试均通过，各自实际构建导出项目并执行其测试。
+- 规格复核：SPEC COMPLIANT。最终质量复核：Ready to merge，唯一 Minor 已在 `150c044` 解决，无剩余 Critical、Important 或 Minor。
+- 窗口交互探针使用 Qt 鼠标事件验证节点拖拽、工具栏按来源/目标连线、属性 Apply 与 Undo/Redo；随后通过窗口按钮实际配置、构建和导出，全部断言通过，退出码 0。
+- 已查看窗口渲染截图，节点标题、连线箭头、属性面板和构建/导出成功日志显示正常。截图位于忽略的 `build/task10-ui-check/editor-acceptance.png`，不是已提交的产品资源。
+- 候选预览验证当前文件缺失与候选内容的差异，确认接受前工程文件未写入，显式接受后构建成功；候选审核仍是 API 功能，尚无审核窗口，不能据此宣称完成该窗口的人工验收。
+- 登录示例使用固定 Fake 响应；真实模型联调和应用入口自动串接业务流程不属于本次验收结果。
+
 ## Task 9 实现与边界
 
 - `BuildService` 使用独立 `QProcess` 异步执行 CMake 配置、构建，分别收集 stdout、stderr 和退出码；配置失败不启动构建，同一实例拒绝并发请求，不自动运行生成应用。
@@ -138,7 +160,7 @@
 - 导出将 `generated-project/` 展平至目标根部，另带生成清单及原始蓝图；经过契约、哈希和目录清单复验的外部代码映射到 `src/external/<node-id>/`。
 - 当前实现文件的人工修改按原始字节保留；生成清单作为历史记录复制，不冒充当前文件全部重新生成或已通过业务验收。候选、工作目录构建产物和其他非映射文件不参与导出。
 - 目标必须是现有空目录，且不得与工作目录重叠。先在同级唯一临时目录复制并验证哈希，再通过目录重命名提交；普通失败清理暂存并尝试恢复目标。可信本机单写入者、非断电原子性边界与既有工作目录服务一致。
-- Task 10 尚未开始；Task 9 交付后必须暂停并提醒用户切换 Agent 模式。
+- Task 9 交付时已按用户要求暂停并提醒切换模式；用户确认合并后，于 2026-09-08 明确要求开始 Task 10。
 
 ## Task 8 实现与边界
 
@@ -176,11 +198,11 @@
 
 ## 恢复工作
 
-1. Task 9 的代码与构建位于上述独立 worktree；原项目目录和 Task 6 至 Task 8 worktree 保留不动。
-2. Task 8 已合入远端 `main`；Task 9 已基于该合并新建分支，当前按测试先行流程开发构建服务、构建面板和原子导出。
-3. Task 9 完成后通过普通推送和 PR 交付；不自动合并或开始 Task 10。开始 Task 10 前须确认 Task 9 已合入最新 `origin/main`，并提醒用户切换 Agent 模式。
+1. Task 10 的代码与构建位于上述独立 worktree，当前分支为 `feature/task10-end-to-end`。
+2. Task 9 已合入远端 `main`，Task 10 基于合并提交 `b89202c` 开发登录示例及端到端验收。
+3. 完成 Task 10 后普通推送并创建独立 PR；后续 UI 完整工作流或多语言演进须另行确定范围。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
-5. 开始 Task 10 前仍须暂停，提醒用户切换智能体模式。
+5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 
 ## 约束提醒
 

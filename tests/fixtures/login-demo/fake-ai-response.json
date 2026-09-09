@@ -1,0 +1,44 @@
+[
+  {
+    "nodeId": "login_page",
+    "summary": "Offline login demo login_page implementation and executable behavior tests",
+    "files": [
+      {
+        "path": "src/modules/login_page/implementation/login_page.h",
+        "content": "#pragma once\n#include \"modules/login_page/contract.h\"\n#include <QFormLayout>\n#include <QLineEdit>\nnamespace Blueprint_Login_Demo {\nclass LoginPage final : public Module_d6e34a00df0b18b6 {\npublic:\n    explicit LoginPage(QWidget *parent = nullptr) : Module_d6e34a00df0b18b6(parent) {\n        auto *layout = new QFormLayout(this);\n        username = new QLineEdit(this);\n        username->setObjectName(\"username\");\n        password = new QLineEdit(this);\n        password->setObjectName(\"password\");\n        password->setEchoMode(QLineEdit::Password);\n        layout->addRow(\"Username\", username);\n        layout->addRow(\"Password\", password);\n    }\n    Outputs execute(const Inputs &) override {\n        return {{\"username\", username->text()}, {\"password\", password->text()}};\n    }\nprivate:\n    QLineEdit *username;\n    QLineEdit *password;\n};\n}\n"
+      },
+      {
+        "path": "tests/login_page/tst_login_page.cpp",
+        "content": "#include \"modules/login_page/implementation/login_page.h\"\n#include <QtTest>\nusing namespace Blueprint_Login_Demo;\nclass LoginPageTest final : public QObject {\n    Q_OBJECT\nprivate slots:\n    void masksPassword() {\n        LoginPage page;\n        auto *password = page.findChild<QLineEdit *>(\"password\");\n        QVERIFY(password);\n        QCOMPARE(password->echoMode(), QLineEdit::Password);\n    }\n    void returnsEnteredCredentials() {\n        LoginPage page;\n        auto *username = page.findChild<QLineEdit *>(\"username\");\n        auto *password = page.findChild<QLineEdit *>(\"password\");\n        QVERIFY(username);\n        QVERIFY(password);\n        Module_d6e34a00df0b18b6 &contract = page;\n        QCOMPARE(contract.execute({}), (Outputs{{\"username\", QString()}, {\"password\", QString()}}));\n        username->setText(\"demo\");\n        password->setText(\"secret\");\n        QCOMPARE(contract.execute({}), (Outputs{{\"username\", \"demo\"}, {\"password\", \"secret\"}}));\n    }\n};\nQTEST_MAIN(LoginPageTest)\n#include \"tst_login_page.moc\"\n"
+      }
+    ]
+  },
+  {
+    "nodeId": "authenticate",
+    "summary": "Offline login demo authenticate implementation and executable behavior tests",
+    "files": [
+      {
+        "path": "src/modules/authenticate/implementation/authenticate.h",
+        "content": "#pragma once\n#include \"modules/authenticate/contract.h\"\nnamespace Blueprint_Login_Demo {\nclass Authenticate final : public Module_20dc65af899cb0b5 {\npublic:\n    using Module_20dc65af899cb0b5::Module_20dc65af899cb0b5;\n    Outputs execute(const Inputs &inputs) override {\n        const bool accepted = inputs.value(\"username\").toString() == \"demo\"\n            && inputs.value(\"password\").toString() == \"secret\";\n        return {{\"authenticated\", accepted},\n                {\"message\", accepted ? QString(\"Welcome, demo\") : QString(\"Invalid credentials\")}};\n    }\n};\n}\n"
+      },
+      {
+        "path": "tests/authenticate/tst_authenticate.cpp",
+        "content": "#include \"modules/authenticate/implementation/authenticate.h\"\n#include <QtTest>\nusing namespace Blueprint_Login_Demo;\nclass AuthenticateTest final : public QObject {\n    Q_OBJECT\nprivate slots:\n    void credentials_data() {\n        QTest::addColumn<Inputs>(\"inputs\");\n        QTest::addColumn<bool>(\"accepted\");\n        QTest::newRow(\"valid\") << Inputs{{\"username\", \"demo\"}, {\"password\", \"secret\"}} << true;\n        QTest::newRow(\"wrong-password\") << Inputs{{\"username\", \"demo\"}, {\"password\", \"bad\"}} << false;\n        QTest::newRow(\"wrong-user\") << Inputs{{\"username\", \"other\"}, {\"password\", \"secret\"}} << false;\n        QTest::newRow(\"empty-user\") << Inputs{{\"username\", \"\"}, {\"password\", \"secret\"}} << false;\n        QTest::newRow(\"empty-password\") << Inputs{{\"username\", \"demo\"}, {\"password\", \"\"}} << false;\n        QTest::newRow(\"missing\") << Inputs{} << false;\n    }\n    void credentials() {\n        QFETCH(Inputs, inputs);\n        QFETCH(bool, accepted);\n        Authenticate module;\n        Module_20dc65af899cb0b5 &contract = module;\n        const Outputs output = contract.execute(inputs);\n        QCOMPARE(output.value(\"authenticated\").toBool(), accepted);\n        QCOMPARE(output.value(\"message\").toString(),\n                 accepted ? QString(\"Welcome, demo\") : QString(\"Invalid credentials\"));\n        QVERIFY(!output.contains(\"password\"));\n    }\n};\nQTEST_MAIN(AuthenticateTest)\n#include \"tst_authenticate.moc\"\n"
+      }
+    ]
+  },
+  {
+    "nodeId": "authenticated",
+    "summary": "Offline login demo authenticated implementation and executable behavior tests",
+    "files": [
+      {
+        "path": "src/modules/authenticated/implementation/authenticated.h",
+        "content": "#pragma once\n#include \"modules/authenticated/contract.h\"\nnamespace Blueprint_Login_Demo {\nclass Authenticated final : public Module_40c041842ccbe556 {\npublic:\n    bool decide(const Inputs &inputs) const override {\n        return inputs.value(\"authenticated\", false).toBool();\n    }\n};\n}\n"
+      },
+      {
+        "path": "tests/authenticated/tst_authenticated.cpp",
+        "content": "#include \"modules/authenticated/implementation/authenticated.h\"\n#include \"modules/authenticate/implementation/authenticate.h\"\n#include \"modules/login_page/implementation/login_page.h\"\n#include <QtTest>\nusing namespace Blueprint_Login_Demo;\nclass AuthenticatedTest final : public QObject {\n    Q_OBJECT\nprivate slots:\n    void branches_data() {\n        QTest::addColumn<Inputs>(\"inputs\");\n        QTest::addColumn<bool>(\"expected\");\n        QTest::newRow(\"true\") << Inputs{{\"authenticated\", true}} << true;\n        QTest::newRow(\"false\") << Inputs{{\"authenticated\", false}} << false;\n        QTest::newRow(\"missing\") << Inputs{} << false;\n    }\n    void branches() {\n        QFETCH(Inputs, inputs);\n        QFETCH(bool, expected);\n        Authenticated decision;\n        const Module_40c041842ccbe556 &contract = decision;\n        QCOMPARE(contract.decide(inputs), expected);\n    }\n    void loginFlow_data() {\n        QTest::addColumn<QString>(\"username\");\n        QTest::addColumn<QString>(\"password\");\n        QTest::addColumn<QString>(\"terminal\");\n        QTest::newRow(\"success\") << QString(\"demo\") << QString(\"secret\") << QString(\"success\");\n        QTest::newRow(\"bad-password\") << QString(\"demo\") << QString(\"bad\") << QString(\"failure\");\n        QTest::newRow(\"empty-user\") << QString() << QString(\"secret\") << QString(\"failure\");\n        QTest::newRow(\"empty-password\") << QString(\"demo\") << QString() << QString(\"failure\");\n    }\n    void loginFlow() {\n        QFETCH(QString, username);\n        QFETCH(QString, password);\n        QFETCH(QString, terminal);\n        LoginPage page;\n        auto *userField = page.findChild<QLineEdit *>(\"username\");\n        auto *passwordField = page.findChild<QLineEdit *>(\"password\");\n        QVERIFY(userField);\n        QVERIFY(passwordField);\n        userField->setText(username);\n        passwordField->setText(password);\n        Authenticate authenticate;\n        Authenticated decision;\n        const Outputs result = authenticate.execute(page.execute({}));\n        const QString actualTerminal = decision.decide(result) ? \"success\" : \"failure\";\n        QCOMPARE(actualTerminal, terminal);\n        QCOMPARE(result.value(\"message\").toString(),\n                 terminal == \"success\" ? QString(\"Welcome, demo\") : QString(\"Invalid credentials\"));\n    }\n};\nQTEST_MAIN(AuthenticatedTest)\n#include \"tst_authenticated.moc\"\n"
+      }
+    ]
+  }
+]
