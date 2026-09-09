@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-- 当前开发分支：`feature/bilingual-ui`，直接基于远端 `main` 的 `43ecdb3`（Task 10 / PR #11）。
+- 当前开发分支：`feature/issue-16-dock-recovery`，基于远端 `main` 的 `4e2378e`（中英文界面 PR #12）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
-- MVP 基线：`doc/mvp-implementation-plan.md`；中英文界面任务计划：`doc/plans/2026-09-09-bilingual-ui.md`。
+- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-09-issue-16-dock-recovery.md`。
 - `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；本任务仅增加编辑器 UI 本地化，不迁移后台语言。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
@@ -24,7 +24,11 @@
 - Task 10 离线登录端到端验收已完成，主实现 `42cdd6e`、质量调整 `150c044`；规格与最终质量复核均通过。完整构建与 CTest `11/11 passed`（66.54 秒），导出示例测试 `4/4 passed`；质量调整后的两种导出专项均通过。
 - Task 10 的 PR #11 已于 2026-09-09 合入远端 `main`，合并提交为 `43ecdb3`。
 - 中英文界面切换已在 `feature/bilingual-ui` 实现：运行时切换、选择持久化、稳定控件标识和完整当前界面翻译均通过测试。
-- 分支已普通推送至 `origin/feature/bilingual-ui`，并创建 PR #12；未强推、未自动合并。
+- 中英文界面 PR #12 已合入远端 `main`，合并提交为 `4e2378e`。
+- 项目使用说明已通过 `docs/project-usage-guide` 分支创建 PR #20，当前尚未合并。
+- 远端 Issue 按依赖、关键程度和更改幅度排序为 #16、#14、#13、#15、#17、#18、#19；均已标记 `enhancement` 和 `ready-for-agent`。
+- 当前开始处理 #16：新增 View 菜单、Dock 恢复、默认布局复位和现有 Build/Export 工具栏入口。
+- 同步目标：`origin/feature/issue-16-dock-recovery`；完成后通过普通推送和独立 PR 交付。
 
 ## 已完成提交
 
@@ -215,9 +219,9 @@
 
 ## 恢复工作
 
-1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/bilingual-ui`。
-2. Task 10 已通过 PR #11 合入远端 `main`；本任务从合并提交 `43ecdb3` 新建分支。
-3. 中英文界面任务已通过 `feature/bilingual-ui` 和 PR #12 交付；AI 图形化工作流或 C++/Python 混合演进属于后续独立任务。
+1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-16-dock-recovery`。
+2. 中英文界面任务已通过 PR #12 合入远端 `main`；#16 以合并提交 `4e2378e` 为基线。
+3. 项目说明 PR #20 尚未合并；#16 不依赖该文档变更，仍独立基于当前最新 `main` 开发。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 
