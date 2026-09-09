@@ -22,12 +22,12 @@
 **Files:**
 - Modify: tests/tst_blueprint_scene.cpp
 
-- [ ] Test output-port press and mouse movement create a temporary path whose end follows the pointer.
-- [ ] Test valid input hover feedback and release create the expected directed FlowEdge.
-- [ ] Test invalid release leaves the document and undo stack unchanged.
-- [ ] Test Esc and right-click cancel the temporary path and clear hover state.
-- [ ] Test Undo/Redo, node movement, drag labels, Decision true/false labels, and the existing Connect action.
-- [ ] Run blueprint_scene and record the expected RED result.
+- [x] Test output-port press and mouse movement create a temporary path whose end follows the pointer.
+- [x] Test valid input hover feedback and release create the expected directed FlowEdge.
+- [x] Test invalid release leaves the document and undo stack unchanged.
+- [x] Test Esc and right-click cancel the temporary path and clear hover state.
+- [x] Test Undo/Redo, node movement, drag labels, Decision true/false labels, and the existing Connect action.
+- [x] Run blueprint_scene and record the expected RED result.
 
 ## Task 2: Implement port drag interaction
 

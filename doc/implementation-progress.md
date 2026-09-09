@@ -136,6 +136,7 @@
 ## 验证记录
 
 - #13 基线：全新 ASCII 构建目录配置成功，`blueprint_scene` `1/1 passed`（0.34 秒）。
+- #13 RED：端口拖拽 GUI 合同测试因 `NodeItem::highlightedInputPort()` 与拖拽实现尚不存在而按预期编译失败。
 - #16 基线专项：`language_switch|blueprint_scene` `2/2 passed`（1.84 秒）。
 - #16 RED：新增 View/Dock/Toolbar 断言后两项测试均按预期失败；GREEN：`2/2 passed`（0.49 秒）。
 - #16 Qt Linguist：60 条完成翻译，0 条 unfinished；无 vanished 或 obsolete 条目。
