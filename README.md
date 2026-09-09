@@ -1,10 +1,10 @@
 # Qt Blueprint Generator
 
-一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统对蓝图执行静态校验，将其编译为稳定的中间表示和 AI 生成提示词，并提供工程骨架与候选文件审核的核心服务。完整 MVP 将支持生成、审核、构建并导出 C++17/CMake 项目。
+一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统对蓝图执行静态校验，将其编译为稳定的中间表示和 AI 生成提示词，并提供工程骨架与候选文件审核的核心服务。离线验收已串联生成、候选接受、构建和导出 C++17/CMake 工程；生成与候选审核目前通过 API 使用。
 
 ## 当前状态
 
-项目当前已完成 MVP Task 1 至 Task 9：
+项目当前已完成 MVP Task 1 至 Task 10 范围内的核心服务和离线自动化验收：
 
 - Qt 6 Widgets / C++17 / CMake 工程骨架和 Qt Test 测试环境。
 - 蓝图领域模型及 `blueprint.json` 序列化往返。
@@ -15,8 +15,9 @@
 - 确定性 Qt 工程骨架、公共契约、生成清单与 SHA-256，以及候选保存、预览、逐文件接受/拒绝/取消和人工修改保护。
 - 外部 C/C++ 文件黑盒导入、接口契约绑定、文件哈希复验，以及与 AI 提示词和候选覆盖流程的隔离。
 - 显式异步 CMake 配置与构建、构建日志面板，以及携带外部代码且保留当前文件字节的空目录导出。
+- 三模块离线登录示例、候选接受与导出全链路测试，以及导出项目自身的 Qt Test。
 
-Task 6 至 Task 9 已通过 PR #6、#7、#8 和 #10 合入 main。Task 10 已由用户确认开始，当前在基于 Task 9 合并提交 `b89202c` 的独立分支 `feature/task10-end-to-end` 上开发。新工作区基线构建与 CTest 10/10 通过；本阶段加入离线登录示例、导出工程自身的 Qt Test，以及可重复的演示与验收说明。
+Task 6 至 Task 9 已通过 PR #6、#7、#8 和 #10 合入 main。Task 10 位于基于 `b89202c` 的独立分支 `feature/task10-end-to-end`；完整构建和 CTest 11/11 通过，导出登录示例的 4 项测试全部通过。窗口交互经 Qt 鼠标事件和渲染截图核验，候选差异经 API 验证；完整图形化生成/审核工作流仍待接入。
 
 ## MVP 工作流
 
@@ -32,10 +33,12 @@ Task 6 至 Task 9 已通过 PR #6、#7、#8 和 #10 合入 main。Task 10 已由
 - Windows 10/11
 - Qt 6 Widgets、Network 和 Qt Test（当前验证版本：Qt 6.9.3）
 - 支持 C++17 的编译器（当前验证版本：MinGW 13.1）
-- CMake 3.22 或更高版本
+- CMake 3.22 或更高版本（当前验证版本：4.3.2）
 - Ninja
 
 ## 构建与测试
+
+首次安装时，在 Qt 安装器中选择 Qt 6 的 MinGW 64-bit 套件及对应 MinGW 工具链，准备 CMake 和 Ninja。将私有仓库克隆到本机后，在仓库根目录执行以下命令。示例不需要 AI 服务商账号或 API 密钥；Qt Widgets、Network 和 Test 模块都需要可用。
 
 以下 PowerShell 示例使用本机已验证的 Qt 路径；如果安装位置不同，请相应调整：
 
@@ -56,6 +59,52 @@ ctest --test-dir build -C Debug --output-on-failure
 ```
 
 请优先通过 CTest 运行测试。直接双击单个 `tst_*.exe` 时，如果 Qt 的 `bin` 目录不在 `PATH` 中，Windows 会提示缺少 `Qt6Test.dll`。
+
+## 离线登录示例与验收（Task 10）
+
+`tests/fixtures/login-demo/blueprint.json` 是固定登录蓝图，`fake-ai-response.json` 是 JSON 数组，每项保存一个模块的 `nodeId`、摘要和候选文件。测试使用 `FakeAiClient` 逐模块生成候选，预览并核对候选内容，再显式接受、导出；随后用真实 CMake 配置和编译导出项目，并执行项目自身的 Qt Test。默认临时目录在测试结束后清理，不调用外部模型。
+
+示例包含登录页面、凭据检查和认证分支三个生成模块。`demo / secret` 是公开的离线测试凭据：正确输入进入 success，错误或空输入进入 failure；页面密码框使用掩码显示。该示例不连接认证服务，不作为生产账号系统使用。
+
+配置并构建编辑器后，可单独运行：
+
+```powershell
+ctest --test-dir build -C Debug -R '^end_to_end$' --output-on-failure
+```
+
+如需保留演示导出文件，先准备一个新的空目录，并仅在本次测试设置输出目录：
+
+```powershell
+$demoPath = 'C:/bp-login-demo'
+New-Item -ItemType Directory -Path $demoPath -ErrorAction Stop | Out-Null
+$env:BLUEPRINT_DEMO_OUTPUT_DIR = $demoPath
+try {
+    ctest --test-dir build -C Debug -R '^end_to_end$' --output-on-failure
+    if ($LASTEXITCODE -ne 0) { throw 'Login demo acceptance failed' }
+} finally {
+    Remove-Item Env:BLUEPRINT_DEMO_OUTPUT_DIR -ErrorAction SilentlyContinue
+}
+```
+
+`BLUEPRINT_DEMO_OUTPUT_DIR` 必须指向已存在的绝对空目录；同一非空目录不能被后续运行覆盖。它只控制演示导出位置，不是 API 密钥或模型配置。导出的 `generation-manifest.json` 保留生成与接受记录，`blueprint.json` 保留原始语义蓝图，候选目录不随工程导出。
+
+需要在测试之外重新构建导出项目时，可运行：
+
+```powershell
+cmake -S C:/bp-login-demo -B C:/bp-login-build -G Ninja `
+  -DBUILD_TESTING=ON -DCMAKE_PREFIX_PATH=E:/Qt/6.9.3/mingw_64
+cmake --build C:/bp-login-build
+ctest --test-dir C:/bp-login-build -C Debug --output-on-failure --no-tests=error
+```
+
+窗口交互复查步骤：
+
+1. 从 Add node 菜单创建 Start、UI Page、End，拖动页面节点；确认连线锚点跟随节点移动。
+2. 点击 Connect，依次选择来源和目标，连接 Start → UI Page → End。
+3. 选中页面，在 Properties 修改名称与说明并 Apply，再用 Undo/Redo 核对字段和节点标题同步。
+4. 在 Build and export 面板填入已有工作目录、独立构建目录和 CMake 参数，点击 Build，确认日志显示 configure/build 退出码和最终状态；选择现有空目录点击 Export。
+
+当前候选差异、生成与接受操作通过服务 API 和上述测试验收，尚无候选审核窗口。生成工程入口仍是骨架占位窗口；登录模块行为由导出项目内的测试调用验证，尚未将蓝图业务流程自动连接到应用入口。真实服务商联调、完整图形化工作流和后续多语言方案不属于这次离线验收结果。
 
 ## AI 生成服务（Task 6）
 
@@ -131,7 +180,7 @@ ctest --test-dir build -C Debug -R '^external_code_importer$' --output-on-failur
 
 复制先在目标目录同级的唯一临时目录中进行，并核对文件哈希；成功后通过目录重命名提交。非空目标、路径重叠、链接、非法路径和映射冲突会被拒绝，普通失败会尝试清理临时副本、恢复空目标。该保证面向可信本机单写入者，不涵盖断电、进程崩溃或恶意并发替换目录。
 
-构建会执行工程中的 CMake 和编译步骤，应先人工审查来源。导出不等于编译或业务验收通过，也不会自动生成外部模块的调用连接。当前导出为同步操作，大工程复制期间界面可能短暂阻塞；尚不提供取消操作。Task 10 的完整端到端验收尚未开始。
+构建会执行工程中的 CMake 和编译步骤，应先人工审查来源。导出不等于编译或业务验收通过，也不会自动生成外部模块的调用连接。当前导出为同步操作，大工程复制期间界面可能短暂阻塞；尚不提供取消操作。Task 10 的登录示例通过独立测试验证构建和业务行为，不能据此推断任意模型输出都正确。
 
 单独运行构建与导出测试：
 
