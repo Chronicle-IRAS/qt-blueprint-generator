@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-- 当前开发分支：`feature/bilingual-ui`，直接基于远端 `main` 的 `43ecdb3`（Task 10 / PR #11）。
+- 当前开发分支：`docs/project-usage-guide`，基于远端 `main` 的 `4e2378e`（中英文界面 PR #12）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
-- MVP 基线：`doc/mvp-implementation-plan.md`；中英文界面任务计划：`doc/plans/2026-09-09-bilingual-ui.md`。
+- MVP 基线：`doc/mvp-implementation-plan.md`；完整使用说明：`doc/project-usage-guide.md`。
 - `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；本任务仅增加编辑器 UI 本地化，不迁移后台语言。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
@@ -24,10 +24,15 @@
 - Task 10 离线登录端到端验收已完成，主实现 `42cdd6e`、质量调整 `150c044`；规格与最终质量复核均通过。完整构建与 CTest `11/11 passed`（66.54 秒），导出示例测试 `4/4 passed`；质量调整后的两种导出专项均通过。
 - Task 10 的 PR #11 已于 2026-09-09 合入远端 `main`，合并提交为 `43ecdb3`。
 - 中英文界面切换已在 `feature/bilingual-ui` 实现：运行时切换、选择持久化、稳定控件标识和完整当前界面翻译均通过测试。
-- 分支已普通推送至 `origin/feature/bilingual-ui`，并创建 PR #12；未强推、未自动合并。
+- 中英文界面 PR #12 已合入远端 `main`，合并提交为 `4e2378e`。
+- 项目使用说明任务已新建 `docs/project-usage-guide` 分支：新增面向使用者的完整指南，并把 README 精简为稳定的项目说明，不再保留 Task、分支、PR 或测试耗时等开发过程记录。
+- 同步目标：`origin/docs/project-usage-guide`；完成后通过普通推送和独立 PR 交付。
 
 ## 已完成提交
 
+- 项目说明与使用指南
+  - 新增 `doc/project-usage-guide.md`，覆盖环境、构建、启动、画布操作、离线示例、工作目录、AI/外部代码使用边界及常见问题。
+  - README 改为稳定项目首页，删除 Task、分支、PR 和测试耗时等开发过程记录。
 - `d1a13c2 docs: plan bilingual UI switching`
   - 记录中英文运行时切换、持久化、翻译资源、测试和交付范围。
 - `d281bfb feat: add English and Chinese UI switching`
@@ -117,6 +122,8 @@
 
 ## 验证记录
 
+- 项目说明任务使用全新纯 ASCII 构建目录完成 CMake 配置和完整构建；CTest `12/12 passed`（83.13 秒）。
+- README 与使用指南的本地 Markdown 链接全部可解析；`git diff --check` 通过。
 - Qt：`E:\Qt\6.9.3\mingw_64`
 - 编译器：`E:\Qt\Tools\mingw1310_64`
 - 生成器：Ninja
@@ -215,9 +222,9 @@
 
 ## 恢复工作
 
-1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/bilingual-ui`。
-2. Task 10 已通过 PR #11 合入远端 `main`；本任务从合并提交 `43ecdb3` 新建分支。
-3. 中英文界面任务已通过 `feature/bilingual-ui` 和 PR #12 交付；AI 图形化工作流或 C++/Python 混合演进属于后续独立任务。
+1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `docs/project-usage-guide`。
+2. 中英文界面任务已通过 PR #12 合入远端 `main`；本任务以合并提交 `4e2378e` 为基线。
+3. 本任务只调整项目文档，不修改产品代码；AI 图形化工作流或 C++/Python 混合演进属于后续独立任务。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 
