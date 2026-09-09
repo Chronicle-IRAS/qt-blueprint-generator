@@ -16,8 +16,9 @@
 - 外部 C/C++ 文件黑盒导入、接口契约绑定、文件哈希复验，以及与 AI 提示词和候选覆盖流程的隔离。
 - 显式异步 CMake 配置与构建、构建日志面板，以及携带外部代码且保留当前文件字节的空目录导出。
 - 三模块离线登录示例、候选接受与导出全链路测试，以及导出项目自身的 Qt Test。
+- 编辑器界面可在运行时切换英文与简体中文，并记住上次选择。
 
-Task 6 至 Task 9 已通过 PR #6、#7、#8 和 #10 合入 main。Task 10 位于基于 `b89202c` 的独立分支 `feature/task10-end-to-end`；完整构建和 CTest 11/11 通过，导出登录示例的 4 项测试全部通过。窗口交互经 Qt 鼠标事件和渲染截图核验，候选差异经 API 验证；完整图形化生成/审核工作流仍待接入。
+MVP Task 1 至 Task 10 已合入 `main`，其中 Task 6 至 Task 10 分别通过 PR #6、#7、#8、#10 和 #11 交付。中英文界面切换由独立分支 `feature/bilingual-ui` 通过 PR #12 交付；完整构建和 CTest 12/12 通过。窗口交互经 Qt 鼠标事件和自动化测试核验，候选差异经 API 验证；完整图形化生成/审核工作流仍待接入。
 
 ## MVP 工作流
 
@@ -31,7 +32,7 @@ Task 6 至 Task 9 已通过 PR #6、#7、#8 和 #10 合入 main。Task 10 位于
 ## 环境要求
 
 - Windows 10/11
-- Qt 6 Widgets、Network 和 Qt Test（当前验证版本：Qt 6.9.3）
+- Qt 6 Widgets、Network、Qt Test 和 LinguistTools（当前验证版本：Qt 6.9.3）
 - 支持 C++17 的编译器（当前验证版本：MinGW 13.1）
 - CMake 3.22 或更高版本（当前验证版本：4.3.2）
 - Ninja
@@ -59,6 +60,18 @@ ctest --test-dir build -C Debug --output-on-failure
 ```
 
 请优先通过 CTest 运行测试。直接双击单个 `tst_*.exe` 时，如果 Qt 的 `bin` 目录不在 `PATH` 中，Windows 会提示缺少 `Qt6Test.dll`。
+
+## 界面语言
+
+菜单栏的 **Language / 语言** 菜单提供 **English / 英语**（语言代码 `en`）和 **Chinese / 中文**（语言代码 `zh_CN`）。选择后窗口标题、菜单、工具栏、属性面板、构建与导出面板及后续状态信息会立即切换，无需重启；选择保存在本机 `QSettings` 的 `ui/language` 项，下次启动时自动恢复。仅使用默认英文时不会创建该设置项。
+
+英文是源码语言，简体中文由 `translations/BlueprintEditor_zh_CN.ts` 提供。语言切换只作用于编辑器自身界面，不修改已创建节点的名称和说明，不翻译蓝图 JSON、提示词、AI 返回内容、构建输出或生成项目源码。节点在创建时使用当前界面的默认类型名称，创建后即作为用户数据保留。
+
+可单独运行语言切换回归测试：
+
+```powershell
+ctest --test-dir build -C Debug -R '^language_switch$' --output-on-failure
+```
 
 ## 离线登录示例与验收（Task 10）
 

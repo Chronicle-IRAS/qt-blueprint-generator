@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 REQUIRED COMPONENTS Network Widgets)
+find_package(Qt6 REQUIRED COMPONENTS LinguistTools Network Widgets)
 
 qt_standard_project_setup()
 
@@ -74,3 +74,15 @@ if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
     add_subdirectory(tests)
 endif()
+
+set(translation_targets BlueprintEditor)
+if(BUILD_TESTING)
+    list(APPEND translation_targets tst_language_switch)
+endif()
+
+qt_add_translations(
+    TARGETS ${translation_targets}
+    SOURCE_TARGETS BlueprintEditorCore
+    TS_FILES translations/BlueprintEditor_zh_CN.ts
+    RESOURCE_PREFIX "/i18n"
+)

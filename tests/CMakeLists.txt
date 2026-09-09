@@ -1,5 +1,17 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
 
+set(language_switch_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_language_switch.moc")
+add_custom_command(OUTPUT "${language_switch_moc}"
+    COMMAND Qt6::moc -o tst_language_switch.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_language_switch.cpp"
+    DEPENDS tst_language_switch.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_language_switch tst_language_switch.cpp "${language_switch_moc}")
+set_target_properties(tst_language_switch PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_language_switch PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_language_switch PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME language_switch COMMAND tst_language_switch)
+set_tests_properties(language_switch PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 set(end_to_end_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_end_to_end.moc")
 add_custom_command(OUTPUT "${end_to_end_moc}"
     COMMAND Qt6::moc -o tst_end_to_end.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_end_to_end.cpp"
