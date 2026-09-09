@@ -713,9 +713,11 @@ void BlueprintSceneTest::mainWindowRestoresClosedDocksAndDefaultLayout()
     QVERIFY(buildAction->isChecked());
 
     propertiesDock->setFloating(true);
-    buildDock->setFloating(true);
+    window.addDockWidget(Qt::LeftDockWidgetArea, buildDock);
+    buildDock->close();
     QTRY_VERIFY(propertiesDock->isFloating());
-    QTRY_VERIFY(buildDock->isFloating());
+    QTRY_VERIFY(buildDock->isHidden());
+    QTRY_VERIFY(!buildAction->isChecked());
     resetAction->trigger();
 
     QCOMPARE(window.dockWidgetArea(propertiesDock), Qt::RightDockWidgetArea);

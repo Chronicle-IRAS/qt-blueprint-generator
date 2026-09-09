@@ -5,6 +5,7 @@
 #include "workspace/project_exporter_recovery_p.h"
 #include "app/main_window.h"
 
+#include <QAction>
 #include <QCryptographicHash>
 #include <QDirIterator>
 #include <QFile>
@@ -383,18 +384,21 @@ void ProjectExporterTest::mainWindowReportsBuildInputErrorsAndRestoresButton()
     auto *workspace = window.findChild<QLineEdit *>(QStringLiteral("workspacePathEdit"));
     auto *build = window.findChild<QLineEdit *>(QStringLiteral("buildDirectoryEdit"));
     auto *button = window.findChild<QPushButton *>(QStringLiteral("buildProjectButton"));
+    auto *toolbarAction = window.findChild<QAction *>(QStringLiteral("toolbarBuildAction"));
     auto *log = window.findChild<QPlainTextEdit *>(QStringLiteral("buildLog"));
     QVERIFY(workspace);
     QVERIFY(build);
     QVERIFY(button);
+    QVERIFY(toolbarAction);
     QVERIFY(log);
     QVERIFY(log->isReadOnly());
     QVERIFY(log->toPlainText().isEmpty());
     workspace->setText(QStringLiteral("relative-workspace"));
     build->setText(QStringLiteral("relative-build"));
-    button->click();
+    toolbarAction->trigger();
     QTRY_VERIFY(log->toPlainText().contains(QStringLiteral("absolute"), Qt::CaseInsensitive));
     QVERIFY(button->isEnabled());
+    QVERIFY(toolbarAction->isEnabled());
 }
 
 void ProjectExporterTest::mainWindowStreamsFailedConfigureAndPreservesArguments()
@@ -418,20 +422,25 @@ void ProjectExporterTest::mainWindowStreamsFailedConfigureAndPreservesArguments(
     auto *workspace = window.findChild<QLineEdit *>(QStringLiteral("workspacePathEdit"));
     auto *build = window.findChild<QLineEdit *>(QStringLiteral("buildDirectoryEdit"));
     auto *button = window.findChild<QPushButton *>(QStringLiteral("buildProjectButton"));
+    auto *toolbarAction = window.findChild<QAction *>(QStringLiteral("toolbarBuildAction"));
     auto *log = window.findChild<QPlainTextEdit *>(QStringLiteral("buildLog"));
     QVERIFY(workspace);
     QVERIFY(build);
     QVERIFY(button);
+    QVERIFY(toolbarAction);
     QVERIFY(log);
     workspace->setText(workspacePath);
     build->setText(buildPath);
-    button->click();
+    toolbarAction->trigger();
+    QVERIFY(!button->isEnabled());
+    QVERIFY(!toolbarAction->isEnabled());
     QTRY_VERIFY_WITH_TIMEOUT(log->toPlainText().contains(QStringLiteral("[configure] exit code")), 30000);
     QVERIFY(log->toPlainText().contains(QStringLiteral("[configure stderr]")));
     QVERIFY(log->toPlainText().contains(QStringLiteral("expected UI failure")));
     QVERIFY(!log->toPlainText().contains(QStringLiteral("argument boundary lost")));
     QVERIFY(log->toPlainText().contains(QStringLiteral("Build failed:")));
     QVERIFY(button->isEnabled());
+    QVERIFY(toolbarAction->isEnabled());
 }
 
 void ProjectExporterTest::mainWindowRestoresBuildButtonWhenCmakeCannotStart()
@@ -446,18 +455,21 @@ void ProjectExporterTest::mainWindowRestoresBuildButtonWhenCmakeCannotStart()
     auto *workspace = window.findChild<QLineEdit *>(QStringLiteral("workspacePathEdit"));
     auto *build = window.findChild<QLineEdit *>(QStringLiteral("buildDirectoryEdit"));
     auto *button = window.findChild<QPushButton *>(QStringLiteral("buildProjectButton"));
+    auto *toolbarAction = window.findChild<QAction *>(QStringLiteral("toolbarBuildAction"));
     auto *log = window.findChild<QPlainTextEdit *>(QStringLiteral("buildLog"));
     QVERIFY(workspace);
     QVERIFY(build);
     QVERIFY(button);
+    QVERIFY(toolbarAction);
     QVERIFY(log);
     workspace->setText(workspacePath);
     build->setText(buildPath);
 
-    button->click();
+    toolbarAction->trigger();
     QTRY_VERIFY_WITH_TIMEOUT(log->toPlainText().contains(QStringLiteral("Could not start CMake")), 10000);
     QVERIFY(log->toPlainText().contains(QStringLiteral("Build failed:")));
     QVERIFY(button->isEnabled());
+    QVERIFY(toolbarAction->isEnabled());
 }
 
 void ProjectExporterTest::preservesEveryMappedFileHash()
