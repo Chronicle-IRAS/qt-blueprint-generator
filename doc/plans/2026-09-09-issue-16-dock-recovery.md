@@ -16,7 +16,7 @@
 - Modify: `tests/tst_blueprint_scene.cpp`
 - Modify: `tests/tst_language_switch.cpp`
 
-- [ ] **Step 1: Write the failing dock recovery test**
+- [x] **Step 1: Write the failing dock recovery test**
 
 Add `mainWindowRestoresClosedDocksAndDefaultLayout()` to `BlueprintSceneTest`. Show the window, locate `propertiesDockAction`, `buildExportDockAction`, and `resetLayoutAction`, close both docks, verify the actions become unchecked, reopen them through the actions, then float the docks and trigger Reset Layout. Verify Properties returns to the right and Build/Export to the bottom, both docked and visible.
 
@@ -31,13 +31,13 @@ auto *resetAction = window.findChild<QAction *>(QStringLiteral("resetLayoutActio
 QVERIFY(propertiesDock && buildDock && propertiesAction && buildAction && resetAction);
 ```
 
-- [ ] **Step 2: Write failing toolbar and translation assertions**
+- [x] **Step 2: Write failing toolbar and translation assertions**
 
 Add `mainWindowExposesBuildAndExportInToolbar()` to `BlueprintSceneTest`. Locate `toolbarBuildAction` and `toolbarExportAction`, trigger them with intentionally incomplete fields, and verify the existing build log receives the corresponding rejection messages.
 
 Extend `LanguageSwitchTest` to locate `viewMenu`, both dock actions, Reset Layout, toolbar Build, and toolbar Export. Assert the English labels, switch to Chinese, and assert `视图`、`属性`、`构建与导出`、`重置布局`、`构建`、`导出`.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 Run:
 
@@ -56,7 +56,7 @@ Expected: assertions fail because the new menu and actions do not exist.
 - Modify: `src/app/main_window.h`
 - Modify: `src/app/main_window.cpp`
 
-- [ ] **Step 1: Add stable action members and the layout reset method**
+- [x] **Step 1: Add stable action members and the layout reset method**
 
 ```cpp
 void resetWindowLayout();
@@ -69,21 +69,21 @@ QAction *m_toolbarBuildAction = nullptr;
 QAction *m_toolbarExportAction = nullptr;
 ```
 
-- [ ] **Step 2: Create and connect actions**
+- [x] **Step 2: Create and connect actions**
 
 Create View before Language. After constructing both docks, reuse their toggle actions, assign stable object names, and add Reset Layout. Add Build and Export to the existing toolbar after a separator and connect them to `startBuild()` and `exportProject()`.
 
 When a build starts, disable both the dock button and toolbar Build action. Re-enable both on immediate rejection or asynchronous completion.
 
-- [ ] **Step 3: Restore the default layout**
+- [x] **Step 3: Restore the default layout**
 
 Implement `resetWindowLayout()` by removing both existing docks, docking Properties at `Qt::RightDockWidgetArea` and Build/Export at `Qt::BottomDockWidgetArea`, showing both, and applying default horizontal/vertical sizes with `resizeDocks()`. The method must not alter the blueprint or current language.
 
-- [ ] **Step 4: Retranslate all new labels**
+- [x] **Step 4: Retranslate all new labels**
 
 In `retranslateUi()`, set View, both dock toggle actions, Reset Layout, toolbar Build, and toolbar Export from `tr()` strings. Existing Language behavior must remain unchanged.
 
-- [ ] **Step 5: Run GREEN and affected regressions**
+- [x] **Step 5: Run GREEN and affected regressions**
 
 Build both affected test targets and run `blueprint_scene|language_switch`. Expected: both pass with the new interaction and translation coverage.
 
@@ -94,15 +94,15 @@ Build both affected test targets and run `blueprint_scene|language_switch`. Expe
 - Modify: `README.md`
 - Modify: `doc/implementation-progress.md`
 
-- [ ] **Step 1: Update the Qt translation catalog**
+- [x] **Step 1: Update the Qt translation catalog**
 
 Run `update_translations`, translate `View` as `视图` and `Reset Layout` as `重置布局`, then rebuild. Confirm Linguist reports no unfinished, vanished, or obsolete entries.
 
-- [ ] **Step 2: Document stable behavior**
+- [x] **Step 2: Document stable behavior**
 
 Document how to reopen Properties and Build/Export through View, how Reset Layout behaves, and that toolbar Build/Export reuse the existing operations. Do not add development-history details to README.
 
-- [ ] **Step 3: Verify the complete task**
+- [x] **Step 3: Verify the complete task**
 
 Run `git diff --check`, a complete build, and the full CTest suite. Start `BlueprintEditor.exe`, confirm it remains running, and stop only the process created by the probe.
 

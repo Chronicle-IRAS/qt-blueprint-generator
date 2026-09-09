@@ -73,6 +73,12 @@ ctest --test-dir build -C Debug --output-on-failure
 ctest --test-dir build -C Debug -R '^language_switch$' --output-on-failure
 ```
 
+## 菜单、工具栏与面板
+
+`View / 视图` 菜单可以重新打开已关闭的 `Properties / 属性` 和 `Build and export / 构建与导出` 面板，菜单勾选状态会随面板可见性同步。`Reset Layout / 重置布局` 会把属性面板恢复到右侧、构建与导出面板恢复到底部，并重新显示两者；该操作不会修改蓝图或界面语言。
+
+顶部工具栏提供已有的 Build / 构建和 Export / 导出入口，与底部面板按钮执行相同操作。它们不会创建工程骨架：Build 仍要求工作目录中已经存在 `generated-project/`，Export 仍要求目标是已存在的绝对空目录。
+
 ## 离线登录示例与验收（Task 10）
 
 `tests/fixtures/login-demo/blueprint.json` 是固定登录蓝图，`fake-ai-response.json` 是 JSON 数组，每项保存一个模块的 `nodeId`、摘要和候选文件。测试使用 `FakeAiClient` 逐模块生成候选，预览并核对候选内容，再显式接受、导出；随后用真实 CMake 配置和编译导出项目，并执行项目自身的 Qt Test。默认临时目录在测试结束后清理，不调用外部模型。

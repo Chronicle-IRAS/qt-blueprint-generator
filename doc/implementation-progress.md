@@ -28,10 +28,16 @@
 - 项目使用说明已通过 `docs/project-usage-guide` 分支创建 PR #20，当前尚未合并。
 - 远端 Issue 按依赖、关键程度和更改幅度排序为 #16、#14、#13、#15、#17、#18、#19；均已标记 `enhancement` 和 `ready-for-agent`。
 - 当前开始处理 #16：新增 View 菜单、Dock 恢复、默认布局复位和现有 Build/Export 工具栏入口。
+- #16 主实现已完成：View 菜单复用 Dock toggle action，Reset Layout 恢复默认区域与可见性，Build/Export 工具栏动作复用现有操作。
 - 同步目标：`origin/feature/issue-16-dock-recovery`；完成后通过普通推送和独立 PR 交付。
 
 ## 已完成提交
 
+- `b31d446 docs: plan issue 16 dock recovery`
+  - 记录 #16 的测试先行步骤、实现范围、双语文本和交付约束。
+- `2165f85 feat: restore editor docks from view menu`
+  - 新增 View 菜单、两项 Dock 恢复入口、默认布局复位和 Build/Export 工具栏入口。
+  - Qt Linguist 目录扩展到 60 条完成翻译；GUI 测试覆盖可见性、勾选状态、布局区域、动作复用和中英文切换。
 - `d1a13c2 docs: plan bilingual UI switching`
   - 记录中英文运行时切换、持久化、翻译资源、测试和交付范围。
 - `d281bfb feat: add English and Chinese UI switching`
@@ -121,6 +127,11 @@
 
 ## 验证记录
 
+- #16 基线专项：`language_switch|blueprint_scene` `2/2 passed`（1.84 秒）。
+- #16 RED：新增 View/Dock/Toolbar 断言后两项测试均按预期失败；GREEN：`2/2 passed`（0.49 秒）。
+- #16 Qt Linguist：60 条完成翻译，0 条 unfinished；无 vanished 或 obsolete 条目。
+- #16 最终完整构建通过；CTest `12/12 passed`（79.46 秒）。
+- #16 `BlueprintEditor.exe` 使用 offscreen 平台插件启动并保持运行 2 秒，启动探测退出码 0。
 - Qt：`E:\Qt\6.9.3\mingw_64`
 - 编译器：`E:\Qt\Tools\mingw1310_64`
 - 生成器：Ninja
