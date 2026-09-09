@@ -1,11 +1,14 @@
 #include <QtTest/QtTest>
 
-#include <QGraphicsView>
 #include <QAction>
+#include <QDockWidget>
+#include <QGraphicsView>
 #include <QLineEdit>
+#include <QMenu>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QStatusBar>
+#include <QToolBar>
 #include <QWheelEvent>
 
 #include "app/main_window.h"
@@ -56,6 +59,8 @@ private slots:
     void mainWindowUsesExplicitConnectionDirection();
     void mainWindowCreatesLabeledConnectionsFromToolbar();
     void mainWindowUsesRubberBandDragAndClampedZoom();
+    void mainWindowRestoresClosedDocksAndDefaultLayout();
+    void mainWindowExposesBuildAndExportInToolbar();
 };
 
 void BlueprintSceneTest::addingNodeUpdatesDocumentAndSupportsUndo()
@@ -673,6 +678,77 @@ void BlueprintSceneTest::mainWindowUsesRubberBandDragAndClampedZoom()
     }
     QVERIFY(view->transform().m11() >= 0.25);
     QVERIFY(view->transform().m11() <= 3.0);
+}
+
+void BlueprintSceneTest::mainWindowRestoresClosedDocksAndDefaultLayout()
+{
+    MainWindow window;
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *viewMenu = window.findChild<QMenu *>(QStringLiteral("viewMenu"));
+    auto *propertiesDock = window.findChild<QDockWidget *>(QStringLiteral("propertiesDock"));
+    auto *buildDock = window.findChild<QDockWidget *>(QStringLiteral("buildExportDock"));
+    auto *propertiesAction = window.findChild<QAction *>(QStringLiteral("propertiesDockAction"));
+    auto *buildAction = window.findChild<QAction *>(QStringLiteral("buildExportDockAction"));
+    auto *resetAction = window.findChild<QAction *>(QStringLiteral("resetLayoutAction"));
+    QVERIFY(viewMenu && propertiesDock && buildDock && propertiesAction && buildAction
+            && resetAction);
+    QVERIFY(viewMenu->actions().contains(propertiesAction));
+    QVERIFY(viewMenu->actions().contains(buildAction));
+    QVERIFY(viewMenu->actions().contains(resetAction));
+
+    propertiesDock->close();
+    buildDock->close();
+    QTRY_VERIFY(propertiesDock->isHidden());
+    QTRY_VERIFY(buildDock->isHidden());
+    QTRY_VERIFY(!propertiesAction->isChecked());
+    QTRY_VERIFY(!buildAction->isChecked());
+
+    propertiesAction->trigger();
+    buildAction->trigger();
+    QTRY_VERIFY(propertiesDock->isVisible());
+    QTRY_VERIFY(buildDock->isVisible());
+    QVERIFY(propertiesAction->isChecked());
+    QVERIFY(buildAction->isChecked());
+
+    propertiesDock->setFloating(true);
+    buildDock->setFloating(true);
+    QTRY_VERIFY(propertiesDock->isFloating());
+    QTRY_VERIFY(buildDock->isFloating());
+    resetAction->trigger();
+
+    QCOMPARE(window.dockWidgetArea(propertiesDock), Qt::RightDockWidgetArea);
+    QCOMPARE(window.dockWidgetArea(buildDock), Qt::BottomDockWidgetArea);
+    QVERIFY(!propertiesDock->isFloating());
+    QVERIFY(!buildDock->isFloating());
+    QVERIFY(propertiesDock->isVisible());
+    QVERIFY(buildDock->isVisible());
+    QVERIFY(propertiesAction->isChecked());
+    QVERIFY(buildAction->isChecked());
+}
+
+void BlueprintSceneTest::mainWindowExposesBuildAndExportInToolbar()
+{
+    MainWindow window;
+    auto *toolbar = window.findChild<QToolBar *>(QStringLiteral("blueprintToolbar"));
+    auto *buildAction = window.findChild<QAction *>(QStringLiteral("toolbarBuildAction"));
+    auto *exportAction = window.findChild<QAction *>(QStringLiteral("toolbarExportAction"));
+    auto *workspaceEdit = window.findChild<QLineEdit *>(QStringLiteral("workspacePathEdit"));
+    auto *exportEdit = window.findChild<QLineEdit *>(QStringLiteral("exportTargetEdit"));
+    auto *buildLog = window.findChild<QPlainTextEdit *>(QStringLiteral("buildLog"));
+    QVERIFY(toolbar && buildAction && exportAction && workspaceEdit && exportEdit && buildLog);
+    QVERIFY(toolbar->actions().contains(buildAction));
+    QVERIFY(toolbar->actions().contains(exportAction));
+
+    workspaceEdit->clear();
+    buildAction->trigger();
+    QVERIFY(buildLog->toPlainText().contains(QStringLiteral("Build request rejected")));
+
+    buildLog->clear();
+    exportEdit->clear();
+    exportAction->trigger();
+    QVERIFY(buildLog->toPlainText().contains(QStringLiteral("Export failed")));
 }
 
 QTEST_MAIN(BlueprintSceneTest)

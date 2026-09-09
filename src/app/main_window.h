@@ -54,6 +54,7 @@ private:
     void updatePropertyEditor();
     void startBuild();
     void exportProject();
+    void resetWindowLayout();
     void appendBuildLog(const QString &text);
     QString selectedNodeId() const;
 
@@ -72,9 +73,15 @@ private:
     QAction *m_cancelConnectionAction = nullptr;
     QAction *m_toolbarUndoAction = nullptr;
     QAction *m_toolbarRedoAction = nullptr;
+    QAction *m_toolbarBuildAction = nullptr;
+    QAction *m_toolbarExportAction = nullptr;
     QMenu *m_editMenu = nullptr;
     QAction *m_menuUndoAction = nullptr;
     QAction *m_menuRedoAction = nullptr;
+    QMenu *m_viewMenu = nullptr;
+    QAction *m_propertiesDockAction = nullptr;
+    QAction *m_buildDockAction = nullptr;
+    QAction *m_resetLayoutAction = nullptr;
     QMenu *m_languageMenu = nullptr;
     QAction *m_englishLanguageAction = nullptr;
     QAction *m_chineseLanguageAction = nullptr;
