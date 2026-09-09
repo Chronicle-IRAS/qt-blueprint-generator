@@ -124,6 +124,7 @@
 
 - 项目说明任务使用全新纯 ASCII 构建目录完成 CMake 配置和完整构建；CTest `12/12 passed`（83.13 秒）。
 - README 与使用指南的本地 Markdown 链接全部可解析；`git diff --check` 通过。
+- 项目说明最终只读复核结论为 Ready，无 Critical 或 Important；唯一序列化 API 表述 Minor 已修正。
 - Qt：`E:\Qt\6.9.3\mingw_64`
 - 编译器：`E:\Qt\Tools\mingw1310_64`
 - 生成器：Ninja
