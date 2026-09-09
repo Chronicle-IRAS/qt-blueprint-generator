@@ -53,7 +53,7 @@
 - Modify: doc/project-usage-guide.md
 - Modify: doc/implementation-progress.md
 
-- [ ] Update stable user documentation and README for port dragging and cancellation.
+- [x] Update stable user documentation and README for port dragging and cancellation.
 - [ ] Run complete build, full CTest, startup probe, link check, and git diff --check.
 - [ ] Perform quality review and resolve all Critical, Important, and Minor findings.
 - [ ] Commit each completed change group and normally push the branch.

@@ -33,6 +33,13 @@
 
 ## 已完成提交
 
+- `293bfd8 feat: add direct port drag connections`
+  - 支持从输出端口拖出临时曲线、有效输入端口绿色反馈、有效释放创建 FlowEdge，以及 Esc、右键和无效释放取消。
+  - 有效连线复用现有标签和撤销栈；专项测试覆盖 Decision `true`/`false`、旧 Connect 操作、节点移动，以及取消后不产生伪移动命令。
+- `fd33bd7 test: define port drag connection behavior`
+  - 先建立端口拖拽的失败测试，确认实现前缺少端口命中与高亮接口。
+- `3b23c76 docs: plan issue 13 port drag connections`
+  - 记录 Issue #13 的交互范围、测试先行步骤、文档更新和 PR 约束。
 - `b31d446 docs: plan issue 16 dock recovery`
   - 记录 #16 的测试先行步骤、实现范围、双语文本和交付约束。
 - `2165f85 feat: restore editor docks from view menu`
