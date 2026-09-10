@@ -38,6 +38,12 @@ QTableWidget *createTable(int columns, const QString &objectName, QWidget *paren
     return table;
 }
 
+QString itemText(QTableWidget *table, int row, int column)
+{
+    const QTableWidgetItem *item = table->item(row, column);
+    return item ? item->text() : QString();
+}
+
 } // namespace
 
 NodePropertiesEditor::NodePropertiesEditor(const QString &objectNamePrefix, QWidget *parent)
@@ -239,8 +245,8 @@ QVector<PortSpec> NodePropertiesEditor::portsFrom(QTableWidget *table)
     QVector<PortSpec> ports;
     ports.reserve(table->rowCount());
     for (int row = 0; row < table->rowCount(); ++row) {
-        ports.append({table->item(row, 0)->text(), table->item(row, 1)->text(),
-                      table->item(row, 2)->text()});
+        ports.append({itemText(table, row, 0), itemText(table, row, 1),
+                      itemText(table, row, 2)});
     }
     return ports;
 }
@@ -250,7 +256,7 @@ QStringList NodePropertiesEditor::stringsFrom(QTableWidget *table)
     QStringList values;
     values.reserve(table->rowCount());
     for (int row = 0; row < table->rowCount(); ++row) {
-        values.append(table->item(row, 0)->text());
+        values.append(itemText(table, row, 0));
     }
     return values;
 }

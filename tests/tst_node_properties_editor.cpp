@@ -120,13 +120,14 @@ void NodePropertiesEditorTest::portCollectionsSupportAddEditAndDelete()
 
     QTest::mouseClick(button(outputsSection, QStringLiteral("addPortButton")), Qt::LeftButton);
     setPortRow(outputs, 0, {QStringLiteral("result"), QStringLiteral("bool"), QStringLiteral("Result")});
+    delete outputs->takeItem(0, 2);
 
     BlueprintNode result;
     editor.applyTo(&result);
     const QVector<PortSpec> expectedInputs{
         {QStringLiteral("edited"), QStringLiteral("QVector<int>"), QStringLiteral("Changed")}};
     const QVector<PortSpec> expectedOutputs{
-        {QStringLiteral("result"), QStringLiteral("bool"), QStringLiteral("Result")}};
+        {QStringLiteral("result"), QStringLiteral("bool"), QString()}};
     QCOMPARE(result.inputs, expectedInputs);
     QCOMPARE(result.outputs, expectedOutputs);
 }
