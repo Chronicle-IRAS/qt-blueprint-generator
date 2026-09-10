@@ -11,6 +11,7 @@
 
 class BlueprintScene;
 class BuildService;
+class NodePropertiesEditor;
 class QAction;
 class QDockWidget;
 class QEvent;
@@ -87,13 +88,7 @@ private:
     QAction *m_englishLanguageAction = nullptr;
     QAction *m_chineseLanguageAction = nullptr;
     QDockWidget *m_propertiesDock = nullptr;
-    QFormLayout *m_propertyForm = nullptr;
-    QLineEdit *m_nameEdit = nullptr;
-    QPlainTextEdit *m_descriptionEdit = nullptr;
-    QPlainTextEdit *m_inputsEdit = nullptr;
-    QPlainTextEdit *m_outputsEdit = nullptr;
-    QPlainTextEdit *m_constraintsEdit = nullptr;
-    QPlainTextEdit *m_acceptanceCriteriaEdit = nullptr;
+    NodePropertiesEditor *m_nodePropertiesEditor = nullptr;
     QPushButton *m_applyPropertiesButton = nullptr;
     BuildService *m_buildService = nullptr;
     QDockWidget *m_buildDock = nullptr;

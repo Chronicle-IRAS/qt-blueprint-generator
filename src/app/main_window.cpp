@@ -2,6 +2,7 @@
 
 #include "editor/blueprint_scene.h"
 #include "editor/node_item.h"
+#include "editor/node_properties_editor.h"
 #include "workspace/build_service.h"
 #include "workspace/project_exporter.h"
 
@@ -16,10 +17,6 @@
 #include <QFormLayout>
 #include <QGraphicsView>
 #include <QHBoxLayout>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonParseError>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
@@ -29,6 +26,7 @@
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSettings>
 #include <QStatusBar>
 #include <QToolBar>
@@ -38,7 +36,6 @@
 #include <QWheelEvent>
 
 #include <algorithm>
-#include <utility>
 
 namespace {
 
@@ -97,102 +94,6 @@ QString encodeCommandArguments(const QStringList &arguments)
     return encoded.join(QLatin1Char(' '));
 }
 
-QString portsToText(const QVector<PortSpec> &ports)
-{
-    QJsonArray array;
-    for (const PortSpec &port : ports) {
-        array.append(QJsonObject{{QStringLiteral("name"), port.name},
-                                 {QStringLiteral("type"), port.type},
-                                 {QStringLiteral("description"), port.description}});
-    }
-    return QString::fromUtf8(QJsonDocument(array).toJson(QJsonDocument::Indented));
-}
-
-QString stringsToText(const QStringList &values)
-{
-    QJsonArray array;
-    for (const QString &value : values) {
-        array.append(value);
-    }
-    return QString::fromUtf8(QJsonDocument(array).toJson(QJsonDocument::Indented));
-}
-
-bool parsePorts(const QString &text, QVector<PortSpec> *ports)
-{
-    const QString trimmed = text.trimmed();
-    if (trimmed.isEmpty()) {
-        ports->clear();
-        return true;
-    }
-    QJsonParseError error;
-    const QJsonDocument document = QJsonDocument::fromJson(text.toUtf8(), &error);
-    if (error.error != QJsonParseError::NoError || !document.isArray()) {
-        return false;
-    }
-    QVector<PortSpec> parsed;
-    for (const QJsonValue &value : document.array()) {
-        if (!value.isObject()) {
-            return false;
-        }
-        const QJsonObject object = value.toObject();
-        if (!object.value(QStringLiteral("name")).isString()
-            || !object.value(QStringLiteral("type")).isString()
-            || !object.value(QStringLiteral("description")).isString()) {
-            return false;
-        }
-        parsed.append({object.value(QStringLiteral("name")).toString(),
-                       object.value(QStringLiteral("type")).toString(),
-                       object.value(QStringLiteral("description")).toString()});
-    }
-    *ports = parsed;
-    return true;
-}
-
-bool parseStrings(const QString &text, QStringList *values)
-{
-    const QString trimmed = text.trimmed();
-    if (trimmed.isEmpty()) {
-        values->clear();
-        return true;
-    }
-    QJsonParseError error;
-    const QJsonDocument document = QJsonDocument::fromJson(text.toUtf8(), &error);
-    if (error.error != QJsonParseError::NoError || !document.isArray()) {
-        return false;
-    }
-    QStringList parsed;
-    for (const QJsonValue &value : document.array()) {
-        if (!value.isString()) {
-            return false;
-        }
-        parsed.append(value.toString());
-    }
-    *values = parsed;
-    return true;
-}
-
-bool updateNodeFromEditors(BlueprintNode *node,
-                           const QLineEdit *nameEdit,
-                           const QPlainTextEdit *descriptionEdit,
-                           const QPlainTextEdit *inputsEdit,
-                           const QPlainTextEdit *outputsEdit,
-                           const QPlainTextEdit *constraintsEdit,
-                           const QPlainTextEdit *acceptanceCriteriaEdit)
-{
-    BlueprintNode updated = *node;
-    updated.name = nameEdit->text();
-    updated.description = descriptionEdit->toPlainText();
-    if (!parsePorts(inputsEdit->toPlainText(), &updated.inputs)
-        || !parsePorts(outputsEdit->toPlainText(), &updated.outputs)
-        || !parseStrings(constraintsEdit->toPlainText(), &updated.constraints)
-        || !parseStrings(acceptanceCriteriaEdit->toPlainText(),
-                         &updated.acceptanceCriteria)) {
-        return false;
-    }
-    *node = std::move(updated);
-    return true;
-}
-
 void setFormLabel(QFormLayout *form, QWidget *field, const QString &text)
 {
     if (auto *label = qobject_cast<QLabel *>(form->labelForField(field))) {
@@ -212,36 +113,13 @@ public:
         resize(560, 680);
 
         auto *layout = new QVBoxLayout(this);
-        auto *form = new QFormLayout;
-        m_nameEdit = new QLineEdit(node.name, this);
-        m_nameEdit->setObjectName(QStringLiteral("directNodeNameEdit"));
-        m_descriptionEdit = new QPlainTextEdit(node.description, this);
-        m_descriptionEdit->setObjectName(QStringLiteral("directNodeDescriptionEdit"));
-        m_descriptionEdit->setTabChangesFocus(false);
-        m_descriptionEdit->setMaximumHeight(100);
-        m_inputsEdit = createJsonEditor(QStringLiteral("directNodeInputsEdit"),
-                                        portsToText(node.inputs));
-        m_outputsEdit = createJsonEditor(QStringLiteral("directNodeOutputsEdit"),
-                                         portsToText(node.outputs));
-        m_constraintsEdit = createJsonEditor(QStringLiteral("directNodeConstraintsEdit"),
-                                             stringsToText(node.constraints));
-        m_acceptanceCriteriaEdit = createJsonEditor(
-            QStringLiteral("directNodeAcceptanceCriteriaEdit"),
-            stringsToText(node.acceptanceCriteria));
-
-        form->addRow(MainWindow::tr("Name"), m_nameEdit);
-        form->addRow(MainWindow::tr("Description"), m_descriptionEdit);
-        form->addRow(MainWindow::tr("Inputs (JSON)"), m_inputsEdit);
-        form->addRow(MainWindow::tr("Outputs (JSON)"), m_outputsEdit);
-        form->addRow(MainWindow::tr("Constraints (JSON)"), m_constraintsEdit);
-        form->addRow(MainWindow::tr("Acceptance criteria (JSON)"),
-                     m_acceptanceCriteriaEdit);
-        layout->addLayout(form);
-
-        m_validationMessage = new QLabel(this);
-        m_validationMessage->setObjectName(QStringLiteral("nodeEditValidationMessage"));
-        m_validationMessage->setWordWrap(true);
-        layout->addWidget(m_validationMessage);
+        m_editor = new NodePropertiesEditor(QStringLiteral("direct"), this);
+        m_editor->setNode(node);
+        auto *scrollArea = new QScrollArea(this);
+        scrollArea->setObjectName(QStringLiteral("directNodePropertiesScrollArea"));
+        scrollArea->setWidgetResizable(true);
+        scrollArea->setWidget(m_editor);
+        layout->addWidget(scrollArea);
 
         auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel,
                                              Qt::Horizontal, this);
@@ -255,14 +133,8 @@ public:
 
         connect(buttons, &QDialogButtonBox::accepted, this, [this] {
             BlueprintNode updated = m_node;
-            if (!updateNodeFromEditors(&updated, m_nameEdit, m_descriptionEdit, m_inputsEdit,
-                                       m_outputsEdit, m_constraintsEdit,
-                                       m_acceptanceCriteriaEdit)) {
-                m_validationMessage->setText(
-                    MainWindow::tr("Properties use valid JSON arrays for ports and lists"));
-                return;
-            }
-            m_node = std::move(updated);
+            m_editor->applyTo(&updated);
+            m_node = updated;
             accept();
         });
         connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -274,23 +146,8 @@ public:
     }
 
 private:
-    QPlainTextEdit *createJsonEditor(const QString &objectName, const QString &text)
-    {
-        auto *editor = new QPlainTextEdit(text, this);
-        editor->setObjectName(objectName);
-        editor->setTabChangesFocus(false);
-        editor->setMaximumHeight(100);
-        return editor;
-    }
-
     BlueprintNode m_node;
-    QLineEdit *m_nameEdit = nullptr;
-    QPlainTextEdit *m_descriptionEdit = nullptr;
-    QPlainTextEdit *m_inputsEdit = nullptr;
-    QPlainTextEdit *m_outputsEdit = nullptr;
-    QPlainTextEdit *m_constraintsEdit = nullptr;
-    QPlainTextEdit *m_acceptanceCriteriaEdit = nullptr;
-    QLabel *m_validationMessage = nullptr;
+    NodePropertiesEditor *m_editor = nullptr;
 };
 
 class BlueprintView final : public QGraphicsView
@@ -401,35 +258,15 @@ MainWindow::MainWindow(QWidget *parent)
     m_propertiesDock->setObjectName(QStringLiteral("propertiesDock"));
     auto *propertyWidget = new QWidget(m_propertiesDock);
     auto *propertyLayout = new QVBoxLayout(propertyWidget);
-    m_propertyForm = new QFormLayout;
-    m_nameEdit = new QLineEdit(propertyWidget);
-    m_nameEdit->setObjectName(QStringLiteral("nodeNameEdit"));
-    m_descriptionEdit = new QPlainTextEdit(propertyWidget);
-    m_descriptionEdit->setObjectName(QStringLiteral("nodeDescriptionEdit"));
-    m_descriptionEdit->setPlaceholderText(tr("Description"));
-    m_inputsEdit = new QPlainTextEdit(propertyWidget);
-    m_inputsEdit->setObjectName(QStringLiteral("nodeInputsEdit"));
-    m_outputsEdit = new QPlainTextEdit(propertyWidget);
-    m_outputsEdit->setObjectName(QStringLiteral("nodeOutputsEdit"));
-    m_constraintsEdit = new QPlainTextEdit(propertyWidget);
-    m_constraintsEdit->setObjectName(QStringLiteral("nodeConstraintsEdit"));
-    m_acceptanceCriteriaEdit = new QPlainTextEdit(propertyWidget);
-    m_acceptanceCriteriaEdit->setObjectName(QStringLiteral("nodeAcceptanceCriteriaEdit"));
-    for (QPlainTextEdit *editor : {m_inputsEdit, m_outputsEdit, m_constraintsEdit, m_acceptanceCriteriaEdit}) {
-        editor->setTabChangesFocus(false);
-        editor->setMaximumHeight(90);
-    }
-    m_propertyForm->addRow(tr("Name"), m_nameEdit);
-    m_propertyForm->addRow(tr("Description"), m_descriptionEdit);
-    m_propertyForm->addRow(tr("Inputs (JSON)"), m_inputsEdit);
-    m_propertyForm->addRow(tr("Outputs (JSON)"), m_outputsEdit);
-    m_propertyForm->addRow(tr("Constraints (JSON)"), m_constraintsEdit);
-    m_propertyForm->addRow(tr("Acceptance criteria (JSON)"), m_acceptanceCriteriaEdit);
-    propertyLayout->addLayout(m_propertyForm);
+    m_nodePropertiesEditor = new NodePropertiesEditor(QStringLiteral("inspector"), propertyWidget);
+    auto *propertyScrollArea = new QScrollArea(propertyWidget);
+    propertyScrollArea->setObjectName(QStringLiteral("nodePropertiesScrollArea"));
+    propertyScrollArea->setWidgetResizable(true);
+    propertyScrollArea->setWidget(m_nodePropertiesEditor);
+    propertyLayout->addWidget(propertyScrollArea);
     m_applyPropertiesButton = new QPushButton(tr("Apply"), propertyWidget);
     m_applyPropertiesButton->setObjectName(QStringLiteral("applyNodePropertiesButton"));
     propertyLayout->addWidget(m_applyPropertiesButton);
-    propertyLayout->addStretch();
     m_propertiesDock->setWidget(propertyWidget);
     addDockWidget(Qt::RightDockWidgetArea, m_propertiesDock);
 
@@ -670,13 +507,7 @@ void MainWindow::retranslateUi()
 
     m_propertiesDock->setWindowTitle(tr("Properties"));
     m_propertiesDockAction->setText(tr("Properties"));
-    m_descriptionEdit->setPlaceholderText(tr("Description"));
-    setFormLabel(m_propertyForm, m_nameEdit, tr("Name"));
-    setFormLabel(m_propertyForm, m_descriptionEdit, tr("Description"));
-    setFormLabel(m_propertyForm, m_inputsEdit, tr("Inputs (JSON)"));
-    setFormLabel(m_propertyForm, m_outputsEdit, tr("Outputs (JSON)"));
-    setFormLabel(m_propertyForm, m_constraintsEdit, tr("Constraints (JSON)"));
-    setFormLabel(m_propertyForm, m_acceptanceCriteriaEdit, tr("Acceptance criteria (JSON)"));
+    m_nodePropertiesEditor->retranslateUi();
     m_applyPropertiesButton->setText(tr("Apply"));
 
     m_buildDock->setWindowTitle(tr("Build and export"));
@@ -812,12 +643,7 @@ void MainWindow::applyProperties()
                 break;
             }
         }
-        if (!updateNodeFromEditors(&updated, m_nameEdit, m_descriptionEdit, m_inputsEdit,
-                                   m_outputsEdit, m_constraintsEdit,
-                                   m_acceptanceCriteriaEdit)) {
-            statusBar()->showMessage(tr("Properties use valid JSON arrays for ports and lists"));
-            return;
-        }
+        m_nodePropertiesEditor->applyTo(&updated);
         m_scene->editNode(id, updated);
         statusBar()->clearMessage();
     }
@@ -833,31 +659,16 @@ void MainWindow::updatePropertyEditor()
 {
     const QString id = selectedNodeId();
     const bool editable = !id.isEmpty();
-    m_nameEdit->setEnabled(editable);
-    m_descriptionEdit->setEnabled(editable);
-    m_inputsEdit->setEnabled(editable);
-    m_outputsEdit->setEnabled(editable);
-    m_constraintsEdit->setEnabled(editable);
-    m_acceptanceCriteriaEdit->setEnabled(editable);
+    m_nodePropertiesEditor->setEditorEnabled(editable);
     m_applyPropertiesButton->setEnabled(editable);
     if (!editable) {
-        m_nameEdit->clear();
-        m_descriptionEdit->clear();
-        m_inputsEdit->clear();
-        m_outputsEdit->clear();
-        m_constraintsEdit->clear();
-        m_acceptanceCriteriaEdit->clear();
+        m_nodePropertiesEditor->clear();
         return;
     }
 
     for (const BlueprintNode &node : m_document.nodes) {
         if (node.id == id) {
-            m_nameEdit->setText(node.name);
-            m_descriptionEdit->setPlainText(node.description);
-            m_inputsEdit->setPlainText(portsToText(node.inputs));
-            m_outputsEdit->setPlainText(portsToText(node.outputs));
-            m_constraintsEdit->setPlainText(stringsToText(node.constraints));
-            m_acceptanceCriteriaEdit->setPlainText(stringsToText(node.acceptanceCriteria));
+            m_nodePropertiesEditor->setNode(node);
             return;
         }
     }
