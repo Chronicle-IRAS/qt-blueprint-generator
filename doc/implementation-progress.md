@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-- 当前开发分支：`feature/issue-15-structured-node-editor`，基于远端 `main` 的 `c6f0623`（Issue #14 PR #22）。
+- 当前开发分支：`feature/issue-15-structured-node-editor`，已普通合并远端 `main` 的 `55b9557`（Issue #13 PR #23）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
 - MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-10-issue-15-structured-node-editor.md`；完整使用说明：`doc/project-usage-guide.md`。
 - `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；当前任务和使用指南只说明已经实现的功能。
@@ -29,7 +29,7 @@
 - 远端 Issue 按依赖、关键程度和更改幅度排序为 #16、#14、#13、#15、#17、#18、#19；均已标记 `enhancement` 和 `ready-for-agent`。
 - #16 已通过 PR #21 合入远端 `main`，合并提交为 `4f0bce6`。
 - #14 已通过 PR #22 合入远端 `main`，合并提交为 `c6f0623`；双击节点直接编辑全部属性及 Inspector 同步功能已成为 #15 的基线。
-- #13 已通过 PR #23 交付，分支为 `feature/issue-13-port-drag-connections`，当前等待用户合并。
+- #13 已通过 PR #23 合入远端 `main`，合并提交为 `55b9557`；端口拖拽连线已纳入当前分支。
 - #15 已在独立分支完成共享结构化属性控件及两处入口接入：输入/输出按端口表格编辑，约束/验收标准按字符串列表编辑；BlueprintDocument、JSON Schema、Serializer 和 IR 保持不变，全量验证及独立复核均已通过。
 - #15 已通过 PR #24 交付，标题为 `[feat] Replace JSON node properties with structured controls (#15)`，正文包含 `Closes #15`，等待用户审阅与合并。
 
@@ -47,6 +47,17 @@
   - 增加 GUI 数据到 Serializer 的往返验证，以及运行时切换语言不丢失草稿的测试。
 - `ca21a3a fix: preserve missing structured cells as empty values`
   - 对缺失的表格单元格按空字符串读取，避免异常控件状态导致空指针访问，并补充回归覆盖。
+
+- `a6a8bad fix: suppress cancelled port drag gestures`
+  - 取消端口拖拽后抑制同一左键手势余下的移动和释放，避免退化为节点移动并污染撤销栈。
+  - 回归测试覆盖取消后继续移动，以及 Connect 模式与端口拖拽互相接管；复核结果为 Critical、Important、Minor 均无。
+- `293bfd8 feat: add direct port drag connections`
+  - 支持从输出端口拖出临时曲线、有效输入端口绿色反馈、有效释放创建 FlowEdge，以及 Esc、右键和无效释放取消。
+  - 有效连线复用现有标签和撤销栈；专项测试覆盖 Decision `true`/`false`、旧 Connect 操作、节点移动，以及取消后不产生伪移动命令。
+- `fd33bd7 test: define port drag connection behavior`
+  - 先建立端口拖拽的失败测试，确认实现前缺少端口命中与高亮接口。
+- `3b23c76 docs: plan issue 13 port drag connections`
+  - 记录 Issue #13 的交互范围、测试先行步骤、文档更新和 PR 约束。
 
 - `b31d446 docs: plan issue 16 dock recovery`
   - 记录 #16 的测试先行步骤、实现范围、双语文本和交付约束。
@@ -156,7 +167,11 @@
 - #15 翻译扫描发现 69 条当前文本，全部完成，无 unfinished、vanished 或 obsolete；README 与使用指南无失效本地链接，`git diff --check` 通过。
 - #15 `BlueprintEditor.exe` 使用 offscreen 平台启动并保持运行 2 秒，随后只终止本次探测进程。
 - #15 独立只读质量复核结论 Ready：无 Critical、Important 或 Minor；确认两条入口复用组件、六字段无损、单次撤销语义、取消安全和范围边界。
-
+- #15 在 PR #23 合入后普通合并最新 `origin/main` 的 `55b9557`，README 与进度冲突按同时保留端口拖拽和结构化属性编辑解决；受影响测试 `3/3 passed`（0.82 秒），完整 CTest `13/13 passed`（35.57 秒）。
+- #13 基线：全新 ASCII 构建目录配置成功，`blueprint_scene` `1/1 passed`（0.34 秒）。
+- #13 RED：端口拖拽 GUI 合同测试因 `NodeItem::highlightedInputPort()` 与拖拽实现尚不存在而按预期编译失败。
+- #13 合并 #14 后专项 `language_switch|blueprint_scene` `2/2 passed`（0.59 秒）；复核发现 Connect 模式下双击输出端口会绕过既有抑制令牌，现已将端口手势纳入同一连接点击令牌并添加真实 GUI 序列测试。
+- #13 组合交互修复后完整构建与 CTest `12/12 passed`（88.87 秒）；63 条翻译全部完成，启动探针、Markdown 本地链接和暂存差异检查均通过。
 - #14 基线：全新 ASCII 构建目录配置成功，`blueprint_scene` `1/1 passed`（0.31 秒）。
 - #14 RED：两个直接编辑 GUI 用例因双击节点没有打开 `nodeEditDialog` 按预期失败，证明测试能捕获入口缺失、保存未发生和取消/校验合同缺失。
 - #14 GREEN：`blueprint_scene|language_switch` `2/2 passed`（0.52 秒）；翻译目录 61 条全部完成，直接编辑器保存/取消、非法 JSON、Inspector 同步及 Undo/Redo 均有 GUI 覆盖。
@@ -277,7 +292,7 @@
 ## 恢复工作
 
 1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-15-structured-node-editor`。
-2. Issue #14 的 PR #22 已合入 `main`，本分支基于合并提交 `c6f0623`；Issue #13 的 PR #23 当前等待用户合并。
+2. Issue #13 的 PR #23 已合入 `main`，当前分支已普通合并最新远端基线 `55b9557` 并保留 #13 与 #15 两项功能。
 3. Issue #15 已完成实现、文档、全量测试和独立复核，并通过 PR #24 同步远端，等待用户审阅与合并。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。

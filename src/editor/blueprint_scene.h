@@ -10,6 +10,9 @@
 
 class EdgeItem;
 class NodeItem;
+class QGraphicsPathItem;
+class QGraphicsSceneMouseEvent;
+class QKeyEvent;
 
 class BlueprintScene final : public QGraphicsScene
 {
@@ -30,6 +33,7 @@ public:
     bool chooseConnectionNode(const QString &nodeId);
     QString connectionSource() const;
     void cancelConnection();
+    void setDragConnectionLabel(const QString &label);
 
     NodeItem *nodeItem(const QString &nodeId) const;
     EdgeItem *edgeItem(const QString &edgeId) const;
@@ -39,6 +43,10 @@ public:
 
 signals:
     void nodeEditRequested(const QString &nodeId);
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override;
+    void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
 
 private:
     struct IndexedEdge {
@@ -63,6 +71,14 @@ private:
     void handleItemPositionChanged(const QString &nodeId);
     void handleItemMoveFinished(const QString &nodeId, const QPointF &before, const QPointF &after);
     void handleNodeClicked(const QString &nodeId);
+    void rememberConnectionClick(const QString &nodeId);
+    void beginPortDrag(const QString &nodeId, int outputIndex);
+    void updatePortDrag(const QPointF &scenePosition);
+    void finishPortDrag(const QPointF &scenePosition);
+    void cancelPortDrag();
+    NodeItem *inputTargetAt(const QPointF &scenePosition, int *inputIndex) const;
+    void setHoveredInput(NodeItem *node, int inputIndex);
+    void updateTemporaryConnection(const QPointF &endPosition);
     void handleNodeDoubleClicked(const QString &nodeId);
     void notifySemanticChanged();
 
@@ -75,6 +91,12 @@ private:
     QHash<QString, QPointF> m_layout;
     QString m_connectionSource;
     QString m_connectionLabel;
+    QString m_dragConnectionLabel;
+    QString m_portDragSource;
+    int m_portDragOutput = -1;
+    QGraphicsPathItem *m_temporaryConnection = nullptr;
+    NodeItem *m_hoveredInputNode = nullptr;
+    int m_hoveredInputPort = -1;
     QString m_recentConnectionClickNode;
     quint64 m_connectionClickToken = 0;
     bool m_connectionMode = false;

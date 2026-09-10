@@ -3,6 +3,7 @@
 #include <QAction>
 #include <QDialog>
 #include <QDockWidget>
+#include <QGraphicsPathItem>
 #include <QGraphicsView>
 #include <QLineEdit>
 #include <QMenu>
@@ -32,6 +33,25 @@ BlueprintNode node(const QString &id, const QString &name)
     return result;
 }
 
+QGraphicsPathItem *portConnectionPreview(const BlueprintScene &scene)
+{
+    for (QGraphicsItem *item : scene.items()) {
+        if (item->data(0).toString() == QStringLiteral("portConnectionPreview")) {
+            return dynamic_cast<QGraphicsPathItem *>(item);
+        }
+    }
+    return nullptr;
+}
+
+void dragPort(QGraphicsView *view, const QPointF &source, const QPointF &target)
+{
+    const QPoint sourcePoint = view->mapFromScene(source);
+    const QPoint targetPoint = view->mapFromScene(target);
+    QTest::mousePress(view->viewport(), Qt::LeftButton, Qt::NoModifier, sourcePoint);
+    QTest::mouseMove(view->viewport(), targetPoint, 20);
+    QTest::mouseRelease(view->viewport(), Qt::LeftButton, Qt::NoModifier, targetPoint);
+}
+
 } // namespace
 
 class BlueprintSceneTest : public QObject
@@ -44,6 +64,9 @@ private slots:
     void connectingNodesUpdatesDocumentAndSupportsUndo();
     void explicitConnectionSelectionPreservesDirection();
     void edgeShowsDirectedLabelAndUsesPortAnchors();
+    void portDragShowsPreviewAndCreatesUndoableEdge();
+    void invalidAndCancelledPortDragsDoNotMutateDocument();
+    void portDragPreservesDecisionLabelsAndConnectAction();
     void editingPortsUpdatesIncidentEdgeAnchorsAndUndo();
     void deletingNodeRemovesConnectedEdgesAndSupportsUndo();
     void multiSelectionDragHasOneCoherentUndo();
@@ -166,6 +189,163 @@ void BlueprintSceneTest::edgeShowsDirectedLabelAndUsesPortAnchors()
     QCOMPARE(edgeItem->path().pointAtPercent(0), scene.nodeItem(QStringLiteral("source"))->outputAnchor());
     QCOMPARE(edgeItem->path().pointAtPercent(1), scene.nodeItem(QStringLiteral("target"))->inputAnchor());
     QVERIFY(edgeItem->boundingRect().contains(edgeItem->labelPosition()));
+}
+
+void BlueprintSceneTest::portDragShowsPreviewAndCreatesUndoableEdge()
+{
+    BlueprintDocument document;
+    BlueprintNode source = node(QStringLiteral("source"), QStringLiteral("Source"));
+    source.outputs = {{QStringLiteral("result"), QStringLiteral("bool"), {}}};
+    BlueprintNode target = node(QStringLiteral("target"), QStringLiteral("Target"));
+    target.inputs = {{QStringLiteral("value"), QStringLiteral("bool"), {}}};
+    document.nodes = {source, target};
+    BlueprintScene scene(&document);
+    QGraphicsView view(&scene);
+    view.resize(800, 500);
+    view.show();
+    QApplication::processEvents();
+    NodeItem *sourceItem = scene.nodeItem(source.id);
+    NodeItem *targetItem = scene.nodeItem(target.id);
+    const int commandsBefore = scene.undoStack()->count();
+    const QPoint sourcePoint = view.mapFromScene(sourceItem->outputAnchor(0));
+    const QPointF middleScene = (sourceItem->outputAnchor(0) + targetItem->inputAnchor(0)) / 2.0;
+
+    QTest::mousePress(view.viewport(), Qt::LeftButton, Qt::NoModifier, sourcePoint);
+    QTest::mouseMove(view.viewport(), view.mapFromScene(middleScene), 20);
+    QGraphicsPathItem *preview = portConnectionPreview(scene);
+    QVERIFY(preview);
+    QVERIFY(QLineF(preview->path().currentPosition(), middleScene).length() < 3.0);
+
+    QTest::mouseMove(view.viewport(), view.mapFromScene(targetItem->inputAnchor(0)), 20);
+    QCOMPARE(targetItem->highlightedInputPort(), 0);
+    QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                        view.mapFromScene(targetItem->inputAnchor(0)));
+
+    QVERIFY(portConnectionPreview(scene) == nullptr);
+    QCOMPARE(targetItem->highlightedInputPort(), -1);
+    QCOMPARE(document.edges.size(), 1);
+    QCOMPARE(document.edges.constFirst().source, source.id);
+    QCOMPARE(document.edges.constFirst().target, target.id);
+    QCOMPARE(scene.undoStack()->count(), commandsBefore + 1);
+    scene.undoStack()->undo();
+    QVERIFY(document.edges.isEmpty());
+    scene.undoStack()->redo();
+    QCOMPARE(document.edges.size(), 1);
+    QCOMPARE(scene.edgeItem(document.edges.constFirst().id)->path().pointAtPercent(0.0),
+             sourceItem->outputAnchor());
+
+    const QPointF oldEnd = scene.edgeItem(document.edges.constFirst().id)->path().pointAtPercent(1.0);
+    QVERIFY(scene.moveNode(target.id, targetItem->pos() + QPointF(80.0, 40.0)));
+    QCOMPARE(scene.edgeItem(document.edges.constFirst().id)->path().pointAtPercent(1.0),
+             targetItem->inputAnchor());
+    QVERIFY(scene.edgeItem(document.edges.constFirst().id)->path().pointAtPercent(1.0) != oldEnd);
+}
+
+void BlueprintSceneTest::invalidAndCancelledPortDragsDoNotMutateDocument()
+{
+    BlueprintDocument document;
+    BlueprintNode source = node(QStringLiteral("source"), QStringLiteral("Source"));
+    source.outputs = {{QStringLiteral("result"), QStringLiteral("bool"), {}}};
+    BlueprintNode target = node(QStringLiteral("target"), QStringLiteral("Target"));
+    target.inputs = {{QStringLiteral("value"), QStringLiteral("bool"), {}}};
+    document.nodes = {source, target};
+    BlueprintScene scene(&document);
+    QGraphicsView view(&scene);
+    view.resize(800, 500);
+    view.show();
+    view.setFocus();
+    QApplication::processEvents();
+    NodeItem *sourceItem = scene.nodeItem(source.id);
+    NodeItem *targetItem = scene.nodeItem(target.id);
+    QVERIFY(scene.moveNode(source.id, QPointF(120.0, 80.0)));
+    scene.undoStack()->clear();
+    const BlueprintDocument before = document;
+    const int commandsBefore = scene.undoStack()->count();
+    const QPoint sourcePoint = view.mapFromScene(sourceItem->outputAnchor(0));
+    const QPoint invalidPoint = view.mapFromScene(QPointF(500.0, 300.0));
+
+    QTest::mousePress(view.viewport(), Qt::LeftButton, Qt::NoModifier, sourcePoint);
+    QTest::mouseMove(view.viewport(), invalidPoint, 20);
+    QVERIFY(portConnectionPreview(scene));
+    QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier, invalidPoint);
+    QCOMPARE(document, before);
+    QCOMPARE(scene.undoStack()->count(), commandsBefore);
+    QVERIFY(portConnectionPreview(scene) == nullptr);
+
+    QTest::mousePress(view.viewport(), Qt::LeftButton, Qt::NoModifier, sourcePoint);
+    QTest::mouseMove(view.viewport(), view.mapFromScene(targetItem->inputAnchor(0)), 20);
+    QCOMPARE(targetItem->highlightedInputPort(), 0);
+    QTest::keyClick(view.viewport(), Qt::Key_Escape);
+    QVERIFY(portConnectionPreview(scene) == nullptr);
+    QCOMPARE(targetItem->highlightedInputPort(), -1);
+    QTest::mouseMove(view.viewport(), invalidPoint, 20);
+    QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                        invalidPoint);
+    QCOMPARE(document, before);
+    QCOMPARE(sourceItem->pos(), QPointF(120.0, 80.0));
+    QCOMPARE(scene.undoStack()->count(), commandsBefore);
+
+    QTest::mousePress(view.viewport(), Qt::LeftButton, Qt::NoModifier, sourcePoint);
+    QTest::mouseMove(view.viewport(), view.mapFromScene(targetItem->inputAnchor(0)), 20);
+    QCOMPARE(targetItem->highlightedInputPort(), 0);
+    QTest::mouseClick(view.viewport(), Qt::RightButton, Qt::NoModifier,
+                      view.mapFromScene(targetItem->inputAnchor(0)));
+    QVERIFY(portConnectionPreview(scene) == nullptr);
+    QCOMPARE(targetItem->highlightedInputPort(), -1);
+    QTest::mouseMove(view.viewport(), invalidPoint, 20);
+    QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                        invalidPoint);
+    QCOMPARE(document, before);
+    QCOMPARE(sourceItem->pos(), QPointF(120.0, 80.0));
+    QCOMPARE(scene.undoStack()->count(), commandsBefore);
+}
+
+void BlueprintSceneTest::portDragPreservesDecisionLabelsAndConnectAction()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Decision));
+    QVERIFY(window.addNodeOfType(NodeType::End));
+    QVERIFY(window.addNodeOfType(NodeType::End));
+    window.show();
+    QApplication::processEvents();
+    auto *labelEdit = window.findChild<QLineEdit *>(QStringLiteral("connectionLabelEdit"));
+    auto *connectAction = window.findChild<QAction *>(QStringLiteral("beginConnectionAction"));
+    QVERIFY(labelEdit && connectAction);
+    QGraphicsView *view = window.graphicsView();
+    NodeItem *decision = window.scene()->nodeItem(window.document().nodes.at(0).id);
+    NodeItem *trueTarget = window.scene()->nodeItem(window.document().nodes.at(1).id);
+    NodeItem *falseTarget = window.scene()->nodeItem(window.document().nodes.at(2).id);
+
+    labelEdit->setText(QStringLiteral("true"));
+    dragPort(view, decision->outputAnchor(), trueTarget->inputAnchor());
+    labelEdit->setText(QStringLiteral("false"));
+    dragPort(view, decision->outputAnchor(), falseTarget->inputAnchor());
+    QCOMPARE(window.document().edges.size(), 2);
+    QCOMPARE(window.document().edges.at(0).label, QStringLiteral("true"));
+    QCOMPARE(window.document().edges.at(1).label, QStringLiteral("false"));
+
+    connectAction->trigger();
+    dragPort(view, decision->outputAnchor(), trueTarget->inputAnchor());
+    QCOMPARE(window.document().edges.size(), 3);
+    QVERIFY(window.scene()->connectionSource().isEmpty());
+    QTest::mouseClick(view->viewport(), Qt::LeftButton, Qt::NoModifier,
+                      view->mapFromScene(falseTarget->sceneBoundingRect().center()));
+    QVERIFY(window.scene()->connectionSource().isEmpty());
+    QCOMPARE(window.document().edges.size(), 3);
+
+    const QPoint outputPoint = view->mapFromScene(decision->outputAnchor());
+    const QPointF middle = (decision->outputAnchor() + falseTarget->inputAnchor()) / 2.0;
+    QTest::mousePress(view->viewport(), Qt::LeftButton, Qt::NoModifier, outputPoint);
+    QTest::mouseMove(view->viewport(), view->mapFromScene(middle), 20);
+    QVERIFY(portConnectionPreview(*window.scene()));
+    connectAction->trigger();
+    QVERIFY(portConnectionPreview(*window.scene()) == nullptr);
+    QTest::mouseRelease(view->viewport(), Qt::LeftButton, Qt::NoModifier,
+                        view->mapFromScene(middle));
+
+    QVERIFY(window.scene()->chooseConnectionNode(trueTarget->nodeId()));
+    QVERIFY(window.scene()->chooseConnectionNode(falseTarget->nodeId()));
+    QCOMPARE(window.document().edges.size(), 4);
 }
 
 void BlueprintSceneTest::editingPortsUpdatesIncidentEdgeAnchorsAndUndo()
@@ -395,6 +575,8 @@ void BlueprintSceneTest::connectionModeDoubleClickDoesNotAlsoRequestEditing()
     QSignalSpy editRequests(&scene, &BlueprintScene::nodeEditRequested);
     const QPoint sourcePoint = view.mapFromScene(
         scene.nodeItem(QStringLiteral("source"))->sceneBoundingRect().center());
+    const QPoint sourceOutputPoint = view.mapFromScene(
+        scene.nodeItem(QStringLiteral("source"))->outputAnchor());
     const QPoint targetPoint = view.mapFromScene(
         scene.nodeItem(QStringLiteral("target"))->sceneBoundingRect().center());
 
@@ -412,6 +594,16 @@ void BlueprintSceneTest::connectionModeDoubleClickDoesNotAlsoRequestEditing()
     QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier, targetPoint);
     QCOMPARE(editRequests.count(), 0);
 
+    QVERIFY(scene.beginConnection());
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier, sourceOutputPoint);
+    QVERIFY(scene.connectionSource().isEmpty());
+    QTest::mouseDClick(view.viewport(), Qt::LeftButton, Qt::NoModifier, sourceOutputPoint);
+    QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier, sourceOutputPoint);
+    QCOMPARE(editRequests.count(), 0);
+    QCOMPARE(document.edges.size(), 1);
+
+    QTest::qWait(QApplication::doubleClickInterval() + 10);
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier, targetPoint);
     QTest::mouseDClick(view.viewport(), Qt::LeftButton, Qt::NoModifier, targetPoint);
     QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier, targetPoint);
     QCOMPARE(editRequests.count(), 1);
