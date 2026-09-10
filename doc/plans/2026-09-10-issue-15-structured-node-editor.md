@@ -22,14 +22,14 @@
 
 ## Task 1: Establish failing structured-editor contracts
 
-- [ ] Add `NodePropertiesEditor`-facing Qt tests before the production header exists.
-- [ ] Require stable roots `inspectorNodePropertiesEditor` and `directNodePropertiesEditor`.
-- [ ] Require scoped port areas with `portItemsTable`, `addPortButton`, and per-row Delete buttons.
-- [ ] Require scoped string areas with `stringItemsTable`, `addStringItemButton`, and per-row Delete buttons.
-- [ ] Cover add/edit/delete, Unicode and special characters, empty collections, ordering and duplicate preservation.
-- [ ] Migrate MainWindow tests away from `nodeInputsEdit`, `directNodeInputsEdit` and other JSON text boxes.
-- [ ] Add GUI-to-`BlueprintSerializer` round-trip checks for schema version 1, object arrays and string arrays.
-- [ ] Run the focused target and record RED because `NodePropertiesEditor` and structured controls do not exist.
+- [x] Add `NodePropertiesEditor`-facing Qt tests before the production header exists.
+- [x] Require stable roots `inspectorNodePropertiesEditor` and `directNodePropertiesEditor`.
+- [x] Require scoped port areas with `portItemsTable`, `addPortButton`, and per-row Delete buttons.
+- [x] Require scoped string areas with `stringItemsTable`, `addStringItemButton`, and per-row Delete buttons.
+- [x] Cover add/edit/delete, Unicode and special characters, empty collections, ordering and duplicate preservation.
+- [x] Migrate MainWindow tests away from `nodeInputsEdit`, `directNodeInputsEdit` and other JSON text boxes.
+- [x] Add GUI-to-`BlueprintSerializer` round-trip checks for schema version 1, object arrays and string arrays.
+- [x] Run the focused target and record RED because `NodePropertiesEditor` and structured controls do not exist.
 
 Expected test-facing interface:
 
@@ -48,29 +48,29 @@ public:
 
 ## Task 2: Implement the reusable editor
 
-- [ ] Add Name and Description controls while retaining the established scoped names `nodeNameEdit` / `directNodeNameEdit` and description equivalents.
-- [ ] Add Inputs and Outputs tables with Name, Type, Description and Delete columns plus Add buttons.
-- [ ] Add Constraints and Acceptance Criteria tables with Text and Delete columns plus Add buttons.
-- [ ] Compute the current row at deletion time rather than capturing a stale row index.
-- [ ] Treat absent cells as empty strings; preserve whitespace, empty values, duplicates and order exactly.
-- [ ] Make `applyTo()` update only the six editable fields and never mutate node `id` or `type`.
-- [ ] Make `retranslateUi()` update labels, headers and dynamic buttons without rebuilding rows or discarding drafts.
-- [ ] Run the component-focused tests to GREEN.
+- [x] Add Name and Description controls while retaining the established scoped names `nodeNameEdit` / `directNodeNameEdit` and description equivalents.
+- [x] Add Inputs and Outputs tables with Name, Type, Description and Delete columns plus Add buttons.
+- [x] Add Constraints and Acceptance Criteria tables with Text and Delete columns plus Add buttons.
+- [x] Compute the current row at deletion time rather than capturing a stale row index.
+- [x] Treat absent cells as empty strings; preserve whitespace, empty values, duplicates and order exactly.
+- [x] Make `applyTo()` update only the six editable fields and never mutate node `id` or `type`.
+- [x] Make `retranslateUi()` update labels, headers and dynamic buttons without rebuilding rows or discarding drafts.
+- [x] Run the component-focused tests to GREEN.
 
 ## Task 3: Integrate both explicit submit paths
 
-- [ ] Put the Inspector editor in a scroll area and call `setNode`, `clear`, and `setEditorEnabled` from existing selection synchronization.
-- [ ] Put the same editor class in `NodeEditDialog`; Save applies to a copy and Accepts, Cancel never calls `editNode()`.
-- [ ] Keep Inspector Apply and dialog Save to one `BlueprintScene::editNode()` call each.
-- [ ] Remove GUI JSON conversion helpers and the four JSON `QPlainTextEdit` members.
-- [ ] Keep layout-only changes from refreshing Inspector drafts; keep Undo/Redo semantic refresh.
-- [ ] Run `blueprint_scene` to GREEN and verify existing direct-edit and connection tests remain passing.
+- [x] Put the Inspector editor in a scroll area and call `setNode`, `clear`, and `setEditorEnabled` from existing selection synchronization.
+- [x] Put the same editor class in `NodeEditDialog`; Save applies to a copy and Accepts, Cancel never calls `editNode()`.
+- [x] Keep Inspector Apply and dialog Save to one `BlueprintScene::editNode()` call each.
+- [x] Remove GUI JSON conversion helpers and the four JSON `QPlainTextEdit` members.
+- [x] Keep layout-only changes from refreshing Inspector drafts; keep Undo/Redo semantic refresh.
+- [x] Run `blueprint_scene` to GREEN and verify existing direct-edit and connection tests remain passing.
 
 ## Task 4: Translate, document and deliver
 
-- [ ] Replace visible `(JSON)` labels with structured labels and add translations for Add/Delete and table headers.
-- [ ] Verify the language switch preserves structured draft rows.
-- [ ] Update README and the project usage guide without adding development-history prose to README.
+- [x] Replace visible `(JSON)` labels with structured labels and add translations for Add/Delete and table headers.
+- [x] Verify the language switch preserves structured draft rows.
+- [x] Update README and the project usage guide without adding development-history prose to README.
 - [ ] Update implementation progress with branch, commits, RED/GREEN and final checks.
 - [ ] Run complete build, full CTest, translation hygiene, startup probe, Markdown links and `git diff --check`.
 - [ ] Obtain independent code review and resolve every Critical, Important and Minor finding.

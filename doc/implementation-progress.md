@@ -30,9 +30,20 @@
 - #16 已通过 PR #21 合入远端 `main`，合并提交为 `4f0bce6`。
 - #14 已通过 PR #22 合入远端 `main`，合并提交为 `c6f0623`；双击节点直接编辑全部属性及 Inspector 同步功能已成为 #15 的基线。
 - #13 已通过 PR #23 交付，分支为 `feature/issue-13-port-drag-connections`，当前等待用户合并。
-- #15 已从最新远端 `main` 新建独立分支，开始用共享结构化控件替换两处节点属性 JSON 文本输入；BlueprintDocument、JSON Schema、Serializer 和 IR 保持不变。
+- #15 已在独立分支完成共享结构化属性控件及两处入口接入：输入/输出按端口表格编辑，约束/验收标准按字符串列表编辑；BlueprintDocument、JSON Schema、Serializer 和 IR 保持不变，当前进入最终验证与复核。
 
 ## 已完成提交
+
+- `edc5d96 test: define structured node editor behavior`
+  - 先建立结构化属性控件的失败测试，确认缺少组件接口时按预期编译失败。
+- `4483efe feat: add reusable structured node editor`
+  - 新增可复用属性组件，覆盖端口和字符串列表的增、改、删及无损字段转换。
+- `fc18d9b feat: use structured node editing in both workflows`
+  - 画布双击对话框与右侧 Inspector 改用同一组件，保留单次提交的 Undo/Redo 行为。
+- `84a6e4b feat: translate structured node controls`
+  - 完成结构化控件的简体中文翻译并移除过时 JSON 界面文本。
+- `fa68b41 test: cover schema and language preservation`
+  - 增加 GUI 数据到 Serializer 的往返验证，以及运行时切换语言不丢失草稿的测试。
 
 - `b31d446 docs: plan issue 16 dock recovery`
   - 记录 #16 的测试先行步骤、实现范围、双语文本和交付约束。
@@ -255,9 +266,9 @@
 
 ## 恢复工作
 
-1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-14-direct-node-editing`。
-2. 项目说明 PR #20 与 Issue #16 PR #21 已合入远端 `main`；当前分支已普通合并最新基线 `4f0bce6`。
-3. Issue #14 已通过 PR #22 交付，等待用户审阅与合并；后续 Issue 使用各自独立分支。
+1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-15-structured-node-editor`。
+2. Issue #14 的 PR #22 已合入 `main`，本分支基于合并提交 `c6f0623`；Issue #13 的 PR #23 当前等待用户合并。
+3. Issue #15 已完成实现，继续执行全量测试、独立复核、README/进度收尾和远端 PR 交付。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 
