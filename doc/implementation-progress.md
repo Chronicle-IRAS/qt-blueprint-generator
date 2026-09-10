@@ -271,7 +271,7 @@
 
 1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-13-port-drag-connections`。
 2. 项目说明 PR #20、Issue #16 PR #21 与 Issue #14 PR #22 已合入远端 `main`；当前分支已普通合并最新基线 `c6f0623`。
-3. Issue #13 的 PR #23 已完成冲突复验，等待完成合并提交并推送；推送后再等待用户审阅与合并，后续 Issue 使用各自独立分支。
+3. Issue #13 的 PR #23 已完成冲突复验，合并提交 `943de81` 已完成并等待推送；推送后再等待用户审阅与合并，后续 Issue 使用各自独立分支。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 
