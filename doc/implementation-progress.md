@@ -30,7 +30,7 @@
 - #16 已通过 PR #21 合入远端 `main`，合并提交为 `4f0bce6`。
 - #14 已通过 PR #22 合入远端 `main`，合并提交为 `c6f0623`；双击节点直接编辑全部属性及 Inspector 同步功能已成为 #15 的基线。
 - #13 已通过 PR #23 交付，分支为 `feature/issue-13-port-drag-connections`，当前等待用户合并。
-- #15 已在独立分支完成共享结构化属性控件及两处入口接入：输入/输出按端口表格编辑，约束/验收标准按字符串列表编辑；BlueprintDocument、JSON Schema、Serializer 和 IR 保持不变，当前进入最终验证与复核。
+- #15 已在独立分支完成共享结构化属性控件及两处入口接入：输入/输出按端口表格编辑，约束/验收标准按字符串列表编辑；BlueprintDocument、JSON Schema、Serializer 和 IR 保持不变，全量验证及独立复核均已通过。
 
 ## 已完成提交
 
@@ -44,6 +44,8 @@
   - 完成结构化控件的简体中文翻译并移除过时 JSON 界面文本。
 - `fa68b41 test: cover schema and language preservation`
   - 增加 GUI 数据到 Serializer 的往返验证，以及运行时切换语言不丢失草稿的测试。
+- `ca21a3a fix: preserve missing structured cells as empty values`
+  - 对缺失的表格单元格按空字符串读取，避免异常控件状态导致空指针访问，并补充回归覆盖。
 
 - `b31d446 docs: plan issue 16 dock recovery`
   - 记录 #16 的测试先行步骤、实现范围、双语文本和交付约束。
@@ -146,6 +148,13 @@
   - 增加“删除清单”和“删除清单后替换源码”的 RED→GREEN 回归测试。
 
 ## 验证记录
+
+- #15 RED：新增组件测试因 `editor/node_properties_editor.h` 尚不存在而按预期编译失败，证明结构化编辑接口缺失可被检测。
+- #15 GREEN：`node_properties_editor` 覆盖端口和字符串列表增改删、Unicode、特殊字符、空值、重复项、顺序、缺失单元格与 Serializer schema 1 往返；`blueprint_scene` 覆盖 Inspector、直接编辑、Cancel、Undo/Redo 和草稿同步。
+- #15 最终在纯 ASCII 构建目录重新配置并完整构建；CTest `13/13 passed`（30.58 秒）。
+- #15 翻译扫描发现 69 条当前文本，全部完成，无 unfinished、vanished 或 obsolete；README 与使用指南无失效本地链接，`git diff --check` 通过。
+- #15 `BlueprintEditor.exe` 使用 offscreen 平台启动并保持运行 2 秒，随后只终止本次探测进程。
+- #15 独立只读质量复核结论 Ready：无 Critical、Important 或 Minor；确认两条入口复用组件、六字段无损、单次撤销语义、取消安全和范围边界。
 
 - #14 基线：全新 ASCII 构建目录配置成功，`blueprint_scene` `1/1 passed`（0.31 秒）。
 - #14 RED：两个直接编辑 GUI 用例因双击节点没有打开 `nodeEditDialog` 按预期失败，证明测试能捕获入口缺失、保存未发生和取消/校验合同缺失。
@@ -268,7 +277,7 @@
 
 1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-15-structured-node-editor`。
 2. Issue #14 的 PR #22 已合入 `main`，本分支基于合并提交 `c6f0623`；Issue #13 的 PR #23 当前等待用户合并。
-3. Issue #15 已完成实现，继续执行全量测试、独立复核、README/进度收尾和远端 PR 交付。
+3. Issue #15 已完成实现、文档、全量测试和独立复核，下一步只需同步分支并创建引用 `Closes #15` 的 PR。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 

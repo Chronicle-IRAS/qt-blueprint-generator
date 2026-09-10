@@ -296,74 +296,76 @@
 <context>
     <name>NodePropertiesEditor</name>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="175"/>
-        <location filename="../src/editor/node_properties_editor.cpp" line="178"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="181"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="184"/>
         <source>Name</source>
         <translation>名称</translation>
     </message>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="176"/>
-        <location filename="../src/editor/node_properties_editor.cpp" line="178"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="182"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="184"/>
         <source>Description</source>
         <translation>描述</translation>
     </message>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="178"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="184"/>
         <source>Type</source>
         <translation>类型</translation>
     </message>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="181"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="187"/>
         <source>Text</source>
         <translation>文本</translation>
     </message>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="185"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="191"/>
         <source>Inputs</source>
         <translation>输入</translation>
     </message>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="186"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="192"/>
         <source>Outputs</source>
         <translation>输出</translation>
     </message>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="187"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="193"/>
         <source>Constraints</source>
         <translation>约束</translation>
     </message>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="188"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="194"/>
         <source>Acceptance Criteria</source>
         <translation>验收标准</translation>
     </message>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="189"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="195"/>
         <source>Add input</source>
         <translation>添加输入</translation>
     </message>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="190"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="196"/>
         <source>Add output</source>
         <translation>添加输出</translation>
     </message>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="191"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="197"/>
         <source>Add constraint</source>
         <translation>添加约束</translation>
     </message>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="192"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="198"/>
         <source>Add criterion</source>
         <translation>添加验收标准</translation>
     </message>
     <message>
-        <location filename="../src/editor/node_properties_editor.cpp" line="193"/>
-        <location filename="../src/editor/node_properties_editor.cpp" line="194"/>
-        <location filename="../src/editor/node_properties_editor.cpp" line="195"/>
-        <location filename="../src/editor/node_properties_editor.cpp" line="196"/>
-        <location filename="../src/editor/node_properties_editor.cpp" line="206"/>
-        <location filename="../src/editor/node_properties_editor.cpp" line="224"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="184"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="187"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="199"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="200"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="201"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="202"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="212"/>
+        <location filename="../src/editor/node_properties_editor.cpp" line="230"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>

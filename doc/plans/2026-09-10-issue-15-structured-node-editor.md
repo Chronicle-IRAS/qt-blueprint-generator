@@ -71,9 +71,9 @@ public:
 - [x] Replace visible `(JSON)` labels with structured labels and add translations for Add/Delete and table headers.
 - [x] Verify the language switch preserves structured draft rows.
 - [x] Update README and the project usage guide without adding development-history prose to README.
-- [ ] Update implementation progress with branch, commits, RED/GREEN and final checks.
-- [ ] Run complete build, full CTest, translation hygiene, startup probe, Markdown links and `git diff --check`.
-- [ ] Obtain independent code review and resolve every Critical, Important and Minor finding.
+- [x] Update implementation progress with branch, commits, RED/GREEN and final checks.
+- [x] Run complete build, full CTest, translation hygiene, startup probe, Markdown links and `git diff --check`.
+- [x] Obtain independent code review and resolve every Critical, Important and Minor finding.
 - [ ] Commit each completed group, push normally, and create `[feat] ... (#15)` PR with `Closes #15`; never force-push or auto-merge.
 
 ## Scope guard
