@@ -31,6 +31,7 @@
 - #14 已通过 PR #22 合入远端 `main`，合并提交为 `c6f0623`；双击节点直接编辑全部属性及 Inspector 同步功能已成为 #15 的基线。
 - #13 已通过 PR #23 交付，分支为 `feature/issue-13-port-drag-connections`，当前等待用户合并。
 - #15 已在独立分支完成共享结构化属性控件及两处入口接入：输入/输出按端口表格编辑，约束/验收标准按字符串列表编辑；BlueprintDocument、JSON Schema、Serializer 和 IR 保持不变，全量验证及独立复核均已通过。
+- #15 已通过 PR #24 交付，标题为 `[feat] Replace JSON node properties with structured controls (#15)`，正文包含 `Closes #15`，等待用户审阅与合并。
 
 ## 已完成提交
 
@@ -151,7 +152,7 @@
 
 - #15 RED：新增组件测试因 `editor/node_properties_editor.h` 尚不存在而按预期编译失败，证明结构化编辑接口缺失可被检测。
 - #15 GREEN：`node_properties_editor` 覆盖端口和字符串列表增改删、Unicode、特殊字符、空值、重复项、顺序、缺失单元格与 Serializer schema 1 往返；`blueprint_scene` 覆盖 Inspector、直接编辑、Cancel、Undo/Redo 和草稿同步。
-- #15 最终在纯 ASCII 构建目录重新配置并完整构建；CTest `13/13 passed`（30.58 秒）。
+- #15 最终在纯 ASCII 构建目录重新配置并完整构建；最新 CTest `13/13 passed`（30.31 秒）。
 - #15 翻译扫描发现 69 条当前文本，全部完成，无 unfinished、vanished 或 obsolete；README 与使用指南无失效本地链接，`git diff --check` 通过。
 - #15 `BlueprintEditor.exe` 使用 offscreen 平台启动并保持运行 2 秒，随后只终止本次探测进程。
 - #15 独立只读质量复核结论 Ready：无 Critical、Important 或 Minor；确认两条入口复用组件、六字段无损、单次撤销语义、取消安全和范围边界。
@@ -277,7 +278,7 @@
 
 1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-15-structured-node-editor`。
 2. Issue #14 的 PR #22 已合入 `main`，本分支基于合并提交 `c6f0623`；Issue #13 的 PR #23 当前等待用户合并。
-3. Issue #15 已完成实现、文档、全量测试和独立复核，下一步只需同步分支并创建引用 `Closes #15` 的 PR。
+3. Issue #15 已完成实现、文档、全量测试和独立复核，并通过 PR #24 同步远端，等待用户审阅与合并。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 

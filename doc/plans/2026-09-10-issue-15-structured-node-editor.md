@@ -74,7 +74,7 @@ public:
 - [x] Update implementation progress with branch, commits, RED/GREEN and final checks.
 - [x] Run complete build, full CTest, translation hygiene, startup probe, Markdown links and `git diff --check`.
 - [x] Obtain independent code review and resolve every Critical, Important and Minor finding.
-- [ ] Commit each completed group, push normally, and create `[feat] ... (#15)` PR with `Closes #15`; never force-push or auto-merge.
+- [x] Commit each completed group, push normally, and create `[feat] ... (#15)` PR with `Closes #15`; never force-push or auto-merge.
 
 ## Scope guard
 
