@@ -8,6 +8,8 @@
 #include <QKeyEvent>
 #include <QPainterPath>
 #include <QPen>
+#include <QApplication>
+#include <QTimer>
 #include <QUndoCommand>
 
 #include <QSet>
@@ -162,6 +164,8 @@ bool BlueprintScene::beginConnection(const QString &label)
     }
     cancelPortDrag();
     m_connectionMode = true;
+    ++m_connectionClickToken;
+    m_recentConnectionClickNode.clear();
     m_connectionSource.clear();
     m_connectionLabel = label;
     return true;
@@ -170,6 +174,8 @@ bool BlueprintScene::beginConnection(const QString &label)
 void BlueprintScene::cancelConnection()
 {
     m_connectionMode = false;
+    ++m_connectionClickToken;
+    m_recentConnectionClickNode.clear();
     m_connectionSource.clear();
     m_connectionLabel.clear();
     cancelPortDrag();
@@ -334,6 +340,7 @@ void BlueprintScene::createNodeItem(const BlueprintNode &node, const QPointF &po
         [this](const QPointF &position) { updatePortDrag(position); },
         [this](const QPointF &position) { finishPortDrag(position); },
         [this] { cancelPortDrag(); });
+    item->setDoubleClickedHandler([this](const QString &id) { handleNodeDoubleClicked(id); });
     item->setPositionChangedHandler([this](const QString &id) { handleItemPositionChanged(id); });
     item->setMoveFinishedHandler(
         [this](const QString &id, const QPointF &before, const QPointF &after) {
@@ -489,7 +496,19 @@ void BlueprintScene::handleNodeClicked(const QString &nodeId)
 {
     if (m_connectionMode) {
         chooseConnectionNode(nodeId);
+        rememberConnectionClick(nodeId);
     }
+}
+
+void BlueprintScene::rememberConnectionClick(const QString &nodeId)
+{
+    m_recentConnectionClickNode = nodeId;
+    const quint64 token = ++m_connectionClickToken;
+    QTimer::singleShot(QApplication::doubleClickInterval(), this, [this, token] {
+        if (token == m_connectionClickToken) {
+            m_recentConnectionClickNode.clear();
+        }
+    });
 }
 
 void BlueprintScene::beginPortDrag(const QString &nodeId, int outputIndex)
@@ -498,7 +517,11 @@ void BlueprintScene::beginPortDrag(const QString &nodeId, int outputIndex)
     if (!m_representable || !source || outputIndex < 0) {
         return;
     }
+    const bool replacingConnectionClick = m_connectionMode;
     cancelConnection();
+    if (replacingConnectionClick) {
+        rememberConnectionClick(nodeId);
+    }
     m_portDragSource = nodeId;
     m_portDragOutput = outputIndex;
     m_temporaryConnection = addPath(QPainterPath(),
@@ -598,6 +621,19 @@ void BlueprintScene::updateTemporaryConnection(const QPointF &endPosition)
     path.cubicTo(start + QPointF(controlDistance, 0.0),
                  endPosition - QPointF(controlDistance, 0.0), endPosition);
     m_temporaryConnection->setPath(path);
+}
+
+void BlueprintScene::handleNodeDoubleClicked(const QString &nodeId)
+{
+    if (!m_representable || !hasNode(nodeId)) {
+        return;
+    }
+    if (m_recentConnectionClickNode == nodeId) {
+        ++m_connectionClickToken;
+        m_recentConnectionClickNode.clear();
+        return;
+    }
+    emit nodeEditRequested(nodeId);
 }
 
 void BlueprintScene::notifySemanticChanged()

@@ -1,13 +1,18 @@
 #include <QtTest/QtTest>
 
 #include <QAction>
+#include <QDialog>
 #include <QDockWidget>
+#include <QGraphicsView>
 #include <QMenu>
 #include <QPushButton>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <QTimer>
 
 #include "app/main_window.h"
+#include "editor/blueprint_scene.h"
+#include "editor/node_item.h"
 
 class LanguageSwitchTest : public QObject
 {
@@ -83,6 +88,41 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
         QVERIFY(chineseAction->isChecked());
         QVERIFY(window.addNodeOfType(NodeType::LogicModule));
         QCOMPARE(window.document().nodes.constFirst().name, QStringLiteral("逻辑模块"));
+        window.show();
+        QApplication::processEvents();
+        bool dialogOpened = false;
+        QString dialogTitle;
+        QString saveText;
+        QString cancelText;
+        QTimer::singleShot(0, &window, [&] {
+            auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            if (!dialog) {
+                return;
+            }
+            dialogOpened = true;
+            dialogTitle = dialog->windowTitle();
+            auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveNodeEditButton"));
+            auto *cancel = dialog->findChild<QPushButton *>(QStringLiteral("cancelNodeEditButton"));
+            if (save) {
+                saveText = save->text();
+            }
+            if (cancel) {
+                cancelText = cancel->text();
+                QTest::mouseClick(cancel, Qt::LeftButton);
+            } else {
+                dialog->reject();
+            }
+        });
+        const QString nodeId = window.document().nodes.constFirst().id;
+        const QPoint nodeCenter = window.graphicsView()->mapFromScene(
+            window.scene()->nodeItem(nodeId)->sceneBoundingRect().center());
+        QTest::mouseDClick(window.graphicsView()->viewport(), Qt::LeftButton,
+                           Qt::NoModifier, nodeCenter);
+        QApplication::processEvents();
+        QVERIFY(dialogOpened);
+        QCOMPARE(dialogTitle, QStringLiteral("编辑节点"));
+        QCOMPARE(saveText, QStringLiteral("保存"));
+        QCOMPARE(cancelText, QStringLiteral("取消"));
 
         englishAction->trigger();
         QCOMPARE(window.currentLanguage(), QStringLiteral("en"));

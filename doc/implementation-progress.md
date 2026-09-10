@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-- 当前开发分支：`feature/issue-13-port-drag-connections`，基于远端 `main` 的 `4f0bce6`（Issue #16 PR #21）。
+- 当前开发分支：`feature/issue-13-port-drag-connections`，已普通合并远端 `main` 的 `c6f0623`（Issue #14 PR #22）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
 - MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-09-issue-13-port-drag-connections.md`；完整使用说明：`doc/project-usage-guide.md`。
 - `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；当前任务和使用指南只说明已经实现的功能。
@@ -28,8 +28,8 @@
 - 项目使用说明 PR #20 已合入远端 `main`，合并提交为 `6e16bac`。
 - 远端 Issue 按依赖、关键程度和更改幅度排序为 #16、#14、#13、#15、#17、#18、#19；均已标记 `enhancement` 和 `ready-for-agent`。
 - #16 已通过 PR #21 合入远端 `main`，合并提交为 `4f0bce6`。
-- #14 已通过独立分支创建 PR #22，标题含 `[feat]` 与 `(#14)`，正文含 `Closes #14`；当前等待用户合并。
-- #13 已通过独立分支创建 PR #23；标题为 `[feat] Support drag connections between node ports (#13)`，正文含 `Closes #13`，GitHub 判定为 CLEAN / MERGEABLE。完整 CTest `12/12 passed`（75.11 秒），启动、链接和差异检查通过，质量复核无剩余问题；当前等待用户合并。
+- #14 已通过 PR #22 合入远端 `main`，合并提交为 `c6f0623`；双击节点直接编辑全部属性及 Inspector 同步功能已纳入当前分支。
+- #13 已通过独立分支创建 PR #23；标题为 `[feat] Support drag connections between node ports (#13)`，正文含 `Closes #13`。远端 #14 合入后已普通合并最新 `main` 并同时保留两项功能；组合交互修复后完整 CTest `12/12 passed`（88.87 秒），等待推送。
 
 ## 已完成提交
 
@@ -148,6 +148,18 @@
 
 - #13 基线：全新 ASCII 构建目录配置成功，`blueprint_scene` `1/1 passed`（0.34 秒）。
 - #13 RED：端口拖拽 GUI 合同测试因 `NodeItem::highlightedInputPort()` 与拖拽实现尚不存在而按预期编译失败。
+- #13 合并 #14 后专项 `language_switch|blueprint_scene` `2/2 passed`（0.59 秒）；复核发现 Connect 模式下双击输出端口会绕过既有抑制令牌，现已将端口手势纳入同一连接点击令牌并添加真实 GUI 序列测试。
+- #13 组合交互修复后完整构建与 CTest `12/12 passed`（88.87 秒）；63 条翻译全部完成，启动探针、Markdown 本地链接和暂存差异检查均通过。
+- #14 基线：全新 ASCII 构建目录配置成功，`blueprint_scene` `1/1 passed`（0.31 秒）。
+- #14 RED：两个直接编辑 GUI 用例因双击节点没有打开 `nodeEditDialog` 按预期失败，证明测试能捕获入口缺失、保存未发生和取消/校验合同缺失。
+- #14 GREEN：`blueprint_scene|language_switch` `2/2 passed`（0.52 秒）；翻译目录 61 条全部完成，直接编辑器保存/取消、非法 JSON、Inspector 同步及 Undo/Redo 均有 GUI 覆盖。
+- #14 初次质量复核发现连接模式的真实双击会叠加连接与编辑动作；现已明确连接模式优先并抑制同次编辑请求，GUI 回归覆盖选择 source、完成连接及恢复普通双击编辑。
+- #14 两项突变验证确认：删除 Save 后的 `editNode()` 调用会使保存用例失败，错误接受非法 JSON 会使校验用例失败；两项突变均已恢复。
+- #14 质量修复后完整构建通过，CTest `12/12 passed`（76.45 秒）；翻译目录无 unfinished/vanished/obsolete，README 与使用指南无失效本地链接，离屏启动探测保持运行 2 秒并安全结束。
+- #14 最终只读质量复核结论 Ready：原连接模式 Important 已关闭，无剩余 Critical、Important 或 Minor。
+- #14 PR #22 已按 `[feat] ... (#14)` 标题与 `Closes #14` 引用创建；远端 #16 合入后，已普通合并 `main` 的 `4f0bce6` 并同时保留两项功能。
+- #14 冲突解决后受影响的 `language_switch|project_exporter|blueprint_scene` `3/3 passed`（15.93 秒），最终完整构建与 CTest `12/12 passed`（68.08 秒）；合并后翻译目录 63 条全部完成。
+- #14 已普通推送至 `origin/feature/issue-14-direct-node-editing`，PR #22 等待用户审阅与合并；未强制推送、未自动合并。
 - #16 基线专项：`language_switch|blueprint_scene` `2/2 passed`（1.84 秒）。
 - #16 RED：新增 View/Dock/Toolbar 断言后两项测试均按预期失败；GREEN：`2/2 passed`（0.49 秒）。
 - #16 Qt Linguist：60 条完成翻译，0 条 unfinished；无 vanished 或 obsolete 条目。
@@ -257,9 +269,9 @@
 
 ## 恢复工作
 
-1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-16-dock-recovery`。
-2. 项目说明 PR #20 已合入远端 `main`（`6e16bac`）；#16 分支已普通合并该提交并处理文档冲突。
-3. #16 已通过 PR #21 交付，等待用户审阅与合并；后续 Issue 使用各自独立分支。
+1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-13-port-drag-connections`。
+2. 项目说明 PR #20、Issue #16 PR #21 与 Issue #14 PR #22 已合入远端 `main`；当前分支已普通合并最新基线 `c6f0623`。
+3. Issue #13 的 PR #23 已完成冲突复验，等待完成合并提交并推送；推送后再等待用户审阅与合并，后续 Issue 使用各自独立分支。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 

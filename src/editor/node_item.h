@@ -31,6 +31,7 @@ public:
 
 protected:
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
+    void mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event) override;
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
     void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
@@ -47,6 +48,7 @@ private:
                              std::function<void()> cancelled);
     void setHighlightedInputPort(int index);
     void cancelPortDrag();
+    void setDoubleClickedHandler(std::function<void(const QString &)> handler);
     void setMoveFinishedHandler(
         std::function<void(const QString &, const QPointF &, const QPointF &)> handler);
 
@@ -63,6 +65,7 @@ private:
     std::function<void(const QPointF &)> m_portDragMovedHandler;
     std::function<void(const QPointF &)> m_portDragFinishedHandler;
     std::function<void()> m_portDragCancelledHandler;
+    std::function<void(const QString &)> m_doubleClickedHandler;
     std::function<void(const QString &, const QPointF &, const QPointF &)> m_moveFinishedHandler;
     BlueprintNode m_node;
 };

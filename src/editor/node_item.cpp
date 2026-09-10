@@ -201,6 +201,16 @@ QVariant NodeItem::itemChange(GraphicsItemChange change, const QVariant &value)
     return result;
 }
 
+void NodeItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton && m_doubleClickedHandler) {
+        m_doubleClickedHandler(m_nodeId);
+        event->accept();
+        return;
+    }
+    QGraphicsItem::mouseDoubleClickEvent(event);
+}
+
 void NodeItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     if (event->button() == Qt::RightButton && m_portDragActive) {
@@ -273,4 +283,9 @@ void NodeItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     if (m_dragStart != pos() && m_moveFinishedHandler) {
         m_moveFinishedHandler(m_nodeId, m_dragStart, pos());
     }
+}
+
+void NodeItem::setDoubleClickedHandler(std::function<void(const QString &)> handler)
+{
+    m_doubleClickedHandler = std::move(handler);
 }
