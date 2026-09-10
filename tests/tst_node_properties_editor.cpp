@@ -7,6 +7,7 @@
 #include <QTableWidget>
 
 #include "editor/node_properties_editor.h"
+#include "blueprint/blueprint_serializer.h"
 
 namespace {
 
@@ -85,6 +86,17 @@ void NodePropertiesEditorTest::roundTripPreservesEditableFieldsWithoutChangingId
     QCOMPARE(updated.outputs, source.outputs);
     QCOMPARE(updated.constraints, source.constraints);
     QCOMPARE(updated.acceptanceCriteria, source.acceptanceCriteria);
+
+    BlueprintDocument document;
+    document.projectId = QStringLiteral("structured-editor-round-trip");
+    document.projectName = QStringLiteral("Structured Editor Round Trip");
+    document.target = QStringLiteral("qt6-widgets-cpp17-cmake");
+    document.nodes = {updated};
+    QString error;
+    const std::optional<BlueprintDocument> restored =
+        BlueprintSerializer::fromJson(BlueprintSerializer::toJson(document), &error);
+    QVERIFY2(restored.has_value(), qPrintable(error));
+    QCOMPARE(restored.value(), document);
 }
 
 void NodePropertiesEditorTest::portCollectionsSupportAddEditAndDelete()

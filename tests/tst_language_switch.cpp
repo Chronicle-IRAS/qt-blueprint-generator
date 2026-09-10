@@ -6,9 +6,11 @@
 #include <QGraphicsView>
 #include <QGroupBox>
 #include <QMenu>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <QTableWidget>
 #include <QTimer>
 
 #include "app/main_window.h"
@@ -95,6 +97,9 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
         QVERIFY(chineseAction->isChecked());
         QVERIFY(window.addNodeOfType(NodeType::LogicModule));
         QCOMPARE(window.document().nodes.constFirst().name, QStringLiteral("逻辑模块"));
+        auto *nameDraft = window.findChild<QLineEdit *>(QStringLiteral("nodeNameEdit"));
+        auto *inputsTable = inputsGroup->findChild<QTableWidget *>(QStringLiteral("portItemsTable"));
+        QVERIFY(nameDraft && inputsTable);
         window.show();
         QApplication::processEvents();
         bool dialogOpened = false;
@@ -131,12 +136,18 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
         QCOMPARE(saveText, QStringLiteral("保存"));
         QCOMPARE(cancelText, QStringLiteral("取消"));
 
+        nameDraft->setText(QStringLiteral("未提交草稿"));
+        QTest::mouseClick(addInput, Qt::LeftButton);
+        inputsTable->item(0, 0)->setText(QStringLiteral("draft-input"));
         englishAction->trigger();
         QCOMPARE(window.currentLanguage(), QStringLiteral("en"));
         QCOMPARE(window.windowTitle(), QStringLiteral("Blueprint Editor"));
         QCOMPARE(languageMenu->title(), QStringLiteral("Language"));
         QCOMPARE(propertiesDock->windowTitle(), QStringLiteral("Properties"));
         QCOMPARE(buildButton->text(), QStringLiteral("Build"));
+        QCOMPARE(nameDraft->text(), QStringLiteral("未提交草稿"));
+        QCOMPARE(inputsTable->rowCount(), 1);
+        QCOMPARE(inputsTable->item(0, 0)->text(), QStringLiteral("draft-input"));
         QVERIFY(englishAction->isChecked());
         QCOMPARE(window.document().nodes.constFirst().name, QStringLiteral("逻辑模块"));
 

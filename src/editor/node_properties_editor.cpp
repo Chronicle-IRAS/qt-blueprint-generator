@@ -175,10 +175,10 @@ void NodePropertiesEditor::retranslateUi()
     m_nameLabel->setText(tr("Name"));
     m_descriptionLabel->setText(tr("Description"));
 
-    const QStringList portHeaders{tr("Name"), tr("Type"), tr("Description"), QString()};
+    const QStringList portHeaders{tr("Name"), tr("Type"), tr("Description"), tr("Delete")};
     m_inputsTable->setHorizontalHeaderLabels(portHeaders);
     m_outputsTable->setHorizontalHeaderLabels(portHeaders);
-    const QStringList stringHeaders{tr("Text"), QString()};
+    const QStringList stringHeaders{tr("Text"), tr("Delete")};
     m_constraintsTable->setHorizontalHeaderLabels(stringHeaders);
     m_acceptanceCriteriaTable->setHorizontalHeaderLabels(stringHeaders);
 
