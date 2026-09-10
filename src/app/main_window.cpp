@@ -491,6 +491,9 @@ MainWindow::MainWindow(QWidget *parent)
         m_scene->beginConnection(m_connectionLabelEdit->text());
         statusBar()->showMessage(tr("Choose source node, then target node"));
     });
+    connect(m_connectionLabelEdit, &QLineEdit::textChanged,
+            m_scene, &BlueprintScene::setDragConnectionLabel);
+    m_scene->setDragConnectionLabel(m_connectionLabelEdit->text());
     connect(m_cancelConnectionAction, &QAction::triggered, this, [this] { cancelConnection(); });
     for (QAction *action : {m_toolbarUndoAction, m_menuUndoAction}) {
         connect(action, &QAction::triggered, m_scene->undoStack(), &QUndoStack::undo);
