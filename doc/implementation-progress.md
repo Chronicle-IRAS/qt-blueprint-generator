@@ -1,12 +1,12 @@
 # 实现进度
 
-更新时间：2026-09-09（Asia/Shanghai）
+更新时间：2026-09-10（Asia/Shanghai）
 
 ## 当前状态
 
-- 当前开发分支：`feature/issue-13-port-drag-connections`，已普通合并远端 `main` 的 `c6f0623`（Issue #14 PR #22）。
+- 当前开发分支：`feature/issue-15-structured-node-editor`，已普通合并远端 `main` 的 `55b9557`（Issue #13 PR #23）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
-- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-09-issue-13-port-drag-connections.md`；完整使用说明：`doc/project-usage-guide.md`。
+- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-10-issue-15-structured-node-editor.md`；完整使用说明：`doc/project-usage-guide.md`。
 - `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；当前任务和使用指南只说明已经实现的功能。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
@@ -28,10 +28,25 @@
 - 项目使用说明 PR #20 已合入远端 `main`，合并提交为 `6e16bac`。
 - 远端 Issue 按依赖、关键程度和更改幅度排序为 #16、#14、#13、#15、#17、#18、#19；均已标记 `enhancement` 和 `ready-for-agent`。
 - #16 已通过 PR #21 合入远端 `main`，合并提交为 `4f0bce6`。
-- #14 已通过 PR #22 合入远端 `main`，合并提交为 `c6f0623`；双击节点直接编辑全部属性及 Inspector 同步功能已纳入当前分支。
-- #13 已通过独立分支创建 PR #23；标题为 `[feat] Support drag connections between node ports (#13)`，正文含 `Closes #13`。远端 #14 合入后已普通合并最新 `main` 并同时保留两项功能；组合交互修复后完整 CTest `12/12 passed`（88.87 秒），等待推送。
+- #14 已通过 PR #22 合入远端 `main`，合并提交为 `c6f0623`；双击节点直接编辑全部属性及 Inspector 同步功能已成为 #15 的基线。
+- #13 已通过 PR #23 合入远端 `main`，合并提交为 `55b9557`；端口拖拽连线已纳入当前分支。
+- #15 已在独立分支完成共享结构化属性控件及两处入口接入：输入/输出按端口表格编辑，约束/验收标准按字符串列表编辑；BlueprintDocument、JSON Schema、Serializer 和 IR 保持不变，全量验证及独立复核均已通过。
+- #15 已通过 PR #24 交付，标题为 `[feat] Replace JSON node properties with structured controls (#15)`，正文包含 `Closes #15`，等待用户审阅与合并。
 
 ## 已完成提交
+
+- `edc5d96 test: define structured node editor behavior`
+  - 先建立结构化属性控件的失败测试，确认缺少组件接口时按预期编译失败。
+- `4483efe feat: add reusable structured node editor`
+  - 新增可复用属性组件，覆盖端口和字符串列表的增、改、删及无损字段转换。
+- `fc18d9b feat: use structured node editing in both workflows`
+  - 画布双击对话框与右侧 Inspector 改用同一组件，保留单次提交的 Undo/Redo 行为。
+- `84a6e4b feat: translate structured node controls`
+  - 完成结构化控件的简体中文翻译并移除过时 JSON 界面文本。
+- `fa68b41 test: cover schema and language preservation`
+  - 增加 GUI 数据到 Serializer 的往返验证，以及运行时切换语言不丢失草稿的测试。
+- `ca21a3a fix: preserve missing structured cells as empty values`
+  - 对缺失的表格单元格按空字符串读取，避免异常控件状态导致空指针访问，并补充回归覆盖。
 
 - `a6a8bad fix: suppress cancelled port drag gestures`
   - 取消端口拖拽后抑制同一左键手势余下的移动和释放，避免退化为节点移动并污染撤销栈。
@@ -146,6 +161,13 @@
 
 ## 验证记录
 
+- #15 RED：新增组件测试因 `editor/node_properties_editor.h` 尚不存在而按预期编译失败，证明结构化编辑接口缺失可被检测。
+- #15 GREEN：`node_properties_editor` 覆盖端口和字符串列表增改删、Unicode、特殊字符、空值、重复项、顺序、缺失单元格与 Serializer schema 1 往返；`blueprint_scene` 覆盖 Inspector、直接编辑、Cancel、Undo/Redo 和草稿同步。
+- #15 最终在纯 ASCII 构建目录重新配置并完整构建；最新 CTest `13/13 passed`（30.31 秒）。
+- #15 翻译扫描发现 69 条当前文本，全部完成，无 unfinished、vanished 或 obsolete；README 与使用指南无失效本地链接，`git diff --check` 通过。
+- #15 `BlueprintEditor.exe` 使用 offscreen 平台启动并保持运行 2 秒，随后只终止本次探测进程。
+- #15 独立只读质量复核结论 Ready：无 Critical、Important 或 Minor；确认两条入口复用组件、六字段无损、单次撤销语义、取消安全和范围边界。
+- #15 在 PR #23 合入后普通合并最新 `origin/main` 的 `55b9557`，README 与进度冲突按同时保留端口拖拽和结构化属性编辑解决；受影响测试 `3/3 passed`（0.82 秒），完整 CTest `13/13 passed`（35.57 秒）。
 - #13 基线：全新 ASCII 构建目录配置成功，`blueprint_scene` `1/1 passed`（0.34 秒）。
 - #13 RED：端口拖拽 GUI 合同测试因 `NodeItem::highlightedInputPort()` 与拖拽实现尚不存在而按预期编译失败。
 - #13 合并 #14 后专项 `language_switch|blueprint_scene` `2/2 passed`（0.59 秒）；复核发现 Connect 模式下双击输出端口会绕过既有抑制令牌，现已将端口手势纳入同一连接点击令牌并添加真实 GUI 序列测试。
@@ -269,9 +291,9 @@
 
 ## 恢复工作
 
-1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-13-port-drag-connections`。
-2. 项目说明 PR #20、Issue #16 PR #21 与 Issue #14 PR #22 已合入远端 `main`；当前分支已普通合并最新基线 `c6f0623`。
-3. Issue #13 的 PR #23 已完成冲突复验，合并提交 `943de81` 已完成并等待推送；推送后再等待用户审阅与合并，后续 Issue 使用各自独立分支。
+1. 当前项目以 `C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project` 为准，分支为 `feature/issue-15-structured-node-editor`。
+2. Issue #13 的 PR #23 已合入 `main`，当前分支已普通合并最新远端基线 `55b9557` 并保留 #13 与 #15 两项功能。
+3. Issue #15 已完成实现、文档、全量测试和独立复核，并通过 PR #24 同步远端，等待用户审阅与合并。
 4. 每个 Task 完成后更新 README 和进度，运行相关测试与全量 CTest，创建提交并同步对应分支到远端。
 5. 不为 Git 身份名称差异再次创建 Issue；原 Issue 由用户主动删除，已明确要求不要重建。
 

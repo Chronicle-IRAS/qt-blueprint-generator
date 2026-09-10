@@ -62,7 +62,7 @@ ctest --test-dir $buildRoot -C Debug --output-on-failure
 & (Join-Path $buildRoot 'BlueprintEditor.exe')
 ```
 
-正常情况下会运行 12 项 CTest。测试使用 Fake AI 或离线网络替身，不读取真实 API 密钥，也不会产生模型费用。
+正常情况下会运行 13 项 CTest。测试使用 Fake AI 或离线网络替身，不读取真实 API 密钥，也不会产生模型费用。
 
 以后重新编译只需在已经设置好 `PATH` 的终端运行：
 
@@ -94,28 +94,11 @@ cmake --build $buildRoot
 
 单击一个节点时，右侧 `Properties / 属性` 面板仍会显示同一组字段，可作为 Inspector 和辅助编辑入口；修改后点击 `Apply / 应用`。同时选中多个节点时，属性面板不会修改其中任何一个节点。
 
-输入和输出必须是 JSON 数组，每个端口都要包含 `name`、`type` 和 `description`：
+输入和输出区域使用表格，每行是一个端口，依次填写名称、类型和说明。点击 `Add input / 添加输入` 或 `Add output / 添加输出` 新增一行，点击该行的 `Delete / 删除` 移除。类型是蓝图中的接口文本，例如 `QString`、`bool` 或项目自定义类型，不要求在编辑时解析为 C++ 类型。
 
-```json
-[
-  {
-    "name": "username",
-    "type": "QString",
-    "description": "用户名"
-  }
-]
-```
+约束和验收标准区域同样按行编辑。点击 `Add constraint / 添加约束` 或 `Add criterion / 添加验收标准` 新增一项，再直接填写文本。空列表、空字符串、重复项、排列顺序和首尾空白都会原样保留；编辑器不会擅自整理或去重。
 
-约束和验收标准也是 JSON 数组，但数组元素是字符串：
-
-```json
-[
-  "只使用 Qt 6 Widgets",
-  "不得记录明文密码"
-]
-```
-
-字段留空表示空数组。JSON 格式错误时，直接编辑对话框会保持打开并显示提示，属性面板则在状态栏显示提示；两种入口都不会把无效修改写入节点。
+两种入口只在点击 `Apply / 应用` 或 `Save / 保存` 时写入蓝图，并各自产生一条完整的撤销命令。切换中英文不会丢失尚未提交的表格内容。
 
 ### 5.3 创建连线
 
@@ -266,6 +249,9 @@ ctest --test-dir $buildRoot -C Debug --output-on-failure
 
 # 画布交互
 ctest --test-dir $buildRoot -C Debug -R '^blueprint_scene$' --output-on-failure
+
+# 结构化节点属性编辑
+ctest --test-dir $buildRoot -C Debug -R '^node_properties_editor$' --output-on-failure
 
 # 中英文切换
 ctest --test-dir $buildRoot -C Debug -R '^language_switch$' --output-on-failure

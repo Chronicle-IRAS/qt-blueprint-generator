@@ -28,6 +28,8 @@ qt_add_library(BlueprintEditorCore STATIC
     src/editor/blueprint_scene.h
     src/editor/edge_item.cpp
     src/editor/edge_item.h
+    src/editor/node_properties_editor.cpp
+    src/editor/node_properties_editor.h
     src/editor/node_item.cpp
     src/editor/node_item.h
     src/generation/ir_compiler.cpp

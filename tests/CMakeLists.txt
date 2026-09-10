@@ -186,6 +186,32 @@ set_tests_properties(blueprint_validator PROPERTIES
 
 set(blueprint_scene_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_blueprint_scene.moc")
 
+set(node_properties_editor_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_node_properties_editor.moc")
+
+add_custom_command(
+    OUTPUT "${node_properties_editor_moc}"
+    COMMAND Qt6::moc -o tst_node_properties_editor.moc
+            "${CMAKE_CURRENT_SOURCE_DIR}/tst_node_properties_editor.cpp"
+    DEPENDS tst_node_properties_editor.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM
+)
+
+qt_add_executable(tst_node_properties_editor
+    tst_node_properties_editor.cpp
+    "${node_properties_editor_moc}"
+)
+
+set_target_properties(tst_node_properties_editor PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_node_properties_editor PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_node_properties_editor PRIVATE BlueprintEditorCore Qt6::Test)
+
+add_test(NAME node_properties_editor COMMAND tst_node_properties_editor)
+set_tests_properties(node_properties_editor PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+)
+
 add_custom_command(
     OUTPUT "${blueprint_scene_moc}"
     COMMAND Qt6::moc -o tst_blueprint_scene.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_blueprint_scene.cpp"
