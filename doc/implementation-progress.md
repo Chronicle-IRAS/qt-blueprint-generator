@@ -1,12 +1,12 @@
 # 实现进度
 
-更新时间：2026-09-09（Asia/Shanghai）
+更新时间：2026-09-10（Asia/Shanghai）
 
 ## 当前状态
 
-- 当前开发分支：`feature/issue-14-direct-node-editing`，已普通合并远端 `main` 的 `4f0bce6`（Issue #16 PR #21）。
+- 当前开发分支：`feature/issue-15-structured-node-editor`，基于远端 `main` 的 `c6f0623`（Issue #14 PR #22）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
-- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-09-issue-14-direct-node-editing.md`；完整使用说明：`doc/project-usage-guide.md`。
+- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-10-issue-15-structured-node-editor.md`；完整使用说明：`doc/project-usage-guide.md`。
 - `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；当前任务和使用指南只说明已经实现的功能。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
@@ -28,8 +28,9 @@
 - 项目使用说明 PR #20 已合入远端 `main`，合并提交为 `6e16bac`。
 - 远端 Issue 按依赖、关键程度和更改幅度排序为 #16、#14、#13、#15、#17、#18、#19；均已标记 `enhancement` 和 `ready-for-agent`。
 - #16 已通过 PR #21 合入远端 `main`，合并提交为 `4f0bce6`。
-- Issue #14 已在独立分支开始：从画布节点双击进入全字段编辑，保存复用现有撤销命令，取消不修改文档。
-- Issue #14 主实现已完成：直接编辑对话框覆盖全部节点属性，Properties Dock 继续作为同步 Inspector；README 与使用指南已更新稳定用法。
+- #14 已通过 PR #22 合入远端 `main`，合并提交为 `c6f0623`；双击节点直接编辑全部属性及 Inspector 同步功能已成为 #15 的基线。
+- #13 已通过 PR #23 交付，分支为 `feature/issue-13-port-drag-connections`，当前等待用户合并。
+- #15 已从最新远端 `main` 新建独立分支，开始用共享结构化控件替换两处节点属性 JSON 文本输入；BlueprintDocument、JSON Schema、Serializer 和 IR 保持不变。
 
 ## 已完成提交
 
