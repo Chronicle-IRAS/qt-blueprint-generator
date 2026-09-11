@@ -1,12 +1,12 @@
 # 实现进度
 
-更新时间：2026-09-10（Asia/Shanghai）
+更新时间：2026-09-11（Asia/Shanghai）
 
 ## 当前状态
 
-- 当前开发分支：`feature/issue-15-structured-node-editor`，已普通合并远端 `main` 的 `55b9557`（Issue #13 PR #23）。
+- 当前开发分支：`feature/issue-17-ai-provider-settings`，基于最新远端 `main` 的 `96a9c93`（Issue #15 PR #24 合并提交）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
-- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-10-issue-15-structured-node-editor.md`；完整使用说明：`doc/project-usage-guide.md`。
+- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-11-issue-17-ai-provider-settings.md`；完整使用说明：`doc/project-usage-guide.md`。
 - `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；当前任务和使用指南只说明已经实现的功能。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
@@ -31,7 +31,9 @@
 - #14 已通过 PR #22 合入远端 `main`，合并提交为 `c6f0623`；双击节点直接编辑全部属性及 Inspector 同步功能已成为 #15 的基线。
 - #13 已通过 PR #23 合入远端 `main`，合并提交为 `55b9557`；端口拖拽连线已纳入当前分支。
 - #15 已在独立分支完成共享结构化属性控件及两处入口接入：输入/输出按端口表格编辑，约束/验收标准按字符串列表编辑；BlueprintDocument、JSON Schema、Serializer 和 IR 保持不变，全量验证及独立复核均已通过。
-- #15 已通过 PR #24 交付，标题为 `[feat] Replace JSON node properties with structured controls (#15)`，正文包含 `Closes #15`，等待用户审阅与合并。
+- #15 已通过 PR #24 合入远端 `main`，合并提交为 `96a9c93`。
+- #17 已启动：范围限定为 OpenAI-compatible Provider 设置、环境变量密钥来源、离线可测的 Test Connection、真实 DeepSeek 手工联调工具与说明；普通生成和候选审核 GUI 留给 #18。
+- #17 已确认当前 DeepSeek 官方默认兼容配置为 `https://api.deepseek.com/chat/completions` 与 `deepseek-flash`；自动化测试仍全部禁止访问真实网络。
 
 ## 已完成提交
 
