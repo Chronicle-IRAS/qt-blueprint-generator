@@ -1,5 +1,23 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
 
+set(ai_provider_settings_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_ai_provider_settings.moc")
+add_custom_command(OUTPUT "${ai_provider_settings_moc}"
+    COMMAND Qt6::moc -o tst_ai_provider_settings.moc
+            "${CMAKE_CURRENT_SOURCE_DIR}/tst_ai_provider_settings.cpp"
+    DEPENDS tst_ai_provider_settings.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM)
+qt_add_executable(tst_ai_provider_settings
+    tst_ai_provider_settings.cpp
+    "${ai_provider_settings_moc}")
+set_target_properties(tst_ai_provider_settings PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_ai_provider_settings PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_ai_provider_settings PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME ai_provider_settings COMMAND tst_ai_provider_settings)
+set_tests_properties(ai_provider_settings PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 set(language_switch_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_language_switch.moc")
 add_custom_command(OUTPUT "${language_switch_moc}"
     COMMAND Qt6::moc -o tst_language_switch.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_language_switch.cpp"

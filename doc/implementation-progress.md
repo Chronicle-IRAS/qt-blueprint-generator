@@ -34,6 +34,8 @@
 - #15 已通过 PR #24 合入远端 `main`，合并提交为 `96a9c93`。
 - #17 已启动：范围限定为 OpenAI-compatible Provider 设置、环境变量密钥来源、离线可测的 Test Connection、真实 DeepSeek 手工联调工具与说明；普通生成和候选审核 GUI 留给 #18。
 - #17 已确认当前 DeepSeek 官方默认兼容配置为 `https://api.deepseek.com/chat/completions` 与 `deepseek-flash`；自动化测试仍全部禁止访问真实网络。
+- #17 Task 1 已完成非秘密 Provider 设置边界：仅持久化 Provider、Endpoint、Model 与凭据来源，API 密钥只检查 `BLUEPRINT_AI_API_KEY` 是否可用；损坏凭据来源、非 HTTPS/带 user-info/query/fragment 的 URL、空白或带首尾空白的模型均被拒绝。
+- #17 Task 1 已通过独立规格与质量复核；最终结论为 `SPEC COMPLIANT` / `Ready`，无 Critical、Important 或 Minor。
 
 ## 已完成提交
 
@@ -162,6 +164,9 @@
   - 增加“删除清单”和“删除清单后替换源码”的 RED→GREEN 回归测试。
 
 ## 验证记录
+
+- #17 Task 1 RED：新增设置合同测试后因 `ai/ai_provider_settings.h` 不存在而编译失败；补充 Provider/其他组件设置边界后为 `16 passed, 2 failed`；空 user-info、写失败回滚同步和 sticky `QSettings` 重试均分别完成突变失败验证。
+- #17 Task 1 GREEN：`ai_provider_settings` 聚焦 CTest `1/1 passed`；初版实现后的完整 CTest `14/14 passed`（73.40 秒）。最终回归覆盖默认值不落盘、四键白名单、旧明文键清理、未知字段保留、无效配置零修改、后端失败回滚、错误对象零写重试和重建对象后恢复保存。
 
 - #15 RED：新增组件测试因 `editor/node_properties_editor.h` 尚不存在而按预期编译失败，证明结构化编辑接口缺失可被检测。
 - #15 GREEN：`node_properties_editor` 覆盖端口和字符串列表增改删、Unicode、特殊字符、空值、重复项、顺序、缺失单元格与 Serializer schema 1 往返；`blueprint_scene` 覆盖 Inspector、直接编辑、Cancel、Undo/Redo 和草稿同步。

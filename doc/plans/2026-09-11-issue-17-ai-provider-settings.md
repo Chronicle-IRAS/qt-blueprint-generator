@@ -24,12 +24,12 @@
 
 ## Task 1: Define and persist non-secret provider settings
 
-- [ ] Add failing tests for the expected DeepSeek-compatible defaults: endpoint `https://api.deepseek.com/chat/completions`, model `deepseek-flash`, provider `openai-compatible`, credential source `environment`.
-- [ ] Add failing tests rejecting non-HTTPS endpoints, missing hosts, user information, query strings, fragments, and empty model names.
-- [ ] Add failing tests proving load/save only touches the provider, endpoint, model, and credential-source keys and never writes the API key or any arbitrary environment value.
-- [ ] Implement `AiProviderSettings`, `AiCredentialSource`, validation, allowlisted persistence, and `BLUEPRINT_AI_API_KEY` availability checks.
-- [ ] Keep defaults usable without persisting them until the user explicitly saves.
-- [ ] Run the focused settings test to GREEN and commit this completed group.
+- [x] Add failing tests for the expected DeepSeek-compatible defaults: endpoint `https://api.deepseek.com/chat/completions`, model `deepseek-flash`, provider `openai-compatible`, credential source `environment`.
+- [x] Add failing tests rejecting non-HTTPS endpoints, missing hosts, user information, query strings, fragments, and empty model names.
+- [x] Add failing tests proving load/save only touches the provider, endpoint, model, and credential-source keys and never writes the API key or any arbitrary environment value.
+- [x] Implement `AiProviderSettings`, `AiCredentialSource`, validation, allowlisted persistence, and `BLUEPRINT_AI_API_KEY` availability checks.
+- [x] Keep defaults usable without persisting them until the user explicitly saves.
+- [x] Run the focused settings test to GREEN and commit this completed group.
 
 Expected value boundary:
 

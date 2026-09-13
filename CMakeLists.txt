@@ -12,6 +12,8 @@ qt_standard_project_setup()
 
 qt_add_library(BlueprintEditorCore STATIC
     src/ai/ai_client.h
+    src/ai/ai_provider_settings.cpp
+    src/ai/ai_provider_settings.h
     src/ai/fake_ai_client.cpp
     src/ai/fake_ai_client.h
     src/ai/openai_compatible_client.cpp
