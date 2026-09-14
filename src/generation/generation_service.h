@@ -104,7 +104,7 @@ private:
     };
 
     void handleResponse(const QUuid &requestId, const QByteArray &modelResponse);
-    void handleFailure(const QUuid &requestId, const QString &errorMessage);
+    void handleFailure(const QUuid &requestId, const AiClientError &error);
 
     QPointer<IAiClient> m_client;
     QHash<QUuid, RequestContext> m_pending;

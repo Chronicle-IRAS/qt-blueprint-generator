@@ -40,9 +40,9 @@ private:
         QTimer *deadlineTimer = nullptr;
     };
 
-    void failLater(const QUuid &requestId, const QString &errorMessage);
+    void failLater(const QUuid &requestId, const AiClientError &error);
     void failPending(QNetworkReply *reply,
-                     const QString &errorMessage,
+                     const AiClientError &error,
                      bool abortReply);
     void readAvailable(QNetworkReply *reply);
     void finish(QNetworkReply *reply);

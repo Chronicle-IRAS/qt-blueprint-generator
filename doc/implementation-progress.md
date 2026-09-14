@@ -36,6 +36,8 @@
 - #17 已确认当前 DeepSeek 官方默认兼容配置为 `https://api.deepseek.com/chat/completions` 与 `deepseek-flash`；自动化测试仍全部禁止访问真实网络。
 - #17 Task 1 已完成非秘密 Provider 设置边界：仅持久化 Provider、Endpoint、Model 与凭据来源，API 密钥只检查 `BLUEPRINT_AI_API_KEY` 是否可用；损坏凭据来源、非 HTTPS/带 user-info/query/fragment 的 URL、空白或带首尾空白的模型均被拒绝。
 - #17 Task 1 已通过独立规格与质量复核；最终结论为 `SPEC COMPLIANT` / `Ready`，无 Critical、Important 或 Minor。
+- #17 Task 2 已完成结构化且脱敏的 AI 错误模型、OpenAI-compatible HTTP/provider 分类和一次性连接测试器；普通生成继续保持原有字符串失败信号，且不会发送探测专用字段。
+- #17 Task 2 已通过独立规格与质量复核；最终结论为 `SPEC COMPLIANT` / `Ready`，无 Critical、Important 或 Minor。所有自动化网络测试均使用 Fake 或注入式网络替身。
 
 ## 已完成提交
 
@@ -167,6 +169,8 @@
 
 - #17 Task 1 RED：新增设置合同测试后因 `ai/ai_provider_settings.h` 不存在而编译失败；补充 Provider/其他组件设置边界后为 `16 passed, 2 failed`；空 user-info、写失败回滚同步和 sticky `QSettings` 重试均分别完成突变失败验证。
 - #17 Task 1 GREEN：`ai_provider_settings` 聚焦 CTest `1/1 passed`；初版实现后的完整 CTest `14/14 passed`（73.40 秒）。最终回归覆盖默认值不落盘、四键白名单、旧明文键清理、未知字段保留、无效配置零修改、后端失败回滚、错误对象零写重试和重建对象后恢复保存。
+- #17 Task 2 RED：字符串型 `requestFailed`、缺失的探测请求字段与 `AiConnectionTester` 使三个新增/更新目标按预期编译失败；审查补强另分别捕获 401 分类优先级、HTTP 408 超时、400 + 受信 `model_not_found` 和对象生命周期分支。
+- #17 Task 2 GREEN：`openai_compatible_client|ai_connection_tester|generation_service` 聚焦 `3/3 passed`；最新完整离线 CTest `16/16 passed`（独立复核分别为 81.51 秒、94.71 秒）。响应体、prompt、API key 与底层网络错误文本均不进入失败信号或日志。
 
 - #15 RED：新增组件测试因 `editor/node_properties_editor.h` 尚不存在而按预期编译失败，证明结构化编辑接口缺失可被检测。
 - #15 GREEN：`node_properties_editor` 覆盖端口和字符串列表增改删、Unicode、特殊字符、空值、重复项、顺序、缺失单元格与 Serializer schema 1 往返；`blueprint_scene` 覆盖 Inspector、直接编辑、Cancel、Undo/Redo 和草稿同步。

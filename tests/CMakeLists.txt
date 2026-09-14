@@ -18,6 +18,42 @@ set_tests_properties(ai_provider_settings PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
 
+set(openai_compatible_client_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_openai_compatible_client.moc")
+add_custom_command(OUTPUT "${openai_compatible_client_moc}"
+    COMMAND Qt6::moc -o tst_openai_compatible_client.moc
+            "${CMAKE_CURRENT_SOURCE_DIR}/tst_openai_compatible_client.cpp"
+    DEPENDS tst_openai_compatible_client.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM)
+qt_add_executable(tst_openai_compatible_client
+    tst_openai_compatible_client.cpp
+    "${openai_compatible_client_moc}")
+set_target_properties(tst_openai_compatible_client PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_openai_compatible_client PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_openai_compatible_client PRIVATE BlueprintEditorCore Qt6::Network Qt6::Test)
+add_test(NAME openai_compatible_client COMMAND tst_openai_compatible_client)
+set_tests_properties(openai_compatible_client PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
+set(ai_connection_tester_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_ai_connection_tester.moc")
+add_custom_command(OUTPUT "${ai_connection_tester_moc}"
+    COMMAND Qt6::moc -o tst_ai_connection_tester.moc
+            "${CMAKE_CURRENT_SOURCE_DIR}/tst_ai_connection_tester.cpp"
+    DEPENDS tst_ai_connection_tester.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM)
+qt_add_executable(tst_ai_connection_tester
+    tst_ai_connection_tester.cpp
+    "${ai_connection_tester_moc}")
+set_target_properties(tst_ai_connection_tester PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_ai_connection_tester PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_ai_connection_tester PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME ai_connection_tester COMMAND tst_ai_connection_tester)
+set_tests_properties(ai_connection_tester PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 set(language_switch_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_language_switch.moc")
 add_custom_command(OUTPUT "${language_switch_moc}"
     COMMAND Qt6::moc -o tst_language_switch.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_language_switch.cpp"

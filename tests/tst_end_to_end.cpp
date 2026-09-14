@@ -340,7 +340,9 @@ void EndToEndTest::fakeFailureLeavesWorkspaceUnchanged()
     QVERIFY2(prompt.has_value(), qPrintable(error));
     const auto before = snapshot(root.path());
     FakeAiClient client;
-    client.setFailure("offline demo failure");
+    client.setFailure({AiErrorKind::Network,
+                       0,
+                       QStringLiteral("offline demo failure")});
     GenerationService service(&client);
     QSignalSpy success(&service, &GenerationService::generationSucceeded);
     QSignalSpy failure(&service, &GenerationService::generationFailed);

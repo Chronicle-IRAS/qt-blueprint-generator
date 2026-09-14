@@ -46,14 +46,14 @@ struct AiProviderSettings {
 
 ## Task 2: Add sanitized client errors and offline connection testing
 
-- [ ] First update Qt tests so they fail against the current string-only `requestFailed` signal and absent connection tester.
-- [ ] Define `AiErrorKind` and `AiClientError` with a safe user-facing message and optional HTTP status; register the metatype for `QSignalSpy`.
-- [ ] Preserve `GenerationService`'s public string failure contract by mapping structured client failures to safe text at that boundary.
-- [ ] Classify configuration, missing credential, network, timeout, authentication, payment, rate limiting, endpoint/model, invalid response, and provider-unavailable failures without copying response bodies, prompts, or keys into signals/logs.
-- [ ] Extend `AiRequest` only with probe-safe optional fields (`maxTokens`, `disableThinking`) that normal generation leaves unset; verify the request JSON includes them only when requested.
-- [ ] Implement `AiConnectionTester` around an injected client. It must emit Testing then Success or one sanitized failure, ignore unrelated request IDs, and handle repeated/cancelled object lifetimes safely.
-- [ ] Cover every branch with fake clients and network reply stubs; no test may access the real network.
-- [ ] Run `openai_compatible_client`, `generation_service`, and `ai_connection_tester` tests to GREEN and commit this completed group.
+- [x] First update Qt tests so they fail against the current string-only `requestFailed` signal and absent connection tester.
+- [x] Define `AiErrorKind` and `AiClientError` with a safe user-facing message and optional HTTP status; register the metatype for `QSignalSpy`.
+- [x] Preserve `GenerationService`'s public string failure contract by mapping structured client failures to safe text at that boundary.
+- [x] Classify configuration, missing credential, network, timeout, authentication, payment, rate limiting, endpoint/model, invalid response, and provider-unavailable failures without copying response bodies, prompts, or keys into signals/logs.
+- [x] Extend `AiRequest` only with probe-safe optional fields (`maxTokens`, `disableThinking`) that normal generation leaves unset; verify the request JSON includes them only when requested.
+- [x] Implement `AiConnectionTester` around an injected client. It must emit Testing then Success or one sanitized failure, ignore unrelated request IDs, and handle repeated/cancelled object lifetimes safely.
+- [x] Cover every branch with fake clients and network reply stubs; no test may access the real network.
+- [x] Run `openai_compatible_client`, `generation_service`, and `ai_connection_tester` tests to GREEN and commit this completed group.
 
 Expected safe failure boundary:
 
