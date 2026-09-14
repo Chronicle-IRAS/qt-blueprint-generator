@@ -38,6 +38,8 @@
 - #17 Task 1 已通过独立规格与质量复核；最终结论为 `SPEC COMPLIANT` / `Ready`，无 Critical、Important 或 Minor。
 - #17 Task 2 已完成结构化且脱敏的 AI 错误模型、OpenAI-compatible HTTP/provider 分类和一次性连接测试器；普通生成继续保持原有字符串失败信号，且不会发送探测专用字段。
 - #17 Task 2 已通过独立规格与质量复核；最终结论为 `SPEC COMPLIANT` / `Ready`，无 Critical、Important 或 Minor。所有自动化网络测试均使用 Fake 或注入式网络替身。
+- #17 Task 3 已完成双语 AI Provider 设置对话框和主窗口入口：支持 Endpoint、Model、环境变量凭据来源/可用状态、使用未保存草稿的 Test Connection、Save/Cancel 与安全错误状态；界面没有明文 API key 输入。
+- #17 Task 3 已通过独立规格与质量复核；最终结论为 `SPEC COMPLIANT` / `Ready`，无 Critical、Important 或 Minor。普通生成/候选审核 GUI 仍留给 #18。
 
 ## 已完成提交
 
@@ -171,6 +173,8 @@
 - #17 Task 1 GREEN：`ai_provider_settings` 聚焦 CTest `1/1 passed`；初版实现后的完整 CTest `14/14 passed`（73.40 秒）。最终回归覆盖默认值不落盘、四键白名单、旧明文键清理、未知字段保留、无效配置零修改、后端失败回滚、错误对象零写重试和重建对象后恢复保存。
 - #17 Task 2 RED：字符串型 `requestFailed`、缺失的探测请求字段与 `AiConnectionTester` 使三个新增/更新目标按预期编译失败；审查补强另分别捕获 401 分类优先级、HTTP 408 超时、400 + 受信 `model_not_found` 和对象生命周期分支。
 - #17 Task 2 GREEN：`openai_compatible_client|ai_connection_tester|generation_service` 聚焦 `3/3 passed`；最新完整离线 CTest `16/16 passed`（独立复核分别为 81.51 秒、94.71 秒）。响应体、prompt、API key 与底层网络错误文本均不进入失败信号或日志。
+- #17 Task 3 RED：新增 GUI 合同测试因缺少 `app/ai_settings_dialog.h` 按预期编译失败；“已保存配置 A + 未保存草稿 B”测试通过临时改为回读 A 的突变，准确失败于 Endpoint 不匹配。
+- #17 Task 3 GREEN：设置对话框覆盖 20 个用例/数据行；`ai_settings_dialog|language_switch|blueprint_scene` 为 `3/3 passed`，完整离线 CTest `17/17 passed`（79.19 秒）。连接测试前后完整 QSettings 快照保持不变，运行时重译保留草稿、状态与稳定 ID。
 
 - #15 RED：新增组件测试因 `editor/node_properties_editor.h` 尚不存在而按预期编译失败，证明结构化编辑接口缺失可被检测。
 - #15 GREEN：`node_properties_editor` 覆盖端口和字符串列表增改删、Unicode、特殊字符、空值、重复项、顺序、缺失单元格与 Serializer schema 1 往返；`blueprint_scene` 覆盖 Inspector、直接编辑、Cancel、Undo/Redo 和草稿同步。

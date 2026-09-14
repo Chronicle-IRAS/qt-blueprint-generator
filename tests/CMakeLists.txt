@@ -1,5 +1,23 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
 
+set(ai_settings_dialog_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_ai_settings_dialog.moc")
+add_custom_command(OUTPUT "${ai_settings_dialog_moc}"
+    COMMAND Qt6::moc -o tst_ai_settings_dialog.moc
+            "${CMAKE_CURRENT_SOURCE_DIR}/tst_ai_settings_dialog.cpp"
+    DEPENDS tst_ai_settings_dialog.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM)
+qt_add_executable(tst_ai_settings_dialog
+    tst_ai_settings_dialog.cpp
+    "${ai_settings_dialog_moc}")
+set_target_properties(tst_ai_settings_dialog PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_ai_settings_dialog PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_ai_settings_dialog PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME ai_settings_dialog COMMAND tst_ai_settings_dialog)
+set_tests_properties(ai_settings_dialog PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 set(ai_provider_settings_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_ai_provider_settings.moc")
 add_custom_command(OUTPUT "${ai_provider_settings_moc}"
     COMMAND Qt6::moc -o tst_ai_provider_settings.moc

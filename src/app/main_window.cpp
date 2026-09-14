@@ -1,5 +1,7 @@
 #include "app/main_window.h"
 
+#include "app/ai_settings_dialog.h"
+
 #include "editor/blueprint_scene.h"
 #include "editor/node_item.h"
 #include "editor/node_properties_editor.h"
@@ -241,6 +243,11 @@ MainWindow::MainWindow(QWidget *parent)
     m_viewMenu = menuBar()->addMenu(tr("View"));
     m_viewMenu->setObjectName(QStringLiteral("viewMenu"));
 
+    m_aiMenu = menuBar()->addMenu(tr("AI"));
+    m_aiMenu->setObjectName(QStringLiteral("aiMenu"));
+    m_aiSettingsAction = m_aiMenu->addAction(tr("AI Settings..."));
+    m_aiSettingsAction->setObjectName(QStringLiteral("aiSettingsAction"));
+
     m_languageMenu = menuBar()->addMenu(tr("Language"));
     m_languageMenu->setObjectName(QStringLiteral("languageMenu"));
     auto *languageGroup = new QActionGroup(this);
@@ -352,6 +359,10 @@ MainWindow::MainWindow(QWidget *parent)
             [this] { setLanguage(QStringLiteral("en")); });
     connect(m_chineseLanguageAction, &QAction::triggered, this,
             [this] { setLanguage(QStringLiteral("zh_CN")); });
+    connect(m_aiSettingsAction, &QAction::triggered, this, [this] {
+        AiSettingsDialog dialog(this);
+        dialog.exec();
+    });
     connect(m_applyPropertiesButton, &QPushButton::clicked, this, [this] { applyProperties(); });
     connect(m_buildProjectButton, &QPushButton::clicked, this, [this] { startBuild(); });
     connect(m_exportProjectButton, &QPushButton::clicked, this, [this] { exportProject(); });
@@ -504,6 +515,8 @@ void MainWindow::retranslateUi()
     m_menuUndoAction->setText(tr("Undo"));
     m_menuRedoAction->setText(tr("Redo"));
     m_viewMenu->setTitle(tr("View"));
+    m_aiMenu->setTitle(tr("AI"));
+    m_aiSettingsAction->setText(tr("AI Settings..."));
     m_languageMenu->setTitle(tr("Language"));
     m_englishLanguageAction->setText(tr("English"));
     m_chineseLanguageAction->setText(tr("Chinese"));

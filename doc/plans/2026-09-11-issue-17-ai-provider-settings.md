@@ -82,14 +82,14 @@ struct AiClientError {
 
 ## Task 3: Add the bilingual AI settings dialog
 
-- [ ] Add failing GUI tests for stable object names, loaded defaults, edit/save/reopen persistence, Cancel isolation, environment credential status, invalid-form rejection, and Test Connection button state.
-- [ ] Inject an AI-client factory so success, authentication failure, timeout, endpoint failure, and provider failure are tested entirely offline.
-- [ ] Implement a modal `AiSettingsDialog` with Provider, full Chat Completions HTTPS endpoint, Model, API key source, key availability, Test Connection, status, Save, and Cancel.
-- [ ] Do not provide a plaintext key editor or persist secrets. Explain in the dialog that the key comes from `BLUEPRINT_AI_API_KEY`.
-- [ ] Test the unsaved form values, disable duplicate connection attempts while running, reset stale status when fields change, and save only after validation succeeds.
-- [ ] Add `AI > Provider Settings...` to `MainWindow`, preserving existing menus, actions, blueprints, docks, and undo history.
-- [ ] Add complete Simplified Chinese translations and verify runtime English/Chinese switching does not erase unsaved settings drafts.
-- [ ] Run GUI and language tests to GREEN and commit this completed group.
+- [x] Add failing GUI tests for stable object names, loaded defaults, edit/save/reopen persistence, Cancel isolation, environment credential status, invalid-form rejection, and Test Connection button state.
+- [x] Inject an AI-client factory so success, authentication failure, timeout, endpoint failure, and provider failure are tested entirely offline.
+- [x] Implement a modal `AiSettingsDialog` with Provider, full Chat Completions HTTPS endpoint, Model, API key source, key availability, Test Connection, status, Save, and Cancel.
+- [x] Do not provide a plaintext key editor or persist secrets. Explain in the dialog that the key comes from `BLUEPRINT_AI_API_KEY`.
+- [x] Test the unsaved form values, disable duplicate connection attempts while running, reset stale status when fields change, and save only after validation succeeds.
+- [x] Add `AI > Provider Settings...` to `MainWindow`, preserving existing menus, actions, blueprints, docks, and undo history.
+- [x] Add complete Simplified Chinese translations and verify runtime English/Chinese switching does not erase unsaved settings drafts.
+- [x] Run GUI and language tests to GREEN and commit this completed group.
 
 Required stable object names:
 

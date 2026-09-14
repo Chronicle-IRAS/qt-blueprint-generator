@@ -2,6 +2,39 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="zh_CN" sourcelanguage="en">
 <context>
+    <name>AiSettingsDialog</name>
+    <message><source>AI Settings</source><translation>AI 设置</translation></message>
+    <message><source>OpenAI Compatible</source><translation>OpenAI 兼容接口</translation></message>
+    <message><source>Environment variable BLUEPRINT_AI_API_KEY</source><translation>环境变量 BLUEPRINT_AI_API_KEY</translation></message>
+    <message><source>Available</source><translation>可用</translation></message>
+    <message><source>Not available</source><translation>不可用</translation></message>
+    <message><source>Test Connection</source><translation>测试连接</translation></message>
+    <message><source>Not tested</source><translation>未测试</translation></message>
+    <message><source>Testing</source><translation>正在测试</translation></message>
+    <message><source>Success</source><translation>成功</translation></message>
+    <message><source>Invalid configuration</source><translation>配置无效</translation></message>
+    <message><source>Settings could not be saved</source><translation>设置无法保存</translation></message>
+    <message><source>API key is not available</source><translation>API 密钥不可用</translation></message>
+    <message><source>Network error</source><translation>网络错误</translation></message>
+    <message><source>Request timed out</source><translation>请求超时</translation></message>
+    <message><source>Authentication failed</source><translation>身份验证失败</translation></message>
+    <message><source>Payment required</source><translation>需要付费</translation></message>
+    <message><source>Endpoint not found</source><translation>未找到端点</translation></message>
+    <message><source>Model not found</source><translation>未找到模型</translation></message>
+    <message><source>Rate limit reached</source><translation>已达到速率限制</translation></message>
+    <message><source>Invalid response</source><translation>响应无效</translation></message>
+    <message><source>Provider unavailable</source><translation>服务提供方不可用</translation></message>
+    <message><source>Connection failed</source><translation>连接失败</translation></message>
+    <message><source>Save</source><translation>保存</translation></message>
+    <message><source>Cancel</source><translation>取消</translation></message>
+    <message><source>Provider</source><translation>服务提供方</translation></message>
+    <message><source>Chat Completions Endpoint</source><translation>聊天补全端点</translation></message>
+    <message><source>Model</source><translation>模型</translation></message>
+    <message><source>API Key Source</source><translation>API 密钥来源</translation></message>
+    <message><source>API Key Status</source><translation>API 密钥状态</translation></message>
+    <message><source>Connection Status</source><translation>连接状态</translation></message>
+</context>
+<context>
     <name>BlueprintScene</name>
     <message>
         <location filename="../src/editor/blueprint_scene.cpp" line="92"/>
@@ -147,6 +180,14 @@
         <location filename="../src/app/main_window.cpp" line="506"/>
         <source>View</source>
         <translation>视图</translation>
+    </message>
+    <message>
+        <source>AI</source>
+        <translation>AI</translation>
+    </message>
+    <message>
+        <source>AI Settings...</source>
+        <translation>AI 设置...</translation>
     </message>
     <message>
         <location filename="../src/app/main_window.cpp" line="267"/>
