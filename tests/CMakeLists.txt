@@ -422,3 +422,29 @@ set_tests_properties(generation_service PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
 )
+
+set(manual_ai_integration_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_manual_ai_integration.moc")
+add_custom_command(
+    OUTPUT "${manual_ai_integration_moc}"
+    COMMAND Qt6::moc -o tst_manual_ai_integration.moc
+            "${CMAKE_CURRENT_SOURCE_DIR}/tst_manual_ai_integration.cpp"
+    DEPENDS tst_manual_ai_integration.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM
+)
+qt_add_executable(tst_manual_ai_integration
+    tst_manual_ai_integration.cpp
+    "${PROJECT_SOURCE_DIR}/tools/manual_ai_integration_support.cpp"
+    "${manual_ai_integration_moc}"
+)
+set_target_properties(tst_manual_ai_integration PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_manual_ai_integration PRIVATE
+    "${PROJECT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}"
+)
+target_link_libraries(tst_manual_ai_integration PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME manual_ai_integration_offline COMMAND tst_manual_ai_integration)
+set_tests_properties(manual_ai_integration_offline PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+)

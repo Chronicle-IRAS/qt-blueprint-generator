@@ -110,22 +110,22 @@ aiSettingsCancelButton
 
 ## Task 4: Add the opt-in real integration path and user documentation
 
-- [ ] Add an opt-in CMake target for `tools/manual_ai_integration.cpp`; keep it out of the default build if practical and never call `add_test()` for it.
-- [ ] Make the tool load only `BLUEPRINT_AI_API_KEY`, accept optional endpoint/model arguments, create a temporary/scoped workspace, compile a real blueprint prompt, invoke `GenerationService`, and persist only a validated candidate.
-- [ ] Never print or serialize the API key, Authorization header, full prompt, raw provider body, or sensitive environment values. Never automatically accept generated code.
-- [ ] Add an offline test for argument/default handling and the manual workflow's pre-network failure path where practical.
-- [ ] Document environment setup, GUI configuration, connection testing, DeepSeek defaults, manual integration invocation, possible HTTP/provider failures, costs, and key rotation guidance in README and the usage guide.
-- [ ] Update implementation progress with RED/GREEN evidence and completed commit IDs.
-- [ ] Build the opt-in target. Run its real DeepSeek path only when the key is supplied through the process environment; record the sanitized result without recording the secret.
-- [ ] Commit this completed group.
+- [x] Add an opt-in CMake target for `tools/manual_ai_integration.cpp`; keep it out of the default build if practical and never call `add_test()` for it.
+- [x] Make the tool load only `BLUEPRINT_AI_API_KEY`, accept optional endpoint/model arguments, create a temporary/scoped workspace, compile a real blueprint prompt, invoke `GenerationService`, and persist only a validated candidate.
+- [x] Never print or serialize the API key, Authorization header, full prompt, raw provider body, or sensitive environment values. Never automatically accept generated code.
+- [x] Add an offline test for argument/default handling and the manual workflow's pre-network failure path where practical.
+- [x] Document environment setup, GUI configuration, connection testing, DeepSeek defaults, manual integration invocation, possible HTTP/provider failures, costs, and key rotation guidance in README and the usage guide.
+- [x] Update implementation progress with RED/GREEN evidence and completed commit IDs.
+- [x] Build the opt-in target. Run its real DeepSeek path only when the key is supplied through the process environment; record the sanitized result without recording the secret.
+- [x] Commit this completed group.
 
 ## Task 5: Verify, review, and deliver
 
-- [ ] Run a clean configure/build in an ASCII-only build directory and full CTest; all automated tests must remain offline.
-- [ ] Verify Qt translation hygiene, startup behavior, Markdown local links, `git diff --check`, and absence of tracked secret-like values.
-- [ ] Re-run focused security regressions for schema, node ID, path traversal, file extension/size, absolute timeout, manual-edit protection, and candidate boundaries.
-- [ ] Obtain an independent specification review followed by an independent code-quality review; resolve every Critical, Important, and actionable Minor finding.
-- [ ] Update README and progress with final verification only after evidence exists.
+- [x] Run a clean configure/build in an ASCII-only build directory and full CTest; all automated tests must remain offline.
+- [x] Verify Qt translation hygiene, startup behavior, Markdown local links, `git diff --check`, and absence of tracked secret-like values.
+- [x] Re-run focused security regressions for schema, node ID, path traversal, file extension/size, absolute timeout, manual-edit protection, and candidate boundaries.
+- [x] Obtain an independent specification review followed by an independent code-quality review; resolve every Critical, Important, and actionable Minor finding.
+- [x] Update README and progress with final verification only after evidence exists.
 - [ ] Push normally and create a PR titled `[feat] Add AI provider settings and real API integration (#17)` whose body includes `Closes #17`; do not force-push or auto-merge.
 
 ## Scope guard

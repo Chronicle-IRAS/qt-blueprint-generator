@@ -1,8 +1,15 @@
 # 实现进度
 
-更新时间：2026-09-11（Asia/Shanghai）
+更新时间：2026-09-15（Asia/Shanghai）
 
 ## 当前状态
+
+- 最终复验（2026-09-15）：完整构建成功，CTest `18/18 passed`（82.30 秒）；101 条翻译完成；窗口离屏启动通过；源码与文档密钥模式扫描无命中。
+
+- #17 Task 4：手工真实集成工具及 README/使用指南已实现，独立最终复核 Ready。新增离线测试覆盖安全摘要、匹配请求超时、候选路径约束、junction 拒绝和同步客户端完成；既有 18 项离线回归通过。
+- 2026-09-15 真实 DeepSeek 验证成功：`deepseek-flash`、HTTPS Chat Completions、180 秒上限，工具退出码 0。实际经过提示词编译、模型调用、严格响应校验和候选持久化，得到 2 个 pending 文件；没有自动接受或执行生成代码。
+- 真实验收工作区：`C:\Users\Lenovo\AppData\Local\Temp\blueprint-ai-manual-PgZSWO`；候选批次 `manual_11e8ace27bb8454aac22e6dd0d698f58`。密钥仅传入验证进程环境，记录不含密钥。
+- #17 核心 AI 生成及设置界面已实现；窗口内完整生成/候选审核入口按后续 #18 处理。Issue 保持开启，等待交付 PR 合并。
 
 - 当前开发分支：`feature/issue-17-ai-provider-settings`，基于最新远端 `main` 的 `96a9c93`（Issue #15 PR #24 合并提交）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
