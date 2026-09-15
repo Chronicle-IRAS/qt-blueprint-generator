@@ -126,7 +126,7 @@ aiSettingsCancelButton
 - [x] Re-run focused security regressions for schema, node ID, path traversal, file extension/size, absolute timeout, manual-edit protection, and candidate boundaries.
 - [x] Obtain an independent specification review followed by an independent code-quality review; resolve every Critical, Important, and actionable Minor finding.
 - [x] Update README and progress with final verification only after evidence exists.
-- [ ] Push normally and create a PR titled `[feat] Add AI provider settings and real API integration (#17)` whose body includes `Closes #17`; do not force-push or auto-merge.
+- [x] Push normally and create a PR titled `[feat] Add AI provider settings and real API integration (#17)` whose body includes `Closes #17`; do not force-push or auto-merge.
 
 ## Scope guard
 
