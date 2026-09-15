@@ -528,7 +528,7 @@ void GenerationService::handleResponse(const QUuid &requestId,
     emit generationSucceeded(requestId, *result);
 }
 
-void GenerationService::handleFailure(const QUuid &requestId, const QString &errorMessage)
+void GenerationService::handleFailure(const QUuid &requestId, const AiClientError &error)
 {
     auto pendingIt = m_pending.find(requestId);
     if (pendingIt == m_pending.end()) {
@@ -536,6 +536,6 @@ void GenerationService::handleFailure(const QUuid &requestId, const QString &err
     }
     m_pending.erase(pendingIt);
     emit generationFailed(requestId,
-                          errorMessage.isEmpty() ? QStringLiteral("AI request failed")
-                                                 : errorMessage);
+                          error.safeMessage.isEmpty() ? QStringLiteral("AI request failed")
+                                                      : error.safeMessage);
 }

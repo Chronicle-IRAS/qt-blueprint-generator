@@ -1,5 +1,77 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
 
+set(ai_settings_dialog_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_ai_settings_dialog.moc")
+add_custom_command(OUTPUT "${ai_settings_dialog_moc}"
+    COMMAND Qt6::moc -o tst_ai_settings_dialog.moc
+            "${CMAKE_CURRENT_SOURCE_DIR}/tst_ai_settings_dialog.cpp"
+    DEPENDS tst_ai_settings_dialog.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM)
+qt_add_executable(tst_ai_settings_dialog
+    tst_ai_settings_dialog.cpp
+    "${ai_settings_dialog_moc}")
+set_target_properties(tst_ai_settings_dialog PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_ai_settings_dialog PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_ai_settings_dialog PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME ai_settings_dialog COMMAND tst_ai_settings_dialog)
+set_tests_properties(ai_settings_dialog PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
+set(ai_provider_settings_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_ai_provider_settings.moc")
+add_custom_command(OUTPUT "${ai_provider_settings_moc}"
+    COMMAND Qt6::moc -o tst_ai_provider_settings.moc
+            "${CMAKE_CURRENT_SOURCE_DIR}/tst_ai_provider_settings.cpp"
+    DEPENDS tst_ai_provider_settings.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM)
+qt_add_executable(tst_ai_provider_settings
+    tst_ai_provider_settings.cpp
+    "${ai_provider_settings_moc}")
+set_target_properties(tst_ai_provider_settings PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_ai_provider_settings PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_ai_provider_settings PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME ai_provider_settings COMMAND tst_ai_provider_settings)
+set_tests_properties(ai_provider_settings PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
+set(openai_compatible_client_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_openai_compatible_client.moc")
+add_custom_command(OUTPUT "${openai_compatible_client_moc}"
+    COMMAND Qt6::moc -o tst_openai_compatible_client.moc
+            "${CMAKE_CURRENT_SOURCE_DIR}/tst_openai_compatible_client.cpp"
+    DEPENDS tst_openai_compatible_client.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM)
+qt_add_executable(tst_openai_compatible_client
+    tst_openai_compatible_client.cpp
+    "${openai_compatible_client_moc}")
+set_target_properties(tst_openai_compatible_client PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_openai_compatible_client PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_openai_compatible_client PRIVATE BlueprintEditorCore Qt6::Network Qt6::Test)
+add_test(NAME openai_compatible_client COMMAND tst_openai_compatible_client)
+set_tests_properties(openai_compatible_client PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
+set(ai_connection_tester_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_ai_connection_tester.moc")
+add_custom_command(OUTPUT "${ai_connection_tester_moc}"
+    COMMAND Qt6::moc -o tst_ai_connection_tester.moc
+            "${CMAKE_CURRENT_SOURCE_DIR}/tst_ai_connection_tester.cpp"
+    DEPENDS tst_ai_connection_tester.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM)
+qt_add_executable(tst_ai_connection_tester
+    tst_ai_connection_tester.cpp
+    "${ai_connection_tester_moc}")
+set_target_properties(tst_ai_connection_tester PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_ai_connection_tester PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_ai_connection_tester PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME ai_connection_tester COMMAND tst_ai_connection_tester)
+set_tests_properties(ai_connection_tester PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 set(language_switch_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_language_switch.moc")
 add_custom_command(OUTPUT "${language_switch_moc}"
     COMMAND Qt6::moc -o tst_language_switch.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_language_switch.cpp"
@@ -347,6 +419,32 @@ target_link_libraries(tst_generation_service PRIVATE
 add_test(NAME generation_service COMMAND tst_generation_service)
 
 set_tests_properties(generation_service PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+)
+
+set(manual_ai_integration_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_manual_ai_integration.moc")
+add_custom_command(
+    OUTPUT "${manual_ai_integration_moc}"
+    COMMAND Qt6::moc -o tst_manual_ai_integration.moc
+            "${CMAKE_CURRENT_SOURCE_DIR}/tst_manual_ai_integration.cpp"
+    DEPENDS tst_manual_ai_integration.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM
+)
+qt_add_executable(tst_manual_ai_integration
+    tst_manual_ai_integration.cpp
+    "${PROJECT_SOURCE_DIR}/tools/manual_ai_integration_support.cpp"
+    "${manual_ai_integration_moc}"
+)
+set_target_properties(tst_manual_ai_integration PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_manual_ai_integration PRIVATE
+    "${PROJECT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}"
+)
+target_link_libraries(tst_manual_ai_integration PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME manual_ai_integration_offline COMMAND tst_manual_ai_integration)
+set_tests_properties(manual_ai_integration_offline PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
 )

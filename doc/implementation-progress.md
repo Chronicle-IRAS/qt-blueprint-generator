@@ -1,12 +1,21 @@
 # 实现进度
 
-更新时间：2026-09-10（Asia/Shanghai）
+更新时间：2026-09-15（Asia/Shanghai）
 
 ## 当前状态
 
-- 当前开发分支：`feature/issue-15-structured-node-editor`，已普通合并远端 `main` 的 `55b9557`（Issue #13 PR #23）。
+- #17 已通过 PR #25 交付（`Closes #17`），远端 Issue 标签已更新为 `in-review`，等待用户审阅合并。Task 4 提交为 `f6d7fc6`；设置、连接测试和双语界面提交依次为 `310da60`、`1228038`、`493d0bc`。
+
+- 最终复验（2026-09-15）：完整构建成功，CTest `18/18 passed`（82.30 秒）；101 条翻译完成；窗口离屏启动通过；源码与文档密钥模式扫描无命中。
+
+- #17 Task 4：手工真实集成工具及 README/使用指南已实现，独立最终复核 Ready。新增离线测试覆盖安全摘要、匹配请求超时、候选路径约束、junction 拒绝和同步客户端完成；既有 18 项离线回归通过。
+- 2026-09-15 真实 DeepSeek 验证成功：`deepseek-flash`、HTTPS Chat Completions、180 秒上限，工具退出码 0。实际经过提示词编译、模型调用、严格响应校验和候选持久化，得到 2 个 pending 文件；没有自动接受或执行生成代码。
+- 真实验收工作区：`C:\Users\Lenovo\AppData\Local\Temp\blueprint-ai-manual-PgZSWO`；候选批次 `manual_11e8ace27bb8454aac22e6dd0d698f58`。密钥仅传入验证进程环境，记录不含密钥。
+- #17 核心 AI 生成及设置界面已实现；窗口内完整生成/候选审核入口按后续 #18 处理。Issue 保持开启，等待交付 PR 合并。
+
+- 当前开发分支：`feature/issue-17-ai-provider-settings`，基于最新远端 `main` 的 `96a9c93`（Issue #15 PR #24 合并提交）。
 - 当前项目路径：`C:\Users\Lenovo\DeskBox\毕业设计相关\毕设\project`。
-- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-10-issue-15-structured-node-editor.md`；完整使用说明：`doc/project-usage-guide.md`。
+- MVP 基线：`doc/mvp-implementation-plan.md`；当前实施计划：`doc/plans/2026-09-11-issue-17-ai-provider-settings.md`；完整使用说明：`doc/project-usage-guide.md`。
 - `doc/multilanguage-development-design.md` 描述 C++/Python 混合实现的后续规划；当前任务和使用指南只说明已经实现的功能。
 - Task 1「建立可构建、可测试的 Qt 工程」已完成并通过规格与代码质量审查。
 - Task 2「蓝图领域模型与 JSON 往返」已完成并通过规格与代码质量审查。
@@ -31,7 +40,15 @@
 - #14 已通过 PR #22 合入远端 `main`，合并提交为 `c6f0623`；双击节点直接编辑全部属性及 Inspector 同步功能已成为 #15 的基线。
 - #13 已通过 PR #23 合入远端 `main`，合并提交为 `55b9557`；端口拖拽连线已纳入当前分支。
 - #15 已在独立分支完成共享结构化属性控件及两处入口接入：输入/输出按端口表格编辑，约束/验收标准按字符串列表编辑；BlueprintDocument、JSON Schema、Serializer 和 IR 保持不变，全量验证及独立复核均已通过。
-- #15 已通过 PR #24 交付，标题为 `[feat] Replace JSON node properties with structured controls (#15)`，正文包含 `Closes #15`，等待用户审阅与合并。
+- #15 已通过 PR #24 合入远端 `main`，合并提交为 `96a9c93`。
+- #17 已启动：范围限定为 OpenAI-compatible Provider 设置、环境变量密钥来源、离线可测的 Test Connection、真实 DeepSeek 手工联调工具与说明；普通生成和候选审核 GUI 留给 #18。
+- #17 已确认当前 DeepSeek 官方默认兼容配置为 `https://api.deepseek.com/chat/completions` 与 `deepseek-flash`；自动化测试仍全部禁止访问真实网络。
+- #17 Task 1 已完成非秘密 Provider 设置边界：仅持久化 Provider、Endpoint、Model 与凭据来源，API 密钥只检查 `BLUEPRINT_AI_API_KEY` 是否可用；损坏凭据来源、非 HTTPS/带 user-info/query/fragment 的 URL、空白或带首尾空白的模型均被拒绝。
+- #17 Task 1 已通过独立规格与质量复核；最终结论为 `SPEC COMPLIANT` / `Ready`，无 Critical、Important 或 Minor。
+- #17 Task 2 已完成结构化且脱敏的 AI 错误模型、OpenAI-compatible HTTP/provider 分类和一次性连接测试器；普通生成继续保持原有字符串失败信号，且不会发送探测专用字段。
+- #17 Task 2 已通过独立规格与质量复核；最终结论为 `SPEC COMPLIANT` / `Ready`，无 Critical、Important 或 Minor。所有自动化网络测试均使用 Fake 或注入式网络替身。
+- #17 Task 3 已完成双语 AI Provider 设置对话框和主窗口入口：支持 Endpoint、Model、环境变量凭据来源/可用状态、使用未保存草稿的 Test Connection、Save/Cancel 与安全错误状态；界面没有明文 API key 输入。
+- #17 Task 3 已通过独立规格与质量复核；最终结论为 `SPEC COMPLIANT` / `Ready`，无 Critical、Important 或 Minor。普通生成/候选审核 GUI 仍留给 #18。
 
 ## 已完成提交
 
@@ -160,6 +177,13 @@
   - 增加“删除清单”和“删除清单后替换源码”的 RED→GREEN 回归测试。
 
 ## 验证记录
+
+- #17 Task 1 RED：新增设置合同测试后因 `ai/ai_provider_settings.h` 不存在而编译失败；补充 Provider/其他组件设置边界后为 `16 passed, 2 failed`；空 user-info、写失败回滚同步和 sticky `QSettings` 重试均分别完成突变失败验证。
+- #17 Task 1 GREEN：`ai_provider_settings` 聚焦 CTest `1/1 passed`；初版实现后的完整 CTest `14/14 passed`（73.40 秒）。最终回归覆盖默认值不落盘、四键白名单、旧明文键清理、未知字段保留、无效配置零修改、后端失败回滚、错误对象零写重试和重建对象后恢复保存。
+- #17 Task 2 RED：字符串型 `requestFailed`、缺失的探测请求字段与 `AiConnectionTester` 使三个新增/更新目标按预期编译失败；审查补强另分别捕获 401 分类优先级、HTTP 408 超时、400 + 受信 `model_not_found` 和对象生命周期分支。
+- #17 Task 2 GREEN：`openai_compatible_client|ai_connection_tester|generation_service` 聚焦 `3/3 passed`；最新完整离线 CTest `16/16 passed`（独立复核分别为 81.51 秒、94.71 秒）。响应体、prompt、API key 与底层网络错误文本均不进入失败信号或日志。
+- #17 Task 3 RED：新增 GUI 合同测试因缺少 `app/ai_settings_dialog.h` 按预期编译失败；“已保存配置 A + 未保存草稿 B”测试通过临时改为回读 A 的突变，准确失败于 Endpoint 不匹配。
+- #17 Task 3 GREEN：设置对话框覆盖 20 个用例/数据行；`ai_settings_dialog|language_switch|blueprint_scene` 为 `3/3 passed`，完整离线 CTest `17/17 passed`（79.19 秒）。连接测试前后完整 QSettings 快照保持不变，运行时重译保留草稿、状态与稳定 ID。
 
 - #15 RED：新增组件测试因 `editor/node_properties_editor.h` 尚不存在而按预期编译失败，证明结构化编辑接口缺失可被检测。
 - #15 GREEN：`node_properties_editor` 覆盖端口和字符串列表增改删、Unicode、特殊字符、空值、重复项、顺序、缺失单元格与 Serializer schema 1 往返；`blueprint_scene` 覆盖 Inspector、直接编辑、Cancel、Undo/Redo 和草稿同步。

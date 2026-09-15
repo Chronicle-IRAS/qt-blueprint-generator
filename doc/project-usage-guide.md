@@ -16,10 +16,11 @@ Qt Blueprint Generator 是一个 Qt 6 Widgets 蓝图编辑器。它用节点和�
 | 撤销、重做、框选和缩放 | 编辑器窗口 | 可直接使用 |
 | 恢复属性与构建/导出面板 | `View / 视图` 菜单 | 可直接使用 |
 | 中英文界面切换 | `Language / 语言` 菜单 | 可直接使用并记住选择 |
+| AI 服务参数和连接测试 | `AI > AI Settings... / AI 设置...` | 可直接使用 |
 | 构建已准备好的工作目录 | 底部构建面板 | 可直接使用 |
 | 导出已准备好的工作目录 | 底部导出面板 | 可直接使用 |
 | 蓝图 JSON 读写与校验 | C++ API、自动化测试 | 尚未接入打开/保存按钮 |
-| AI 请求、候选预览和接受/拒绝 | C++ API、自动化测试 | 尚未接入窗口 |
+| AI 代码生成、候选预览和接受/拒绝 | 人工集成工具、C++ API、自动化测试 | 尚未接入窗口 |
 | 工程骨架创建、外部代码导入 | C++ API、自动化测试 | 尚未接入窗口 |
 
 关闭编辑器会丢失当前画布中的内容，因为窗口暂时没有打开、保存和自动恢复蓝图的功能。需要长期保存的数据应先通过 `BlueprintSerializer::toJson()` 序列化，再由调用方写入 `blueprint.json`；也可以先使用测试夹具和核心服务验证流程。
@@ -62,7 +63,7 @@ ctest --test-dir $buildRoot -C Debug --output-on-failure
 & (Join-Path $buildRoot 'BlueprintEditor.exe')
 ```
 
-正常情况下会运行 13 项 CTest。测试使用 Fake AI 或离线网络替身，不读取真实 API 密钥，也不会产生模型费用。
+正常情况下会运行全部已注册的 CTest。测试使用 Fake AI 或离线网络替身，不读取真实 API 密钥，也不会产生模型费用。人工真实集成程序从不注册为 CTest。
 
 以后重新编译只需在已经设置好 `PATH` 的终端运行：
 
@@ -204,22 +205,68 @@ MinGW/Ninja 示例参数：
 
 构建操作会执行工作目录中的 CMake 和源码。来源不明的生成代码应先人工审查。
 
-## 8. AI 服务的使用边界
+## 8. AI 设置与人工真实集成
 
-窗口目前没有“生成代码”按钮、服务商设置或候选差异窗口。AI 功能已经作为核心 API 实现，主要入口是：
+### 8.1 GUI 设置与连接测试
+
+从主窗口打开 `AI > AI Settings... / AI 设置...`。Provider 固定为 `openai-compatible`；默认端点为 `https://api.deepseek.com/chat/completions`，默认模型为 `deepseek-flash`。端点必须是没有用户名、密码、查询串或片段的 HTTPS URL。修改后可先点 `Test Connection / 测试连接`，再决定是否保存非敏感设置。
+
+连接测试只验证当前端点、模型和凭据是否能够完成一个受限请求。成功不表示后续代码一定正确；失败可能来自网络、超时、认证、余额或计费、限流、端点、模型、响应格式或服务暂时不可用。界面不会显示原始服务商响应，也不会保存密钥。
+
+窗口目前仍没有“生成代码”按钮或候选差异窗口。AI 生成和候选生命周期的核心入口是：
 
 - `OpenAiCompatibleClient`：向 HTTPS Chat Completions 接口发送请求。
 - `GenerationService::generate()`：发起异步生成并校验响应。
 - `GenerationService::persistCandidate()`：把有效结果保存为候选批次。
 - `previewCandidate()`、`acceptCandidate()`、`rejectCandidate()` 和 `cancelCandidate()`：完成候选审核。
 
-真实模型密钥只从当前进程的 `BLUEPRINT_AI_API_KEY` 环境变量读取：
+真实模型密钥只从当前进程的 `BLUEPRINT_AI_API_KEY` 环境变量读取。在启动编辑器或人工工具的同一个 PowerShell 窗口中临时设置：
 
 ```powershell
-$env:BLUEPRINT_AI_API_KEY = '<API key>'
+$env:BLUEPRINT_AI_API_KEY = '<paste the key only in this terminal>'
 ```
 
-接口地址和模型名由调用代码传给 `OpenAiCompatibleClient`，必须使用有效 HTTPS 地址。密钥不会写入蓝图、候选清单或日志。使用 DeepSeek 等 OpenAI-compatible 服务时，应从服务商当前文档取得 Chat Completions 地址和模型名；本项目没有把这些值硬编码在仓库中。
+不要把密钥写入 `.env`、PowerShell/CMD 启动脚本、CMake 参数、蓝图、生成工程、候选、测试夹具或其他项目文件。使用完毕后执行 `Remove-Item Env:BLUEPRINT_AI_API_KEY`，关闭终端也会清除该进程环境。密钥疑似泄露时，应立即在服务商控制台撤销并创建新密钥；不要只修改本地字符串。
+
+### 8.2 构建和运行人工集成工具
+
+`manual_ai_integration` 是真实请求的人工验收路径，默认 `BUILD_MANUAL_AI_INTEGRATION=OFF`，因此普通配置和构建不会创建它。准备一个独立的 ASCII 构建目录，并显式开启：
+
+```powershell
+$manualBuild = Join-Path $env:LOCALAPPDATA 'QtBlueprintGenerator\manual-ai'
+cmake -S . -B $manualBuild -G Ninja `
+  -DBUILD_TESTING=OFF `
+  -DBUILD_MANUAL_AI_INTEGRATION=ON `
+  -DCMAKE_PREFIX_PATH="$qtRoot"
+cmake --build $manualBuild --target manual_ai_integration
+
+$env:BLUEPRINT_AI_API_KEY = '<paste the key only in this terminal>'
+try {
+    & (Join-Path $manualBuild 'manual_ai_integration.exe')
+} finally {
+    Remove-Item Env:BLUEPRINT_AI_API_KEY -ErrorAction SilentlyContinue
+}
+```
+
+默认使用 DeepSeek 端点和 `deepseek-flash`。可按服务商当前文档覆盖端点、模型和总等待时间：
+
+```powershell
+$manualWorkspace = 'C:\existing-empty-manual-workspace'
+New-Item -ItemType Directory -Path $manualWorkspace -ErrorAction Stop | Out-Null
+& (Join-Path $manualBuild 'manual_ai_integration.exe') `
+  --endpoint 'https://provider.example/v1/chat/completions' `
+  --model 'provider-model' `
+  --timeout-seconds 90 `
+  --workspace $manualWorkspace
+```
+
+不传 `--workspace` 时，工具创建隔离的临时工作目录。显式覆盖时，目录必须在调用前已经存在、为空且为绝对路径；从该目录到文件系统根的任一级都不能是 symlink、Windows junction 或其他 reparse point。工具不会创建、清空或复用不合格的覆盖目录，拒绝时不会改动链接目标。成功后的目录不再为空，因此不能原样用于下一次运行。
+
+工具先检查密钥和工作目录边界，再校验内置 Blueprint，调用 `ProjectScaffolder`，从脚手架 IR 和模块契约编译真实提示词；提示词明确把候选限制在 `src/modules/manual_logic/implementation/` 或 `tests/manual_logic/`，并只允许 `.h`、`.hpp`、`.cpp`、`.cc`。随后通过 `OpenAiCompatibleClient` 和 `GenerationService` 请求并严格校验响应，最后调用 `persistCandidate()`。成功时会保留并输出工作目录和候选批次 ID，方便人工检查。它只保存 `active/pending` 候选，从不调用 `acceptCandidate()`，所以 `generated-project` 不会因本次模型回复被自动覆盖。
+
+固定退出码约定：`0` 成功；`2` 参数错误；`3` 缺少环境密钥；`4` 内置蓝图校验失败；`5` 工作目录或脚手架失败；`6` 提示词准备失败；`7` 非超时的网络或服务商失败；`8` 客户端超时、HTTP 408 或工具总等待超时；`9` 模型响应未通过严格校验；`10` 候选持久化失败。输出只包含固定安全摘要，不包含密钥、Authorization 头、完整提示词、原始响应正文，模型返回的节点 ID、文件路径或校验错误也不会回显。
+
+真实请求可能产生服务商费用，即使最终响应校验失败也可能计费。运行前确认账户、模型价格、配额和数据处理政策；遇到认证、余额、限流、模型或端点错误时，先在 GUI 的连接测试中验证相同设置，再查服务商控制台。不要为了“跑通”而放宽 HTTPS、响应结构、路径、大小或候选边界。
 
 模型返回内容必须是项目规定的 JSON 格式，并通过文件数量、大小、扩展名和相对路径校验。允许的源码扩展名是 `.h`、`.hpp`、`.cpp` 和 `.cc`。未经接受的候选不会覆盖工程文件，接受候选也不代表代码已经通过编译或业务验收。
 
@@ -284,9 +331,9 @@ ctest --test-dir $buildRoot -C Debug -R '^project_exporter$' --output-on-failure
 
 导出目录必须已存在、为空、使用绝对路径，且不能与工作目录重叠。为避免误覆盖，程序不会导出到非空目录。
 
-### 设置了密钥但窗口里没有 AI 按钮
+### 设置了密钥但窗口里没有生成按钮
 
-这是当前版本的正常限制。设置环境变量只为 `OpenAiCompatibleClient` 提供密钥，窗口尚未连接 AI 和候选审核服务。
+这是当前版本的正常边界。`AI Settings` 提供参数配置和连接测试；代码生成与候选审核尚未接入窗口。需要真实验证时使用显式启用的 `manual_ai_integration`，并在输出的工作目录中人工审查候选。
 
 ## 12. 相关文档
 

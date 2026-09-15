@@ -344,6 +344,7 @@ private slots:
 void GenerationServiceTest::initTestCase()
 {
     qRegisterMetaType<GenerationResult>();
+    qRegisterMetaType<AiClientError>();
 }
 
 void GenerationServiceTest::acceptsValidResponseWithoutWritingFiles()
@@ -613,6 +614,8 @@ void GenerationServiceTest::fakeClientCompletesSuccessfullyAsynchronously()
     QCOMPARE(client.requests().size(), 1);
     QCOMPARE(client.requests().constFirst().requestId, requestId);
     QCOMPARE(client.requests().constFirst().prompt, QStringLiteral("prompt"));
+    QVERIFY(!client.requests().constFirst().maxTokens.has_value());
+    QVERIFY(!client.requests().constFirst().disableThinking.has_value());
     QCOMPARE(successSpy.count(), 0);
     QCOMPARE(failureSpy.count(), 0);
     QVERIFY(successSpy.wait(1000));
@@ -630,7 +633,9 @@ void GenerationServiceTest::propagatesClientFailureAsynchronously()
     QTemporaryDir root;
     QVERIFY(root.isValid());
     FakeAiClient client;
-    client.setFailure(QStringLiteral("offline"));
+    client.setFailure({AiErrorKind::Network,
+                       0,
+                       QStringLiteral("AI network request failed")});
     GenerationService service(&client);
     QSignalSpy successSpy(&service, &GenerationService::generationSucceeded);
     QSignalSpy failureSpy(&service, &GenerationService::generationFailed);
@@ -645,7 +650,8 @@ void GenerationServiceTest::propagatesClientFailureAsynchronously()
     QCOMPARE(successSpy.count(), 0);
     QCOMPARE(failureSpy.count(), 1);
     QCOMPARE(failureSpy.constFirst().at(0).toUuid(), requestId);
-    QVERIFY(failureSpy.constFirst().at(1).toString().contains(QStringLiteral("offline")));
+    QCOMPARE(failureSpy.constFirst().at(1).toString(),
+             QStringLiteral("AI network request failed"));
     QVERIFY(directoryIsEmpty(root.path()));
 }
 
@@ -741,8 +747,8 @@ void GenerationServiceTest::openAiClientEnforcesAbsoluteDeadline()
     QCOMPARE(successSpy.count(), 0);
     QCOMPARE(failureSpy.count(), 1);
     QCOMPARE(failureSpy.constFirst().at(0).toUuid(), requestId);
-    QVERIFY(failureSpy.constFirst().at(1).toString().contains(QStringLiteral("timed out"),
-                                                              Qt::CaseInsensitive));
+    QCOMPARE(qvariant_cast<AiClientError>(failureSpy.constFirst().at(1)).kind,
+             AiErrorKind::Timeout);
     QTest::qWait(50);
     QCOMPARE(failureSpy.count(), 1);
 }
@@ -816,8 +822,8 @@ void GenerationServiceTest::openAiClientEnforcesWireLimitOffline()
     QCOMPARE(failureSpy.count(), 1);
     QCOMPARE(successSpy.constFirst().at(0).toUuid(), boundaryId);
     QCOMPARE(failureSpy.constFirst().at(0).toUuid(), oversizedId);
-    QVERIFY(failureSpy.constFirst().at(1).toString().contains(QStringLiteral("wire"),
-                                                              Qt::CaseInsensitive));
+    QCOMPARE(qvariant_cast<AiClientError>(failureSpy.constFirst().at(1)).kind,
+             AiErrorKind::InvalidResponse);
     QTest::qWait(50);
     QCOMPARE(successSpy.count() + failureSpy.count(), 2);
 }
@@ -836,7 +842,8 @@ void GenerationServiceTest::openAiClientRejectsInsecureEndpointOffline()
     QCOMPARE(failureSpy.count(), 0);
     QVERIFY(failureSpy.wait(500));
     QCOMPARE(manager.requests.size(), 0);
-    QVERIFY(failureSpy.constFirst().at(1).toString().contains(QStringLiteral("HTTPS")));
+    QCOMPARE(qvariant_cast<AiClientError>(failureSpy.constFirst().at(1)).kind,
+             AiErrorKind::InvalidConfiguration);
 }
 
 void GenerationServiceTest::openAiClientRejectsRedirectAndInvalidEnvelopeOffline()
@@ -857,9 +864,11 @@ void GenerationServiceTest::openAiClientRejectsRedirectAndInvalidEnvelopeOffline
     QTRY_COMPARE_WITH_TIMEOUT(failureSpy.count(), 2, 500);
     QCOMPARE(successSpy.count(), 0);
     QCOMPARE(manager.requests.size(), 2);
-    QVERIFY(failureSpy.at(0).at(1).toString().contains(QStringLiteral("302")));
-    QVERIFY(failureSpy.at(1).at(1).toString().contains(QStringLiteral("content"),
-                                                       Qt::CaseInsensitive));
+    QCOMPARE(qvariant_cast<AiClientError>(failureSpy.at(0).at(1)).kind,
+             AiErrorKind::Unknown);
+    QCOMPARE(qvariant_cast<AiClientError>(failureSpy.at(0).at(1)).httpStatus, 302);
+    QCOMPARE(qvariant_cast<AiClientError>(failureSpy.at(1).at(1)).kind,
+             AiErrorKind::InvalidResponse);
 }
 
 void GenerationServiceTest::generationServiceDeletionDuringClientDestroyedFanoutIsSafe()
@@ -935,7 +944,7 @@ void GenerationServiceTest::openAiClientDeletionDuringAbortIsSafe()
                                   &manager);
             QObject::connect(&*clientStorage,
                              &IAiClient::requestFailed,
-                             [&replacementFailureCount](const QUuid &, const QString &) {
+                             [&replacementFailureCount](const QUuid &, const AiClientError &) {
                                  ++replacementFailureCount;
                              });
         };

@@ -10,7 +10,7 @@ public:
     explicit FakeAiClient(QObject *parent = nullptr);
 
     void setSuccessfulResponse(const QByteArray &modelResponse);
-    void setFailure(const QString &errorMessage);
+    void setFailure(const AiClientError &error);
 
     void generate(const AiRequest &request) override;
 
@@ -25,6 +25,6 @@ private:
 
     ResultType m_resultType = ResultType::Success;
     QByteArray m_modelResponse;
-    QString m_errorMessage;
+    AiClientError m_error;
     QVector<AiRequest> m_requests;
 };

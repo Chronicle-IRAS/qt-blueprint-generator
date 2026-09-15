@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.22)
 
 project(BlueprintEditor LANGUAGES CXX)
 
+option(BUILD_MANUAL_AI_INTEGRATION
+    "Build the opt-in real-provider manual integration executable"
+    OFF)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -11,11 +15,17 @@ find_package(Qt6 REQUIRED COMPONENTS LinguistTools Network Widgets)
 qt_standard_project_setup()
 
 qt_add_library(BlueprintEditorCore STATIC
+    src/ai/ai_connection_tester.cpp
+    src/ai/ai_connection_tester.h
     src/ai/ai_client.h
+    src/ai/ai_provider_settings.cpp
+    src/ai/ai_provider_settings.h
     src/ai/fake_ai_client.cpp
     src/ai/fake_ai_client.h
     src/ai/openai_compatible_client.cpp
     src/ai/openai_compatible_client.h
+    src/app/ai_settings_dialog.cpp
+    src/app/ai_settings_dialog.h
     src/app/main_window.cpp
     src/app/main_window.h
     src/blueprint/blueprint_document.cpp
@@ -70,6 +80,16 @@ target_link_libraries(BlueprintEditor PRIVATE
     BlueprintEditorCore
 )
 
+if(BUILD_MANUAL_AI_INTEGRATION)
+    qt_add_executable(manual_ai_integration
+        tools/manual_ai_integration.cpp
+        tools/manual_ai_integration_support.cpp
+        tools/manual_ai_integration_support.h
+    )
+    target_include_directories(manual_ai_integration PRIVATE ${PROJECT_SOURCE_DIR})
+    target_link_libraries(manual_ai_integration PRIVATE BlueprintEditorCore Qt6::Network)
+endif()
+
 include(CTest)
 
 if(BUILD_TESTING)
@@ -79,7 +99,7 @@ endif()
 
 set(translation_targets BlueprintEditor)
 if(BUILD_TESTING)
-    list(APPEND translation_targets tst_language_switch)
+    list(APPEND translation_targets tst_language_switch tst_ai_settings_dialog)
 endif()
 
 qt_add_translations(

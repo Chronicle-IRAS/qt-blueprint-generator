@@ -13,14 +13,14 @@ void FakeAiClient::setSuccessfulResponse(const QByteArray &modelResponse)
 {
     m_resultType = ResultType::Success;
     m_modelResponse = modelResponse;
-    m_errorMessage.clear();
+    m_error = {};
 }
 
-void FakeAiClient::setFailure(const QString &errorMessage)
+void FakeAiClient::setFailure(const AiClientError &error)
 {
     m_resultType = ResultType::Failure;
     m_modelResponse.clear();
-    m_errorMessage = errorMessage;
+    m_error = error;
 }
 
 void FakeAiClient::generate(const AiRequest &request)
@@ -29,14 +29,14 @@ void FakeAiClient::generate(const AiRequest &request)
 
     const ResultType resultType = m_resultType;
     const QByteArray modelResponse = m_modelResponse;
-    const QString errorMessage = m_errorMessage;
+    const AiClientError error = m_error;
     const QUuid requestId = request.requestId;
-    QTimer::singleShot(0, this, [this, resultType, modelResponse, errorMessage, requestId]() {
+    QTimer::singleShot(0, this, [this, resultType, modelResponse, error, requestId]() {
         if (resultType == ResultType::Success) {
             emit responseReady(requestId, modelResponse);
             return;
         }
-        emit requestFailed(requestId, errorMessage);
+        emit requestFailed(requestId, error);
     });
 }
 

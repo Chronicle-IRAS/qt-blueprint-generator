@@ -81,6 +81,8 @@ private:
     QAction *m_menuUndoAction = nullptr;
     QAction *m_menuRedoAction = nullptr;
     QMenu *m_viewMenu = nullptr;
+    QMenu *m_aiMenu = nullptr;
+    QAction *m_aiSettingsAction = nullptr;
     QAction *m_propertiesDockAction = nullptr;
     QAction *m_buildDockAction = nullptr;
     QAction *m_resetLayoutAction = nullptr;
