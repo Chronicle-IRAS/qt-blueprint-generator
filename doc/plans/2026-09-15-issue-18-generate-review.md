@@ -21,9 +21,9 @@ Base: `origin/main` merge `9959917`; branch: `feature/issue-18-ai-generation-rev
 
 ### 1. Generation controller
 
-- [ ] Define offline behavior tests before implementation: valid selected module, invalid selection/configuration/blueprint, snapshot handling, provider failure, candidate-only success and lifetime cleanup.
-- [ ] Implement a controller and injected client factory, reusing provider settings, scaffold/prompt and GenerationService.
-- [ ] Show stable state transitions and safe error categories; prevent duplicate generation.
+- [x] Define offline behavior tests before implementation: valid selected module, invalid selection/configuration/blueprint, snapshot handling, provider failure, candidate-only success and lifetime cleanup.
+- [x] Implement a controller and injected client factory, reusing provider settings, scaffold/prompt and GenerationService.
+- [x] Show stable state transitions and safe error categories; prevent duplicate generation.
 - [ ] Run focused tests, obtain independent review, update README/progress and push completed group.
 
 ### 2. Candidate review

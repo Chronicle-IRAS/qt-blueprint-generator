@@ -26,6 +26,8 @@ qt_add_library(BlueprintEditorCore STATIC
     src/ai/openai_compatible_client.h
     src/app/ai_settings_dialog.cpp
     src/app/ai_settings_dialog.h
+    src/app/generation_controller.cpp
+    src/app/generation_controller.h
     src/app/main_window.cpp
     src/app/main_window.h
     src/blueprint/blueprint_document.cpp
