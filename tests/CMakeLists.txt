@@ -1,5 +1,41 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
 
+set(generation_workflow_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_generation_workflow.moc")
+add_custom_command(OUTPUT "${generation_workflow_moc}"
+    COMMAND Qt6::moc -o tst_generation_workflow.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_generation_workflow.cpp"
+    DEPENDS tst_generation_workflow.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_generation_workflow tst_generation_workflow.cpp "${generation_workflow_moc}")
+set_target_properties(tst_generation_workflow PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_generation_workflow PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_generation_workflow PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME generation_workflow COMMAND tst_generation_workflow)
+set_tests_properties(generation_workflow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
+set(candidate_review_dialog_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_candidate_review_dialog.moc")
+add_custom_command(OUTPUT "${candidate_review_dialog_moc}"
+    COMMAND Qt6::moc -o tst_candidate_review_dialog.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_candidate_review_dialog.cpp"
+    DEPENDS tst_candidate_review_dialog.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_candidate_review_dialog tst_candidate_review_dialog.cpp "${candidate_review_dialog_moc}")
+set_target_properties(tst_candidate_review_dialog PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_candidate_review_dialog PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_candidate_review_dialog PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME candidate_review_dialog COMMAND tst_candidate_review_dialog)
+set_tests_properties(candidate_review_dialog PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
+set(generation_controller_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_generation_controller.moc")
+add_custom_command(OUTPUT "${generation_controller_moc}"
+    COMMAND Qt6::moc -o tst_generation_controller.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_generation_controller.cpp"
+    DEPENDS tst_generation_controller.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_generation_controller tst_generation_controller.cpp "${generation_controller_moc}")
+set_target_properties(tst_generation_controller PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_generation_controller PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_generation_controller PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME generation_controller COMMAND tst_generation_controller)
+set_tests_properties(generation_controller PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 set(ai_settings_dialog_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_ai_settings_dialog.moc")
 add_custom_command(OUTPUT "${ai_settings_dialog_moc}"
     COMMAND Qt6::moc -o tst_ai_settings_dialog.moc

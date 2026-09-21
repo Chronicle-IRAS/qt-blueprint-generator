@@ -26,6 +26,10 @@ qt_add_library(BlueprintEditorCore STATIC
     src/ai/openai_compatible_client.h
     src/app/ai_settings_dialog.cpp
     src/app/ai_settings_dialog.h
+    src/app/candidate_review_dialog.cpp
+    src/app/candidate_review_dialog.h
+    src/app/generation_controller.cpp
+    src/app/generation_controller.h
     src/app/main_window.cpp
     src/app/main_window.h
     src/blueprint/blueprint_document.cpp
@@ -99,7 +103,7 @@ endif()
 
 set(translation_targets BlueprintEditor)
 if(BUILD_TESTING)
-    list(APPEND translation_targets tst_language_switch tst_ai_settings_dialog)
+    list(APPEND translation_targets tst_language_switch tst_ai_settings_dialog tst_generation_workflow tst_candidate_review_dialog)
 endif()
 
 qt_add_translations(

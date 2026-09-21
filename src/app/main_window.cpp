@@ -1,6 +1,8 @@
 #include "app/main_window.h"
 
 #include "app/ai_settings_dialog.h"
+#include "app/candidate_review_dialog.h"
+#include <QUuid>
 
 #include "editor/blueprint_scene.h"
 #include "editor/node_item.h"
@@ -177,8 +179,16 @@ protected:
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
+    : MainWindow(GenerationController::ClientFactory{}, parent)
+{
+}
+
+MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *parent)
     : QMainWindow(parent)
 {
+    m_document.projectId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    m_document.projectName = QStringLiteral("BlueprintProject");
+    m_document.target = QStringLiteral("qt6-widgets-cpp17-cmake");
     setWindowTitle(tr("Blueprint Editor"));
     resize(1100, 700);
 
@@ -247,6 +257,17 @@ MainWindow::MainWindow(QWidget *parent)
     m_aiMenu->setObjectName(QStringLiteral("aiMenu"));
     m_aiSettingsAction = m_aiMenu->addAction(tr("AI Settings..."));
     m_aiSettingsAction->setObjectName(QStringLiteral("aiSettingsAction"));
+    m_generateAction = m_aiMenu->addAction(tr("Generate selected node"));
+    m_generateAction->setObjectName(QStringLiteral("generateSelectedNodeAction"));
+    m_cancelGenerationAction = m_aiMenu->addAction(tr("Cancel generation"));
+    m_cancelGenerationAction->setObjectName(QStringLiteral("cancelGenerationAction"));
+    m_blueprintToolbar->addSeparator();
+    m_blueprintToolbar->addAction(m_generateAction);
+    m_blueprintToolbar->addAction(m_cancelGenerationAction);
+    m_generationStatus = new QLabel(this);
+    m_generationStatus->setObjectName(QStringLiteral("generationStatus"));
+    m_generationStatus->setTextFormat(Qt::PlainText);
+    statusBar()->addPermanentWidget(m_generationStatus);
 
     m_languageMenu = menuBar()->addMenu(tr("Language"));
     m_languageMenu->setObjectName(QStringLiteral("languageMenu"));
@@ -329,6 +350,29 @@ MainWindow::MainWindow(QWidget *parent)
     m_resetLayoutAction->setObjectName(QStringLiteral("resetLayoutAction"));
 
     m_buildService = new BuildService(this);
+    m_generationController = factory ? new GenerationController(std::move(factory), this)
+                                     : new GenerationController(this);
+    connect(m_generateAction, &QAction::triggered, this, &MainWindow::startGeneration);
+    connect(m_cancelGenerationAction, &QAction::triggered,
+            m_generationController, &GenerationController::cancel);
+    connect(m_generationController, &GenerationController::stateChanged,
+            this, [this] { updateGenerationUi(); });
+    connect(m_generationController, &GenerationController::candidateReady, this,
+            [this](const CandidateBatch &batch) {
+        auto *dialog = new CandidateReviewDialog(m_generationSnapshot, batch.workspace,
+                                                 batch.generationId, batch.result, this);
+        m_reviewDialog = dialog;
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        dialog->setWindowModality(Qt::ApplicationModal);
+        connect(dialog, &QObject::destroyed, this, [this] {
+            m_reviewDialog = nullptr;
+            updateGenerationUi();
+        });
+        dialog->show();
+        updateGenerationUi();
+    });
+    connect(m_workspacePathEdit, &QLineEdit::textChanged,
+            this, &MainWindow::invalidateGenerationContext);
 
     connect(m_deleteAction, &QAction::triggered, this, [this] { deleteSelection(); });
     connect(m_connectAction, &QAction::triggered, this, [this] {
@@ -387,8 +431,14 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(m_scene, &BlueprintScene::nodeEditRequested, this,
             [this](const QString &nodeId) { editNodeFromCanvas(nodeId); });
-    connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] { updatePropertyEditor(); });
-    m_scene->setSemanticChangeHandler([this] { updatePropertyEditor(); });
+    connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] {
+        updatePropertyEditor();
+        updateGenerationUi();
+    });
+    m_scene->setSemanticChangeHandler([this] {
+        updatePropertyEditor();
+        invalidateGenerationContext();
+    });
     updatePropertyEditor();
 
     const QString savedLanguage = QSettings().value(QStringLiteral("ui/language"),
@@ -400,6 +450,9 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
+    if (m_reviewDialog)
+        QObject::disconnect(m_reviewDialog, nullptr, this, nullptr);
+    QObject::disconnect(m_generationController, nullptr, this, nullptr);
     qApp->removeTranslator(&m_translator);
     if (m_scene) {
         QObject::disconnect(m_scene, nullptr, this, nullptr);
@@ -517,6 +570,9 @@ void MainWindow::retranslateUi()
     m_viewMenu->setTitle(tr("View"));
     m_aiMenu->setTitle(tr("AI"));
     m_aiSettingsAction->setText(tr("AI Settings..."));
+    m_generateAction->setText(tr("Generate selected node"));
+    m_cancelGenerationAction->setText(tr("Cancel generation"));
+    updateGenerationUi();
     m_languageMenu->setTitle(tr("Language"));
     m_englishLanguageAction->setText(tr("English"));
     m_chineseLanguageAction->setText(tr("Chinese"));
@@ -554,6 +610,58 @@ void MainWindow::setBuildToolConfiguration(const QString &cmakeExecutable,
     m_cmakeExecutableEdit->setText(cmakeExecutable);
     m_configureArgumentsEdit->setText(encodeCommandArguments(configureArguments));
     m_buildArguments = buildArguments;
+}
+
+void MainWindow::startGeneration()
+{
+    if (!m_generateAction->isEnabled())
+        return;
+    m_generationNodeId = selectedNodeId();
+    // Capture before start(): injected clients may complete synchronously.
+    m_generationSnapshot = m_document;
+    QSettings settings;
+    m_generationController->start(m_generationSnapshot, m_generationNodeId,
+                                 m_workspacePathEdit->text().trimmed(),
+                                 AiProviderSettings::load(settings));
+    updateGenerationUi();
+}
+
+void MainWindow::invalidateGenerationContext()
+{
+    m_generationController->invalidateContext(m_document, m_workspacePathEdit->text().trimmed());
+    if (m_reviewDialog)
+        m_reviewDialog->invalidateContext();
+    updateGenerationUi();
+}
+
+void MainWindow::updateGenerationUi()
+{
+    if (!m_generationController)
+        return;
+    const auto state = m_generationController->state();
+    bool generatable = false;
+    const QString id = selectedNodeId();
+    if (m_scene->selectedItems().size() == 1) {
+        for (const auto &node : m_document.nodes) {
+            if (node.id == id)
+                generatable = node.type == NodeType::LogicModule || node.type == NodeType::UiPage
+                    || node.type == NodeType::Decision;
+        }
+    }
+    m_generateAction->setEnabled(generatable && state != GenerationController::State::Generating
+                                && !m_reviewDialog);
+    m_cancelGenerationAction->setEnabled(state == GenerationController::State::Generating);
+    QString status;
+    switch (state) {
+    case GenerationController::State::Idle: status = tr("Ready to generate"); break;
+    case GenerationController::State::Generating: status = tr("Generating"); break;
+    case GenerationController::State::Success: status = tr("Success — review candidates"); break;
+    case GenerationController::State::Failed:
+        status = tr("Failed: %1").arg(m_generationController->errorMessage()); break;
+    case GenerationController::State::Cancelled: status = tr("Cancelled"); break;
+    }
+    m_generationStatus->setText(m_generationNodeId.isEmpty() ? status
+        : tr("%1: %2").arg(m_generationNodeId, status));
 }
 
 void MainWindow::startBuild()
