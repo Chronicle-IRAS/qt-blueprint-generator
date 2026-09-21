@@ -33,7 +33,7 @@ Groups 2 and 3 share the GUI end-to-end acceptance boundary and will be delivere
 - [x] Add GUI tests for file selection, Current/Candidate preview, diff, accept/reject/edit-and-accept/cancel.
 - [x] Implement explicit manual conflict confirmation and stale-preview rejection through existing service checks.
 - [x] Preserve drafts during translation and handle close/cancel without unintended acceptance.
-- [ ] Verify focused tests, independent review, README/progress and push.
+- [x] Verify focused tests, independent review, README/progress and push (`11c6fe1`).
 
 ### 3. Main window integration and delivery
 
@@ -41,7 +41,7 @@ Groups 2 and 3 share the GUI end-to-end acceptance boundary and will be delivere
 - [x] Add FakeAiClient GUI end-to-end coverage from selection through review and conflict handling.
 - [x] Complete translations and user instructions.
 - [x] Run complete offline CTest and a user-authorized real provider GUI-path verification.
-- [ ] Create `[feat] ... (#18)` PR referencing `Closes #18`; update existing Issue status and stop for review without auto-merging.
+- [x] Create `[feat] ... (#18)` PR referencing `Closes #18`; update existing Issue status and stop for review without auto-merging (PR #26, `in-review`).
 
 ## Local changes to preserve
 
