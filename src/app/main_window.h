@@ -8,9 +8,13 @@
 #include <QVector>
 
 #include "blueprint/blueprint_document.h"
+#include "app/generation_controller.h"
+#include <QPointer>
 
 class BlueprintScene;
 class BuildService;
+class CandidateReviewDialog;
+class QLabel;
 class NodePropertiesEditor;
 class QAction;
 class QDockWidget;
@@ -30,6 +34,7 @@ class MainWindow final : public QMainWindow
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(GenerationController::ClientFactory factory, QWidget *parent = nullptr);
     ~MainWindow() override;
 
     bool addNodeOfType(NodeType type);
@@ -59,8 +64,18 @@ private:
     void resetWindowLayout();
     void appendBuildLog(const QString &text);
     QString selectedNodeId() const;
+    void startGeneration();
+    void updateGenerationUi();
+    void invalidateGenerationContext();
 
     BlueprintDocument m_document;
+    BlueprintDocument m_generationSnapshot;
+    GenerationController *m_generationController = nullptr;
+    QPointer<CandidateReviewDialog> m_reviewDialog;
+    QAction *m_generateAction = nullptr;
+    QAction *m_cancelGenerationAction = nullptr;
+    QLabel *m_generationStatus = nullptr;
+    QString m_generationNodeId;
     QTranslator m_translator;
     QString m_currentLanguage = QStringLiteral("en");
     BlueprintScene *m_scene = nullptr;

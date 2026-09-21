@@ -24,21 +24,23 @@ Base: `origin/main` merge `9959917`; branch: `feature/issue-18-ai-generation-rev
 - [x] Define offline behavior tests before implementation: valid selected module, invalid selection/configuration/blueprint, snapshot handling, provider failure, candidate-only success and lifetime cleanup.
 - [x] Implement a controller and injected client factory, reusing provider settings, scaffold/prompt and GenerationService.
 - [x] Show stable state transitions and safe error categories; prevent duplicate generation.
-- [ ] Run focused tests, obtain independent review, update README/progress and push completed group.
+- [x] Run focused tests, obtain independent review, update README/progress and push completed group (`afdd055`).
 
 ### 2. Candidate review
 
-- [ ] Add GUI tests for file selection, Current/Candidate preview, diff, accept/reject/edit-and-accept/cancel.
-- [ ] Implement explicit manual conflict confirmation and stale-preview rejection through existing service checks.
-- [ ] Preserve drafts during translation and handle close/cancel without unintended acceptance.
+Groups 2 and 3 share the GUI end-to-end acceptance boundary and will be delivered together after integrated review and verification.
+
+- [x] Add GUI tests for file selection, Current/Candidate preview, diff, accept/reject/edit-and-accept/cancel.
+- [x] Implement explicit manual conflict confirmation and stale-preview rejection through existing service checks.
+- [x] Preserve drafts during translation and handle close/cancel without unintended acceptance.
 - [ ] Verify focused tests, independent review, README/progress and push.
 
 ### 3. Main window integration and delivery
 
-- [ ] Add a visible Generate toolbar/menu entry for selected generatable nodes and workspace/status feedback.
-- [ ] Add FakeAiClient GUI end-to-end coverage from selection through review and conflict handling.
-- [ ] Complete translations and user instructions.
-- [ ] Run complete offline CTest and a user-authorized real provider GUI-path verification.
+- [x] Add a visible Generate toolbar/menu entry for selected generatable nodes and workspace/status feedback.
+- [x] Add FakeAiClient GUI end-to-end coverage from selection through review and conflict handling.
+- [x] Complete translations and user instructions.
+- [x] Run complete offline CTest and a user-authorized real provider GUI-path verification.
 - [ ] Create `[feat] ... (#18)` PR referencing `Closes #18`; update existing Issue status and stop for review without auto-merging.
 
 ## Local changes to preserve

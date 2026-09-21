@@ -77,6 +77,7 @@ private slots:
         QVERIFY(prompt.contains("using Inputs = QVariantMap"));
         QVERIFY(prompt.contains("virtual Outputs execute"));
         QVERIFY(prompt.contains("src/modules/logic/implementation/"));
+        QVERIFY(prompt.contains("\"modules/logic/contract.h\""));
         QVERIFY(prompt.contains("tests/logic/"));
         QVERIFY(prompt.contains(".h, .hpp, .cpp, .cc"));
         QVERIFY(prompt.contains("derive"));

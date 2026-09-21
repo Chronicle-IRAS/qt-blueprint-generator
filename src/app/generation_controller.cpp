@@ -82,6 +82,7 @@ bool GenerationController::start(BlueprintDocument document, QString nodeId,
                          "- Allowed extensions: .h, .hpp, .cpp, .cc\n"
                          "- Do not return protected scaffold files or paths outside these roots.\n"
                          "- Include the actual node contract above and derive from its class, using its exact namespace and signatures.\n"
+                         "- The contract include is \"modules/%1/contract.h\" and the shared types include is \"contracts/types.h\". Do not infer header paths from module metadata.\n"
                          "- Each test .cpp/.cc is a separate executable and must provide its own main() (or Qt Test main macro).\n").arg(nodeId);
     if (!m_factory) return fail(QT_TR_NOOP("AI client is unavailable."));
     auto *session = new QObject(this);

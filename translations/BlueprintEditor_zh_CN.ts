@@ -2,6 +2,61 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="zh_CN" sourcelanguage="en">
 <context>
+    <name>CandidateReviewDialog</name>
+    <message><source>Conflict: this file contains manual or newer changes. Accepting requires overwrite confirmation.</source><translation>冲突：此文件包含手工修改或较新的更改，接受前必须确认覆盖。</translation></message>
+    <message><source>Review generated candidates</source><translation>审核生成的候选文件</translation></message>
+    <message><source>Current file</source><translation>当前文件</translation></message>
+    <message><source>Candidate / edited draft</source><translation>候选文件 / 编辑草稿</translation></message>
+    <message><source>Accept original</source><translation>接受原候选</translation></message>
+    <message><source>Accept edited draft</source><translation>接受编辑后的草稿</translation></message>
+    <message><source>Reject file</source><translation>拒绝此文件</translation></message>
+    <message><source>Cancel remaining</source><translation>取消剩余候选</translation></message>
+    <message><source>Refresh preview</source><translation>刷新预览</translation></message>
+    <message><source> — Accepted</source><translation> — 已接受</translation></message>
+    <message><source> — Rejected</source><translation> — 已拒绝</translation></message>
+    <message><source> — Pending</source><translation> — 待审核</translation></message>
+    <message><source>Cannot preview candidate: %1</source><translation>无法预览候选文件：%1</translation></message>
+    <message><source>Load the current files again? Review the updated comparison before accepting.</source><translation>重新加载当前文件吗？接受前请检查更新后的对照内容。</translation></message>
+    <message><source>Cannot refresh preview: %1</source><translation>无法刷新预览：%1</translation></message>
+    <message><source>Preview refreshed. Review the files before accepting.</source><translation>预览已刷新。接受前请重新检查文件。</translation></message>
+    <message><source>Project consistency check failed: %1</source><translation>工程一致性检查失败：%1</translation></message>
+    <message><source>Confirm overwrite</source><translation>确认覆盖</translation></message>
+    <message><source>This file contains manual or newer changes. Overwrite it with the reviewed candidate?</source><translation>此文件包含手工修改或较新的更改。是否用审核后的候选内容覆盖？</translation></message>
+    <message><source>Cannot accept candidate: %1. Refresh the preview if files have changed.</source><translation>无法接受候选文件：%1。文件如有变化，请刷新预览。</translation></message>
+    <message><source>File accepted.</source><translation>文件已接受。</translation></message>
+    <message><source>Cannot reject candidate: %1</source><translation>无法拒绝候选文件：%1</translation></message>
+    <message><source>File rejected.</source><translation>文件已拒绝。</translation></message>
+    <message><source>Cannot cancel remaining candidates: %1</source><translation>无法取消剩余候选文件：%1</translation></message>
+    <message><source>The blueprint or workspace changed. Acceptance is disabled.</source><translation>蓝图或工作目录已变更，不能再接受这些候选文件。</translation></message>
+    <message><source>Close candidate review</source><translation>关闭候选审核</translation></message>
+    <message><source>Reject all remaining candidates and close? Accepted files will be retained.</source><translation>拒绝所有剩余候选并关闭吗？已经接受的文件会保留。</translation></message>
+</context>
+<context>
+    <name>GenerationController</name>
+    <message><source>Select a UI page, logic module, or decision node.</source><translation>请选择一个界面页面、逻辑模块或条件分支节点。</translation></message>
+    <message><source>AI provider settings are invalid.</source><translation>AI 服务设置无效。</translation></message>
+    <message><source>Select an existing absolute workspace directory.</source><translation>请选择已存在的工作目录，并使用绝对路径。</translation></message>
+    <message><source>Fix blueprint validation errors before generating.</source><translation>请先修正蓝图校验错误，再生成代码。</translation></message>
+    <message><source>The workspace scaffold could not be initialized or does not match the blueprint.</source><translation>无法初始化工程骨架，或工作目录与当前蓝图不匹配。</translation></message>
+    <message><source>Could not read the workspace contracts.</source><translation>无法读取工作目录中的接口契约。</translation></message>
+    <message><source>The workspace blueprint contract is invalid.</source><translation>工作目录中的蓝图契约无效。</translation></message>
+    <message><source>Could not prepare the node generation prompt.</source><translation>无法准备节点生成提示词。</translation></message>
+    <message><source>AI client is unavailable.</source><translation>AI 客户端不可用。</translation></message>
+    <message><source>The workspace scaffold changed during generation.</source><translation>生成期间工程骨架发生了变化。</translation></message>
+    <message><source>The generated candidate could not be safely saved.</source><translation>无法安全保存生成的候选文件。</translation></message>
+    <message><source>AI generation failed. Check provider settings and try again.</source><translation>AI 生成失败，请检查服务设置后重试。</translation></message>
+    <message><source>AI provider credentials are unavailable.</source><translation>AI 服务凭据不可用，请检查环境变量中的密钥。</translation></message>
+    <message><source>AI generation failed due to a network error.</source><translation>网络错误导致 AI 生成失败。</translation></message>
+    <message><source>AI generation timed out. Try again.</source><translation>AI 生成超时，请重试。</translation></message>
+    <message><source>AI provider authentication failed.</source><translation>AI 服务身份验证失败。</translation></message>
+    <message><source>AI provider payment or quota is required.</source><translation>AI 服务需要付费或补充额度。</translation></message>
+    <message><source>AI provider endpoint was not found.</source><translation>未找到 AI 服务端点。</translation></message>
+    <message><source>The configured AI model was not found.</source><translation>未找到配置的 AI 模型。</translation></message>
+    <message><source>AI provider rate limit reached. Try again later.</source><translation>AI 服务已达到速率限制，请稍后重试。</translation></message>
+    <message><source>AI returned an invalid or unsafe generation response.</source><translation>AI 返回的生成结果无效，或未通过安全校验。</translation></message>
+    <message><source>AI provider is unavailable. Try again later.</source><translation>AI 服务暂时不可用，请稍后重试。</translation></message>
+</context>
+<context>
     <name>AiSettingsDialog</name>
     <message><source>AI Settings</source><translation>AI 设置</translation></message>
     <message><source>OpenAI Compatible</source><translation>OpenAI 兼容接口</translation></message>
@@ -65,6 +120,14 @@
 </context>
 <context>
     <name>MainWindow</name>
+    <message><source>Generate selected node</source><translation>生成选中节点</translation></message>
+    <message><source>Cancel generation</source><translation>取消生成</translation></message>
+    <message><source>Ready to generate</source><translation>可以开始生成</translation></message>
+    <message><source>Generating</source><translation>正在生成</translation></message>
+    <message><source>Success — review candidates</source><translation>生成成功 — 请审核候选文件</translation></message>
+    <message><source>Failed: %1</source><translation>失败：%1</translation></message>
+    <message><source>Cancelled</source><translation>已取消</translation></message>
+    <message><source>%1: %2</source><translation>%1：%2</translation></message>
     <message>
         <location filename="../src/app/main_window.cpp" line="180"/>
         <location filename="../src/app/main_window.cpp" line="490"/>
