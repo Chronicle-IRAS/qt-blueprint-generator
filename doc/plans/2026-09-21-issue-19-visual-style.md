@@ -54,4 +54,4 @@ ctest --test-dir C:/bp-issue19-build -R "editor_theme|node_properties_editor|ai_
 - [x] 使用虚构离线蓝图与候选，不调用真实模型。渲染中英主窗口、Inspector、AI 设置与候选审核；检查焦点、禁用、选中、长文本和小窗口。
 - [x] 分别以 `QT_SCALE_FACTOR=1/1.25/1.5/2` 新进程检查布局；记录自动检查与待人工检查的边界。
 - [x] README 仅补充已实现界面说明，不添加开发进度；进度写入独立文档。
-- [ ] 精确暂存本任务文件、提交推送、创建 `[feat] ... (#19)` PR，正文包含 `Closes #19`；Issue 标记 in-review，保持开启，停止等待用户审核，不自动合并。
+- [x] 精确暂存本任务文件、提交推送、创建 `[feat] ... (#19)` PR，正文包含 `Closes #19`；Issue 标记 in-review，保持开启，停止等待用户审核，不自动合并。交付 PR #27，实现提交 `c82fba0`。
