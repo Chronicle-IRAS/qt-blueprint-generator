@@ -4,6 +4,7 @@
 
 #include "app/ai_settings_dialog.h"
 #include "app/candidate_review_dialog.h"
+#include "app/validation_diagnostics_dialog.h"
 #include <QUuid>
 
 #include "editor/blueprint_scene.h"
@@ -358,7 +359,10 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     connect(m_cancelGenerationAction, &QAction::triggered,
             m_generationController, &GenerationController::cancel);
     connect(m_generationController, &GenerationController::stateChanged,
-            this, [this] { updateGenerationUi(); });
+            this, [this] {
+        updateGenerationUi();
+        showValidationDiagnostics();
+    });
     connect(m_generationController, &GenerationController::candidateReady, this,
             [this](const CandidateBatch &batch) {
         auto *dialog = new CandidateReviewDialog(m_generationSnapshot, batch.workspace,
@@ -668,6 +672,19 @@ void MainWindow::updateGenerationUi()
     }
     m_generationStatus->setText(m_generationNodeId.isEmpty() ? status
         : tr("%1: %2").arg(m_generationNodeId, status));
+}
+
+void MainWindow::showValidationDiagnostics()
+{
+    const QVector<BlueprintDiagnostic> diagnostics = m_generationController->diagnostics();
+    if (m_generationController->state() != GenerationController::State::Failed
+        || diagnostics.isEmpty()) {
+        return;
+    }
+    // A blueprint structure error is not an AI failure, so it gets its own report
+    // instead of only the generic status bar message.
+    ValidationDiagnosticsDialog dialog(diagnostics, this);
+    dialog.exec();
 }
 
 void MainWindow::startBuild()

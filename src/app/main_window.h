@@ -66,6 +66,7 @@ private:
     QString selectedNodeId() const;
     void startGeneration();
     void updateGenerationUi();
+    void showValidationDiagnostics();
     void invalidateGenerationContext();
 
     BlueprintDocument m_document;

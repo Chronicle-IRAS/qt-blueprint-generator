@@ -36,6 +36,8 @@ qt_add_library(BlueprintEditorCore STATIC
     src/app/generation_controller.h
     src/app/main_window.cpp
     src/app/main_window.h
+    src/app/validation_diagnostics_dialog.cpp
+    src/app/validation_diagnostics_dialog.h
     src/blueprint/blueprint_document.cpp
     src/blueprint/blueprint_document.h
     src/blueprint/blueprint_serializer.cpp
@@ -107,7 +109,7 @@ endif()
 
 set(translation_targets BlueprintEditor)
 if(BUILD_TESTING)
-    list(APPEND translation_targets tst_language_switch tst_ai_settings_dialog tst_generation_workflow tst_candidate_review_dialog tst_editor_theme)
+    list(APPEND translation_targets tst_language_switch tst_ai_settings_dialog tst_generation_workflow tst_candidate_review_dialog tst_editor_theme tst_validation_diagnostics_dialog)
 endif()
 
 qt_add_translations(

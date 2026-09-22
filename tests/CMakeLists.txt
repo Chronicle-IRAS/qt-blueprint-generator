@@ -332,6 +332,34 @@ set_tests_properties(node_properties_editor PROPERTIES
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
 )
 
+set(validation_diagnostics_dialog_moc
+    "${CMAKE_CURRENT_BINARY_DIR}/tst_validation_diagnostics_dialog.moc")
+
+add_custom_command(
+    OUTPUT "${validation_diagnostics_dialog_moc}"
+    COMMAND Qt6::moc -o tst_validation_diagnostics_dialog.moc
+            "${CMAKE_CURRENT_SOURCE_DIR}/tst_validation_diagnostics_dialog.cpp"
+    DEPENDS tst_validation_diagnostics_dialog.cpp
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM
+)
+
+qt_add_executable(tst_validation_diagnostics_dialog
+    tst_validation_diagnostics_dialog.cpp
+    "${validation_diagnostics_dialog_moc}"
+)
+
+set_target_properties(tst_validation_diagnostics_dialog PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_validation_diagnostics_dialog
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_validation_diagnostics_dialog PRIVATE BlueprintEditorCore Qt6::Test)
+
+add_test(NAME validation_diagnostics_dialog COMMAND tst_validation_diagnostics_dialog)
+set_tests_properties(validation_diagnostics_dialog PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+)
+
 add_custom_command(
     OUTPUT "${blueprint_scene_moc}"
     COMMAND Qt6::moc -o tst_blueprint_scene.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_blueprint_scene.cpp"
