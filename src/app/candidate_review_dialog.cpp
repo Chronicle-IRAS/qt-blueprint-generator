@@ -216,4 +216,7 @@ void CandidateReviewDialog::reject() {
 void CandidateReviewDialog::changeEvent(QEvent *event) {
     QDialog::changeEvent(event);
     if (event->type() == QEvent::LanguageChange) { d->translate(); d->update(); }
+    // The diff highlights are theme colours captured when the comparison was built, so an open
+    // dialog has to rebuild them when the theme changes.
+    else if (event->type() == QEvent::PaletteChange || event->type() == QEvent::StyleChange) { d->diff(); }
 }

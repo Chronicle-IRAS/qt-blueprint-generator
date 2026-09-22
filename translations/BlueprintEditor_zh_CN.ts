@@ -232,6 +232,9 @@
         <source>Chinese</source>
         <translation>中文</translation>
     </message>
+    <message><source>Theme</source><translation>主题</translation></message>
+    <message><source>Light</source><translation>亮色</translation></message>
+    <message><source>Dark</source><translation>暗色</translation></message>
     <message>
         <location filename="../src/app/main_window.cpp" line="257"/>
         <location filename="../src/app/main_window.cpp" line="511"/>
