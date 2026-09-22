@@ -213,6 +213,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_connectionLabelEdit->setMaximumWidth(220);
     m_blueprintToolbar->addWidget(m_connectionLabelEdit);
     m_deleteAction = m_blueprintToolbar->addAction(tr("Delete"));
+    m_deleteAction->setObjectName(QStringLiteral("deleteSelectionAction"));
     m_connectAction = m_blueprintToolbar->addAction(tr("Connect: choose source then target"));
     m_connectAction->setObjectName(QStringLiteral("beginConnectionAction"));
     m_cancelConnectionAction = new QAction(tr("Cancel connection"), this);
@@ -380,7 +381,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     connect(m_workspacePathEdit, &QLineEdit::textChanged,
             this, &MainWindow::invalidateGenerationContext);
 
-    connect(m_deleteAction, &QAction::triggered, this, [this] { deleteSelection(); });
+    connect(m_deleteAction, &QAction::triggered, this, [this] { m_scene->deleteSelectedItems(); });
     connect(m_connectAction, &QAction::triggered, this, [this] {
         m_scene->beginConnection(m_connectionLabelEdit->text());
         statusBar()->showMessage(tr("Choose source node, then target node"));
@@ -743,19 +744,6 @@ void MainWindow::appendBuildLog(const QString &text)
     m_buildLog->moveCursor(QTextCursor::End);
     m_buildLog->insertPlainText(text);
     m_buildLog->moveCursor(QTextCursor::End);
-}
-
-void MainWindow::deleteSelection()
-{
-    QStringList ids;
-    for (QGraphicsItem *item : m_scene->selectedItems()) {
-        if (auto *node = dynamic_cast<NodeItem *>(item)) {
-            ids.append(node->nodeId());
-        }
-    }
-    for (const QString &id : ids) {
-        m_scene->deleteNode(id);
-    }
 }
 
 void MainWindow::editNodeFromCanvas(const QString &nodeId)

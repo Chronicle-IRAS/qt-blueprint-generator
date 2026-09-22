@@ -4,6 +4,7 @@
 
 ## 当前状态
 
+- 2026-09-22：完成 Issue #34，画布选中节点或连线后可按 `Delete` 直接删除，连线支持点击选中并显示选中高亮；工具栏与键盘共用 `BlueprintScene::deleteSelectedItems()` 删除入口，删除继续进入既有 Undo/Redo，文本输入控件中的 `Delete` 仍用于编辑自身内容。
 - 2026-09-22：完成 Issue #30，生成前的蓝图校验失败不再只显示一条泛化提示，改为在独立对话框中列出全部 BlueprintValidator 诊断（含 nodeId / edgeId），并与 AI 服务失败明确区分；补充 Controller 与 GUI 回归测试。
 - 2026-09-22：完成 Issue #31，节点卡片、Properties Inspector 与双击编辑对话框以只读方式展示真实 NodeType，支持中英文切换；节点名称与类型显示名相同时卡片只显示名称，避免重复副标题，并补充相关 GUI 回归测试。
 - 2026-09-22：Issue #19 已通过 PR #27 提交审核（`Closes #19`）：https://github.com/Chronicle-IRAS/qt-blueprint-generator/pull/27 ，实现提交 `c82fba0` 已推送，Issue 标记为 `in-review` 并保持开启。统一浅色主题、面板/对话框布局、节点悬停与选择、长文本提示和缩放网格已实现。独立规格审查与质量复审通过，无未解决阻塞项；AI 保存按钮强调样式、节点端口提示翻译与运行时刷新反馈均已通过失败测试复现并修正。停止等待用户审核，不自动合并或开始下一任务。

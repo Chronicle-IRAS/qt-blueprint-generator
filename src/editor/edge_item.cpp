@@ -3,15 +3,22 @@
 #include "editor/node_item.h"
 #include "ui/theme.h"
 
-#include <QPainterPath>
+#include <QPainterPathStroker>
 #include <QPainter>
 #include <QPen>
+#include <QStyleOptionGraphicsItem>
 
 #include <QtMath>
 
 #include <cmath>
 
 namespace {
+
+// Edges are drawn as a few pixel wide curve, so the shape used for mouse picking is a
+// widened stroke: a thin line still stays easy to click and select.
+constexpr qreal EdgeHitWidth = 12.0;
+constexpr qreal LabelWidth = 80.0;
+constexpr qreal LabelHeight = 24.0;
 
 QPolygonF arrowPolygonForPath(const QPainterPath &path)
 {
@@ -29,6 +36,20 @@ QPolygonF arrowPolygonForPath(const QPainterPath &path)
     return {tip, tip - direction * 11.0 + normal * 5.0, tip - direction * 11.0 - normal * 5.0};
 }
 
+QPainterPath hitPathFor(const QPainterPath &path)
+{
+    QPainterPathStroker stroker;
+    stroker.setWidth(EdgeHitWidth);
+    stroker.setCapStyle(Qt::RoundCap);
+    stroker.setJoinStyle(Qt::RoundJoin);
+    return stroker.createStroke(path);
+}
+
+QRectF labelRectFor(const QPointF &center)
+{
+    return {center - QPointF(LabelWidth / 2.0, LabelHeight / 2.0), QSizeF(LabelWidth, LabelHeight)};
+}
+
 } // namespace
 
 EdgeItem::EdgeItem(QString edgeId, QString sourceId, QString targetId, NodeItem *source, NodeItem *target,
@@ -42,6 +63,7 @@ EdgeItem::EdgeItem(QString edgeId, QString sourceId, QString targetId, NodeItem 
     , m_label(std::move(label))
 {
     setPen(QPen(EditorTheme::colors().edge, 2.0));
+    setFlag(ItemIsSelectable, true);
     setToolTip(m_label);
     setZValue(-1.0);
     updatePath();
@@ -88,9 +110,11 @@ void EdgeItem::updatePath()
     QPainterPath newPath(source);
     const qreal controlOffset = qMax<qreal>(60.0, qAbs(target.x() - source.x()) / 2.0);
     newPath.cubicTo(source + QPointF(controlOffset, 0.0), target - QPointF(controlOffset, 0.0), target);
+    const QPainterPath newHitPath = hitPathFor(newPath);
     const QPointF newLabelPosition = newPath.pointAtPercent(0.5) + QPointF(0.0, -8.0);
     prepareGeometryChange();
     setPath(newPath);
+    m_hitPath = newHitPath;
     m_labelPosition = newLabelPosition;
     update();
 }
@@ -103,43 +127,56 @@ QRectF EdgeItem::boundingRect() const
         result = result.united(arrow.boundingRect());
     }
     if (!m_label.isEmpty()) {
-        result = result.united(QRectF(m_labelPosition - QPointF(40.0, 12.0), QSizeF(80.0, 24.0)));
+        result = result.united(labelRectFor(m_labelPosition));
     }
     return result;
 }
 
 QPainterPath EdgeItem::shape() const
 {
-    QPainterPath result = QGraphicsPathItem::shape();
+    QPainterPath result = m_hitPath;
     const QPolygonF arrow = arrowPolygon();
     if (!arrow.isEmpty()) {
-        QPainterPath arrowPath;
-        arrowPath.addPolygon(arrow);
-        result.addPath(arrowPath);
+        result.addPolygon(arrow);
     }
     if (!m_label.isEmpty()) {
-        result.addRect(QRectF(m_labelPosition - QPointF(40.0, 12.0), QSizeF(80.0, 24.0)));
+        result.addRect(labelRectFor(m_labelPosition));
     }
     return result;
 }
 
-void EdgeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+void EdgeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
-    QGraphicsPathItem::paint(painter, option, widget);
     if (path().isEmpty()) {
         return;
     }
+    const bool selected = option->state.testFlag(QStyle::State_Selected);
+    const auto &colors = EditorTheme::colors();
+    const QColor strokeColor = selected ? colors.selection : colors.edge;
+    QPen edgePen = pen();
+    if (selected) {
+        edgePen.setColor(strokeColor);
+        edgePen.setWidthF(edgePen.widthF() + 1.5);
+    }
+
+    painter->save();
+    painter->setPen(edgePen);
+    painter->setBrush(Qt::NoBrush);
+    painter->drawPath(path());
+
     const QPolygonF arrow = arrowPolygon();
     painter->setPen(Qt::NoPen);
-    painter->setBrush(EditorTheme::colors().edge);
+    painter->setBrush(strokeColor);
     painter->drawPolygon(arrow);
+
     if (!m_label.isEmpty()) {
-        const QRectF labelRect(m_labelPosition - QPointF(40.0, 12.0), QSizeF(80.0, 24.0));
-        painter->setPen(QPen(EditorTheme::colors().border, 1.0));
-        painter->setBrush(EditorTheme::colors().surface);
+        const QRectF labelRect = labelRectFor(m_labelPosition);
+        painter->setPen(QPen(selected ? colors.selection : colors.border, selected ? 2.0 : 1.0));
+        painter->setBrush(colors.surface);
         painter->drawRoundedRect(labelRect.adjusted(0.5, 0.5, -0.5, -0.5), 5.0, 5.0);
-        painter->setPen(EditorTheme::colors().text);
+        painter->setPen(colors.text);
         painter->drawText(labelRect.adjusted(6.0, 0.0, -6.0, 0.0), Qt::AlignCenter,
                           painter->fontMetrics().elidedText(m_label, Qt::ElideRight, 68));
     }
+    painter->restore();
 }

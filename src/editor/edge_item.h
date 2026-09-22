@@ -1,11 +1,11 @@
 #pragma once
 
 #include <QGraphicsPathItem>
+#include <QPainterPath>
 #include <QPolygonF>
 #include <QString>
 
 class NodeItem;
-class QPainterPath;
 class QPainter;
 class QStyleOptionGraphicsItem;
 class QWidget;
@@ -36,4 +36,5 @@ private:
     NodeItem *m_target = nullptr;
     QString m_label;
     QPointF m_labelPosition;
+    QPainterPath m_hitPath;
 };

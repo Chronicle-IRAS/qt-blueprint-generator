@@ -110,6 +110,11 @@
         <translation>删除节点</translation>
     </message>
     <message>
+        <location filename="../src/editor/blueprint_scene.cpp" line="171"/>
+        <source>Delete edge</source>
+        <translation>删除连线</translation>
+    </message>
+    <message>
         <location filename="../src/editor/blueprint_scene.cpp" line="134"/>
         <location filename="../src/editor/blueprint_scene.cpp" line="490"/>
         <source>Move node</source>
