@@ -97,6 +97,12 @@ private slots:
     void mainWindowUsesRubberBandDragAndClampedZoom();
     void mainWindowRestoresClosedDocksAndDefaultLayout();
     void mainWindowExposesBuildAndExportInToolbar();
+    void keyboardDeleteRemovesSelectedNodesAndIncidentEdges();
+    void keyboardDeleteRemovesEverySelectedNode();
+    void clickingAnEdgeSelectsItAndDeleteKeepsItsNodes();
+    void keyboardDeleteHandlesMixedNodeAndEdgeSelection();
+    void deleteKeyInsideTextEditorsDoesNotDeleteCanvasItems();
+    void toolbarDeleteSharesTheKeyboardDeletionPath();
 };
 
 void BlueprintSceneTest::canvasPolishPreservesGeometryAndFullText()
@@ -1223,6 +1229,259 @@ void BlueprintSceneTest::mainWindowExposesBuildAndExportInToolbar()
     exportEdit->clear();
     exportAction->trigger();
     QVERIFY(buildLog->toPlainText().contains(QStringLiteral("Export failed")));
+}
+
+void BlueprintSceneTest::keyboardDeleteRemovesSelectedNodesAndIncidentEdges()
+{
+    BlueprintDocument document;
+    document.nodes = {node(QStringLiteral("source"), QStringLiteral("Source")),
+                      node(QStringLiteral("target"), QStringLiteral("Target"))};
+    document.edges = {{QStringLiteral("flow"), QStringLiteral("source"), QStringLiteral("target"), {}}};
+    BlueprintScene scene(&document);
+    QGraphicsView view(&scene);
+    view.resize(800, 500);
+    view.show();
+    view.setFocus();
+    QApplication::processEvents();
+
+    // Nothing is selected yet, so Delete must not touch the document.
+    QTest::keyClick(view.viewport(), Qt::Key_Delete);
+    QCOMPARE(document.nodes.size(), 2);
+    QCOMPARE(document.edges.size(), 1);
+    QCOMPARE(scene.undoStack()->count(), 0);
+
+    scene.nodeItem(QStringLiteral("source"))->setSelected(true);
+    QTest::keyClick(view.viewport(), Qt::Key_Delete);
+    QCOMPARE(document.nodes.size(), 1);
+    QCOMPARE(document.nodes.constFirst().id, QStringLiteral("target"));
+    QVERIFY(document.edges.isEmpty());
+    QVERIFY(scene.nodeItem(QStringLiteral("source")) == nullptr);
+    QVERIFY(scene.edgeItem(QStringLiteral("flow")) == nullptr);
+
+    scene.undoStack()->undo();
+    QCOMPARE(document.nodes.size(), 2);
+    QCOMPARE(document.nodes.constFirst().id, QStringLiteral("source"));
+    QCOMPARE(document.edges.size(), 1);
+    QVERIFY(scene.nodeItem(QStringLiteral("source")) != nullptr);
+    QVERIFY(scene.edgeItem(QStringLiteral("flow")) != nullptr);
+
+    scene.undoStack()->redo();
+    QCOMPARE(document.nodes.size(), 1);
+    QVERIFY(document.edges.isEmpty());
+    QVERIFY(scene.edgeItem(QStringLiteral("flow")) == nullptr);
+}
+
+void BlueprintSceneTest::keyboardDeleteRemovesEverySelectedNode()
+{
+    BlueprintDocument document;
+    document.nodes = {node(QStringLiteral("first"), QStringLiteral("First")),
+                      node(QStringLiteral("second"), QStringLiteral("Second")),
+                      node(QStringLiteral("third"), QStringLiteral("Third"))};
+    BlueprintScene scene(&document);
+    QGraphicsView view(&scene);
+    view.resize(800, 500);
+    view.show();
+    view.setFocus();
+    QApplication::processEvents();
+    const BlueprintDocument before = document;
+
+    scene.nodeItem(QStringLiteral("first"))->setSelected(true);
+    scene.nodeItem(QStringLiteral("third"))->setSelected(true);
+    QTest::keyClick(view.viewport(), Qt::Key_Delete);
+    QCOMPARE(document.nodes.size(), 1);
+    QCOMPARE(document.nodes.constFirst().id, QStringLiteral("second"));
+    QVERIFY(scene.nodeItem(QStringLiteral("first")) == nullptr);
+    QVERIFY(scene.nodeItem(QStringLiteral("third")) == nullptr);
+
+    scene.undoStack()->undo();
+    scene.undoStack()->undo();
+    QCOMPARE(document, before);
+    QVERIFY(scene.nodeItem(QStringLiteral("first")) != nullptr);
+    QVERIFY(scene.nodeItem(QStringLiteral("third")) != nullptr);
+}
+
+void BlueprintSceneTest::clickingAnEdgeSelectsItAndDeleteKeepsItsNodes()
+{
+    BlueprintDocument document;
+    document.nodes = {node(QStringLiteral("source"), QStringLiteral("Source")),
+                      node(QStringLiteral("target"), QStringLiteral("Target"))};
+    document.edges = {{QStringLiteral("flow"), QStringLiteral("source"), QStringLiteral("target"), {}}};
+    BlueprintScene scene(&document);
+    QGraphicsView view(&scene);
+    view.resize(800, 500);
+    view.show();
+    view.setFocus();
+    QApplication::processEvents();
+    EdgeItem *edge = scene.edgeItem(QStringLiteral("flow"));
+    QVERIFY(edge != nullptr);
+    // The scene index filters mouse hits by boundingRect(), so the widened hit stroke has to
+    // stay inside it or the outer band of the click area would silently not be clickable.
+    QVERIFY(edge->boundingRect().contains(edge->shape().boundingRect()));
+
+    // Five pixels off the curve still hit the line, so a thin edge stays clickable.
+    const QPointF curve = edge->path().pointAtPercent(0.5);
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      view.mapFromScene(curve + QPointF(0.0, 5.0)));
+    QVERIFY(edge->isSelected());
+    QCOMPARE(scene.selectedItems().size(), 1);
+    QVERIFY(scene.selectedItems().constFirst() == edge);
+    QVERIFY(!scene.nodeItem(QStringLiteral("source"))->isSelected());
+
+    // Outside the widened stroke the curve is not picked up any more.
+    scene.clearSelection();
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      view.mapFromScene(curve + QPointF(0.0, 8.0)));
+    QVERIFY(!edge->isSelected());
+    QVERIFY(scene.selectedItems().isEmpty());
+
+    const auto render = [&](QStyle::State state) {
+        QImage image(300, 120, QImage::Format_ARGB32_Premultiplied);
+        image.fill(Qt::transparent);
+        QPainter painter(&image);
+        painter.translate(10, 10);
+        QStyleOptionGraphicsItem option;
+        option.state = state;
+        edge->paint(&painter, &option, nullptr);
+        return image;
+    };
+    QVERIFY(render(QStyle::State_None) != render(QStyle::State_Selected));
+
+    // Clicking a node still takes precedence over the selected edge.
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      view.mapFromScene(scene.nodeItem(QStringLiteral("target"))->sceneBoundingRect().center()));
+    QVERIFY(scene.nodeItem(QStringLiteral("target"))->isSelected());
+    QVERIFY(!edge->isSelected());
+
+    scene.clearSelection();
+    edge->setSelected(true);
+    QTest::keyClick(view.viewport(), Qt::Key_Delete);
+    QVERIFY(document.edges.isEmpty());
+    QCOMPARE(document.nodes.size(), 2);
+    QVERIFY(scene.edgeItem(QStringLiteral("flow")) == nullptr);
+    QVERIFY(scene.nodeItem(QStringLiteral("source")) != nullptr);
+    QVERIFY(scene.nodeItem(QStringLiteral("target")) != nullptr);
+
+    scene.undoStack()->undo();
+    QCOMPARE(document.edges.size(), 1);
+    QVERIFY(scene.edgeItem(QStringLiteral("flow")) != nullptr);
+
+    scene.undoStack()->redo();
+    QVERIFY(document.edges.isEmpty());
+    QVERIFY(scene.edgeItem(QStringLiteral("flow")) == nullptr);
+}
+
+void BlueprintSceneTest::keyboardDeleteHandlesMixedNodeAndEdgeSelection()
+{
+    BlueprintDocument document;
+    document.nodes = {node(QStringLiteral("first"), QStringLiteral("First")),
+                      node(QStringLiteral("second"), QStringLiteral("Second")),
+                      node(QStringLiteral("third"), QStringLiteral("Third"))};
+    document.edges = {{QStringLiteral("one"), QStringLiteral("first"), QStringLiteral("second"), {}},
+                      {QStringLiteral("two"), QStringLiteral("second"), QStringLiteral("third"), {}}};
+    BlueprintScene scene(&document);
+    QGraphicsView view(&scene);
+    view.resize(800, 500);
+    view.show();
+    view.setFocus();
+    QApplication::processEvents();
+
+    scene.edgeItem(QStringLiteral("two"))->setSelected(true);
+    scene.nodeItem(QStringLiteral("first"))->setSelected(true);
+    QTest::keyClick(view.viewport(), Qt::Key_Delete);
+
+    QCOMPARE(document.nodes.size(), 2);
+    QCOMPARE(document.nodes.constFirst().id, QStringLiteral("second"));
+    QCOMPARE(document.nodes.constLast().id, QStringLiteral("third"));
+    QVERIFY(document.edges.isEmpty());
+    QVERIFY(scene.nodeItem(QStringLiteral("first")) == nullptr);
+    QVERIFY(scene.edgeItem(QStringLiteral("one")) == nullptr);
+    QVERIFY(scene.edgeItem(QStringLiteral("two")) == nullptr);
+    QCOMPARE(scene.undoStack()->count(), 2);
+
+    scene.undoStack()->undo();
+    scene.undoStack()->undo();
+    QCOMPARE(document.nodes.size(), 3);
+    QCOMPARE(document.edges.size(), 2);
+    QCOMPARE(scene.edgeItem(QStringLiteral("one"))->edgeId(), QStringLiteral("one"));
+    QCOMPARE(scene.edgeItem(QStringLiteral("two"))->edgeId(), QStringLiteral("two"));
+    QCOMPARE(scene.nodeItem(QStringLiteral("first"))->nodeId(), QStringLiteral("first"));
+
+    scene.undoStack()->redo();
+    scene.undoStack()->redo();
+    QCOMPARE(document.nodes.size(), 2);
+    QVERIFY(document.edges.isEmpty());
+    QVERIFY(scene.edgeItem(QStringLiteral("one")) == nullptr);
+    QVERIFY(scene.edgeItem(QStringLiteral("two")) == nullptr);
+}
+
+void BlueprintSceneTest::deleteKeyInsideTextEditorsDoesNotDeleteCanvasItems()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::LogicModule));
+    window.show();
+    QApplication::processEvents();
+    const BlueprintDocument before = window.document();
+    const QString nodeId = before.nodes.constFirst().id;
+    QVERIFY(window.scene()->nodeItem(nodeId)->isSelected());
+
+    auto *nameEdit = window.findChild<QLineEdit *>(QStringLiteral("nodeNameEdit"));
+    auto *descriptionEdit = window.findChild<QPlainTextEdit *>(QStringLiteral("nodeDescriptionEdit"));
+    QVERIFY(nameEdit != nullptr);
+    QVERIFY(descriptionEdit != nullptr);
+
+    nameEdit->setText(QStringLiteral("ab"));
+    nameEdit->setCursorPosition(1);
+    nameEdit->setFocus();
+    QTest::keyClick(nameEdit, Qt::Key_Delete);
+    QCOMPARE(nameEdit->text(), QStringLiteral("a"));
+    QCOMPARE(window.document(), before);
+    QVERIFY(window.scene()->nodeItem(nodeId) != nullptr);
+
+    descriptionEdit->setPlainText(QStringLiteral("first line"));
+    QTextCursor cursor = descriptionEdit->textCursor();
+    cursor.setPosition(5);
+    descriptionEdit->setTextCursor(cursor);
+    descriptionEdit->setFocus();
+    QTest::keyClick(descriptionEdit, Qt::Key_Delete);
+    QCOMPARE(descriptionEdit->toPlainText(), QStringLiteral("firstline"));
+    QCOMPARE(window.document(), before);
+    QVERIFY(window.scene()->nodeItem(nodeId) != nullptr);
+}
+
+void BlueprintSceneTest::toolbarDeleteSharesTheKeyboardDeletionPath()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    QVERIFY(window.addNodeOfType(NodeType::End));
+    auto *deleteAction = window.findChild<QAction *>(QStringLiteral("deleteSelectionAction"));
+    QVERIFY(deleteAction != nullptr);
+    window.show();
+    QApplication::processEvents();
+    const BlueprintDocument before = window.document();
+    const int commandsBefore = window.scene()->undoStack()->count();
+    const QString first = before.nodes.at(0).id;
+    const QString second = before.nodes.at(1).id;
+    const auto selectBoth = [&] {
+        window.scene()->clearSelection();
+        window.scene()->nodeItem(first)->setSelected(true);
+        window.scene()->nodeItem(second)->setSelected(true);
+    };
+
+    selectBoth();
+    window.graphicsView()->setFocus();
+    QTest::keyClick(window.graphicsView()->viewport(), Qt::Key_Delete);
+    const BlueprintDocument afterKeyboard = window.document();
+    QVERIFY(afterKeyboard.nodes.isEmpty());
+    QCOMPARE(window.scene()->undoStack()->count(), commandsBefore + 2);
+
+    // Each deleted item keeps its own undo step, matching the pre-existing toolbar behaviour.
+    window.scene()->undoStack()->undo();
+    window.scene()->undoStack()->undo();
+    QCOMPARE(window.document(), before);
+
+    selectBoth();
+    deleteAction->trigger();
+    QCOMPARE(window.document(), afterKeyboard);
 }
 
 QTEST_MAIN(BlueprintSceneTest)

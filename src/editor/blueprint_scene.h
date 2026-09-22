@@ -23,6 +23,10 @@ public:
 
     bool addNode(const BlueprintNode &node, const QPointF &position);
     bool deleteNode(const QString &nodeId);
+    bool deleteEdge(const QString &edgeId);
+    // Single entry point for deleting whatever is selected on the canvas, shared by the
+    // toolbar action, the Delete key and future context menu entries.
+    bool deleteSelectedItems();
     bool moveNode(const QString &nodeId, const QPointF &position);
     bool connectNodes(const QString &sourceId, const QString &targetId, const QString &label = {});
     bool editNodeText(const QString &nodeId, const QString &name, const QString &description);

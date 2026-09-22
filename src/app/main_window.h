@@ -54,7 +54,6 @@ private:
     bool applyLanguage(const QString &languageCode, bool persist);
     void retranslateUi();
     void updateLanguageActions();
-    void deleteSelection();
     void cancelConnection();
     void editNodeFromCanvas(const QString &nodeId);
     void applyProperties();

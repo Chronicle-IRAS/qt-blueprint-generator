@@ -15,6 +15,7 @@
 #include <QUndoCommand>
 
 #include <QSet>
+#include <QStringList>
 
 #include <algorithm>
 #include <cmath>
@@ -154,6 +155,54 @@ bool BlueprintScene::deleteNode(const QString &nodeId)
             restoreEdgesDirect(edges);
         }));
     return true;
+}
+
+bool BlueprintScene::deleteEdge(const QString &edgeId)
+{
+    if (!m_representable) {
+        return false;
+    }
+    const qsizetype index = edgeIndex(edgeId);
+    if (index < 0) {
+        return false;
+    }
+    const BlueprintEdge edge = m_document->edges.at(index);
+    m_undoStack.push(new SceneCommand(
+        tr("Delete edge"), [this, edgeId] { removeEdgeDirect(edgeId); },
+        [this, edge, index] { addEdgeDirect(edge, index); }));
+    return true;
+}
+
+bool BlueprintScene::deleteSelectedItems()
+{
+    if (!m_representable) {
+        return false;
+    }
+    // Collect every id first: deleting items re-enters setSelected()/selectionChanged and
+    // must not happen while selectedItems() is being walked. Items are unique, so the
+    // collected ids are unique as well, and a repeated id would be a no-op anyway.
+    QStringList nodeIds;
+    QStringList edgeIds;
+    for (QGraphicsItem *item : selectedItems()) {
+        if (auto *node = dynamic_cast<NodeItem *>(item)) {
+            nodeIds.append(node->nodeId());
+        } else if (auto *edge = dynamic_cast<EdgeItem *>(item)) {
+            edgeIds.append(edge->edgeId());
+        }
+    }
+    if (nodeIds.isEmpty() && edgeIds.isEmpty()) {
+        return false;
+    }
+    // Explicitly selected edges go first: deleting a node also removes its incident edges,
+    // so an edge that is already gone only has to survive as its own undo command.
+    bool deleted = false;
+    for (const QString &edgeId : edgeIds) {
+        deleted = deleteEdge(edgeId) || deleted;
+    }
+    for (const QString &nodeId : nodeIds) {
+        deleted = deleteNode(nodeId) || deleted;
+    }
+    return deleted;
 }
 
 bool BlueprintScene::moveNode(const QString &nodeId, const QPointF &position)
@@ -313,6 +362,15 @@ void BlueprintScene::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Escape && m_temporaryConnection) {
         cancelPortDrag();
+        event->accept();
+        return;
+    }
+    // Only reaches the scene while the canvas itself is focused, so text editors keep
+    // Delete for editing their own content. The keypad modifier is not a modifier in the
+    // sense of Ctrl/Shift, so keypad Del behaves like Del.
+    if (event->key() == Qt::Key_Delete
+        && (event->modifiers() & ~Qt::KeypadModifier) == Qt::NoModifier
+        && deleteSelectedItems()) {
         event->accept();
         return;
     }
