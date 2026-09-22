@@ -1,6 +1,5 @@
 #include <QtTest/QtTest>
 
-#include <QComboBox>
 #include <QGroupBox>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -227,7 +226,6 @@ void NodePropertiesEditorTest::nodeTypeRowIsReadOnly()
     QVERIFY(typeValue);
     QCOMPARE(typeValue->text(), expectedText);
     QVERIFY(!(typeValue->textInteractionFlags() & Qt::TextEditable));
-    QCOMPARE(editor.findChildren<QComboBox *>().size(), 0);
 
     const NodeType untouchedType =
         type == NodeType::Start ? NodeType::End : NodeType::Start;

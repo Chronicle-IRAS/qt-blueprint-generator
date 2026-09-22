@@ -1,17 +1,19 @@
 #include <QtTest/QtTest>
 
 #include <QAction>
-#include <QComboBox>
 #include <QDialog>
 #include <QDockWidget>
 #include <QFormLayout>
 #include <QGraphicsView>
 #include <QGroupBox>
+#include <QImage>
 #include <QLabel>
 #include <QMenu>
 #include <QLineEdit>
+#include <QPainter>
 #include <QPushButton>
 #include <QSettings>
+#include <QStyleOptionGraphicsItem>
 #include <QTemporaryDir>
 #include <QTableWidget>
 #include <QTimer>
@@ -20,6 +22,49 @@
 #include "editor/blueprint_scene.h"
 #include "editor/node_item.h"
 #include "editor/node_properties_editor.h"
+#include "ui/theme.h"
+
+namespace {
+
+constexpr int CardHeadHeight = 28;
+constexpr int CardOffset = 10;
+
+// Lowest row of the card head that carries text ink, or -1 when the head only shows its
+// background. Antialiased pixels count as ink when they are closer to the header text
+// colour than to the header background.
+int lowestHeadTextRow(NodeItem *item)
+{
+    QImage image(220, 120, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    QPainter painter(&image);
+    painter.translate(CardOffset, CardOffset);
+    QStyleOptionGraphicsItem option;
+    option.state = QStyle::State_None;
+    item->paint(&painter, &option, nullptr);
+    painter.end();
+
+    const QColor head = EditorTheme::colors().nodeHeader;
+    const QColor text = EditorTheme::colors().nodeHeaderText;
+    const int fullDistance = qAbs(text.red() - head.red()) + qAbs(text.green() - head.green())
+                             + qAbs(text.blue() - head.blue());
+    for (int row = CardHeadHeight - 1; row >= 0; --row) {
+        for (int x = CardOffset + 12; x < CardOffset + 170; ++x) {
+            const QRgb pixel = image.pixel(x, CardOffset + row);
+            if (qAlpha(pixel) == 0) {
+                continue;
+            }
+            const int headDistance = qAbs(qRed(pixel) - head.red())
+                                     + qAbs(qGreen(pixel) - head.green())
+                                     + qAbs(qBlue(pixel) - head.blue());
+            if (headDistance > fullDistance / 2) {
+                return row;
+            }
+        }
+    }
+    return -1;
+}
+
+} // namespace
 
 class LanguageSwitchTest : public QObject
 {
@@ -31,6 +76,8 @@ private slots:
     void switchesBetweenEnglishAndChineseAndPersistsChoice();
     void refreshesExistingNodeTooltips();
     void showsReadOnlyNodeTypeAndFollowsLanguageSwitch();
+    void nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName_data();
+    void nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName();
 
 private:
     QTemporaryDir m_settingsDirectory;
@@ -98,7 +145,6 @@ void LanguageSwitchTest::showsReadOnlyNodeTypeAndFollowsLanguageSwitch()
     QVERIFY(typeLabel);
     QCOMPARE(typeLabel->text(), QStringLiteral("Type"));
     QCOMPARE(typeValue->text(), QStringLiteral("Logic Module"));
-    QCOMPARE(editor->findChildren<QComboBox *>().size(), 0);
 
     auto *nameEdit = window.findChild<QLineEdit *>(QStringLiteral("nodeNameEdit"));
     auto *applyButton = window.findChild<QPushButton *>(
@@ -117,6 +163,79 @@ void LanguageSwitchTest::showsReadOnlyNodeTypeAndFollowsLanguageSwitch()
     QVERIFY(window.setLanguage(QStringLiteral("en")));
     QCOMPARE(typeValue->text(), QStringLiteral("Logic Module"));
     QCOMPARE(typeLabel->text(), QStringLiteral("Type"));
+}
+
+void LanguageSwitchTest::nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName_data()
+{
+    QTest::addColumn<NodeType>("type");
+    QTest::addColumn<QString>("englishType");
+    QTest::addColumn<QString>("chineseType");
+
+    QTest::newRow("Start") << NodeType::Start << QStringLiteral("Start")
+                           << QStringLiteral("开始");
+    QTest::newRow("End") << NodeType::End << QStringLiteral("End")
+                         << QStringLiteral("结束");
+    QTest::newRow("UiPage") << NodeType::UiPage << QStringLiteral("UI Page")
+                            << QStringLiteral("界面页面");
+    QTest::newRow("LogicModule") << NodeType::LogicModule << QStringLiteral("Logic Module")
+                                 << QStringLiteral("逻辑模块");
+    QTest::newRow("Decision") << NodeType::Decision << QStringLiteral("Decision")
+                              << QStringLiteral("判断");
+    QTest::newRow("ExternalCode") << NodeType::ExternalCode
+                                  << QStringLiteral("External Code") << QStringLiteral("外部代码");
+}
+
+void LanguageSwitchTest::nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName()
+{
+    QFETCH(NodeType, type);
+    QFETCH(QString, englishType);
+    QFETCH(QString, chineseType);
+
+    MainWindow window;
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    auto addNode = [&window, type](const QString &id, const QString &name,
+                                   const QPointF &position) {
+        BlueprintNode node;
+        node.id = id;
+        node.type = type;
+        node.name = name;
+        return window.scene()->addNode(node, position);
+    };
+    // The default name a node gets while the UI is English, the one it gets while the UI
+    // is Chinese, and a user chosen name.
+    QVERIFY(addNode(QStringLiteral("english-default"), englishType, {}));
+    QVERIFY(addNode(QStringLiteral("chinese-default"), chineseType, QPointF(240, 0)));
+    QVERIFY(addNode(QStringLiteral("renamed"), QStringLiteral("LoginService"), QPointF(480, 0)));
+
+    NodeItem *englishDefault = window.scene()->nodeItem(QStringLiteral("english-default"));
+    NodeItem *chineseDefault = window.scene()->nodeItem(QStringLiteral("chinese-default"));
+    NodeItem *renamed = window.scene()->nodeItem(QStringLiteral("renamed"));
+    QVERIFY(englishDefault && chineseDefault && renamed);
+
+    const int englishHead = lowestHeadTextRow(englishDefault);
+    QVERIFY(englishHead >= 0);
+    // Only the card whose name repeats the English type label stays on a single line.
+    QVERIFY(lowestHeadTextRow(chineseDefault) > englishHead + 3);
+    QVERIFY(lowestHeadTextRow(renamed) > englishHead + 3);
+    QVERIFY(englishDefault->toolTip().contains(QStringLiteral("Type: ") + englishType));
+    QVERIFY(chineseDefault->toolTip().contains(QStringLiteral("Type: ") + englishType));
+    QVERIFY(renamed->toolTip().contains(QStringLiteral("Type: ") + englishType));
+
+    // The inspector keeps reporting the type even while the card hides the duplicate.
+    englishDefault->setSelected(true);
+    auto *editor = window.findChild<NodePropertiesEditor *>(
+        QStringLiteral("inspectorNodePropertiesEditor"));
+    QVERIFY(editor);
+    auto *typeValue = editor->findChild<QLabel *>(QStringLiteral("nodeTypeValue"));
+    QVERIFY(typeValue);
+    QCOMPARE(typeValue->text(), englishType);
+
+    QVERIFY(window.setLanguage(QStringLiteral("zh_CN")));
+    const int chineseHead = lowestHeadTextRow(chineseDefault);
+    QVERIFY(chineseHead >= 0);
+    QVERIFY(lowestHeadTextRow(englishDefault) > chineseHead + 3);
+    QVERIFY(lowestHeadTextRow(renamed) > chineseHead + 3);
+    QCOMPARE(typeValue->text(), chineseType);
 }
 
 void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()

@@ -188,8 +188,14 @@ void NodePropertiesEditor::applyTo(BlueprintNode *node) const
 
 void NodePropertiesEditor::clear()
 {
-    setNode({});
+    m_node = BlueprintNode{};
     m_hasNode = false;
+    m_nameEdit->clear();
+    m_descriptionEdit->clear();
+    clearRows(m_inputsTable);
+    clearRows(m_outputsTable);
+    clearRows(m_constraintsTable);
+    clearRows(m_acceptanceCriteriaTable);
     m_typeValue->clear();
 }
 
