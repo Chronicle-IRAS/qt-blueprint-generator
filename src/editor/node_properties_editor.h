@@ -25,6 +25,7 @@ public:
     void retranslateUi();
 
 private:
+    void updateTypeText();
     void appendPortRow(QTableWidget *table, const PortSpec &port);
     void appendStringRow(QTableWidget *table, const QString &value);
     static QVector<PortSpec> portsFrom(QTableWidget *table);
@@ -34,6 +35,8 @@ private:
                                          const QString &text);
 
     QLabel *m_nameLabel = nullptr;
+    QLabel *m_typeLabel = nullptr;
+    QLabel *m_typeValue = nullptr;
     QLabel *m_descriptionLabel = nullptr;
     QLineEdit *m_nameEdit = nullptr;
     QPlainTextEdit *m_descriptionEdit = nullptr;
@@ -49,4 +52,6 @@ private:
     QGroupBox *m_acceptanceCriteriaGroup = nullptr;
     QTableWidget *m_acceptanceCriteriaTable = nullptr;
     QPushButton *m_addAcceptanceCriterionButton = nullptr;
+    BlueprintNode m_node;
+    bool m_hasNode = false;
 };

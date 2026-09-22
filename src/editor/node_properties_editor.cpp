@@ -1,4 +1,5 @@
 #include "editor/node_properties_editor.h"
+#include "ui/node_type_display.h"
 #include "ui/theme.h"
 
 #include <QAbstractItemView>
@@ -62,6 +63,12 @@ NodePropertiesEditor::NodePropertiesEditor(const QString &objectNamePrefix, QWid
     m_nameEdit = new QLineEdit(this);
     m_nameEdit->setObjectName(fieldPrefix(objectNamePrefix) + QStringLiteral("NameEdit"));
     form->addRow(m_nameLabel, m_nameEdit);
+
+    m_typeLabel = new QLabel(this);
+    m_typeValue = new QLabel(this);
+    m_typeValue->setObjectName(fieldPrefix(objectNamePrefix) + QStringLiteral("TypeValue"));
+    m_typeValue->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    form->addRow(m_typeLabel, m_typeValue);
 
     m_descriptionLabel = new QLabel(this);
     m_descriptionEdit = new QPlainTextEdit(this);
@@ -135,8 +142,16 @@ NodePropertiesEditor::NodePropertiesEditor(const QString &objectNamePrefix, QWid
     retranslateUi();
 }
 
+void NodePropertiesEditor::updateTypeText()
+{
+    m_typeValue->setText(m_hasNode ? nodeTypeDisplayName(m_node.type) : QString());
+}
+
 void NodePropertiesEditor::setNode(const BlueprintNode &node)
 {
+    m_node = node;
+    m_hasNode = true;
+    updateTypeText();
     m_nameEdit->setText(node.name);
     m_descriptionEdit->setPlainText(node.description);
 
@@ -173,7 +188,15 @@ void NodePropertiesEditor::applyTo(BlueprintNode *node) const
 
 void NodePropertiesEditor::clear()
 {
-    setNode({});
+    m_node = BlueprintNode{};
+    m_hasNode = false;
+    m_nameEdit->clear();
+    m_descriptionEdit->clear();
+    clearRows(m_inputsTable);
+    clearRows(m_outputsTable);
+    clearRows(m_constraintsTable);
+    clearRows(m_acceptanceCriteriaTable);
+    m_typeValue->clear();
 }
 
 void NodePropertiesEditor::setEditorEnabled(bool enabled)
@@ -184,6 +207,8 @@ void NodePropertiesEditor::setEditorEnabled(bool enabled)
 void NodePropertiesEditor::retranslateUi()
 {
     m_nameLabel->setText(tr("Name"));
+    m_typeLabel->setText(tr("Type"));
+    updateTypeText();
     m_descriptionLabel->setText(tr("Description"));
 
     const QStringList portHeaders{tr("Name"), tr("Type"), tr("Description"), tr("Delete")};
