@@ -25,6 +25,7 @@ private slots:
     void initTestCase();
     void cleanupTestCase();
     void switchesBetweenEnglishAndChineseAndPersistsChoice();
+    void refreshesExistingNodeTooltips();
 
 private:
     QTemporaryDir m_settingsDirectory;
@@ -44,6 +45,33 @@ void LanguageSwitchTest::initTestCase()
 void LanguageSwitchTest::cleanupTestCase()
 {
     QSettings().clear();
+}
+
+void LanguageSwitchTest::refreshesExistingNodeTooltips()
+{
+    MainWindow window;
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    BlueprintNode node;
+    node.id = QStringLiteral("tooltip-node");
+    node.name = QStringLiteral("Processor");
+    node.description = QStringLiteral("User description");
+    node.inputs = {{QStringLiteral("request"), QStringLiteral("string"), {}}};
+    node.outputs = {{QStringLiteral("response"), QStringLiteral("string"), {}}};
+    const QPointF position(123, 234);
+    QVERIFY(window.scene()->addNode(node, position));
+    auto *item = window.scene()->nodeItem(node.id);
+    QVERIFY(item);
+    const auto document = window.document();
+    const int undoCount = window.scene()->undoStack()->count();
+    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nUser description\nInput: request\nOutput: response"));
+    QVERIFY(window.setLanguage(QStringLiteral("zh_CN")));
+    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nUser description\n输入：request\n输出：response"));
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nUser description\nInput: request\nOutput: response"));
+    QCOMPARE(window.scene()->nodeItem(node.id), item);
+    QCOMPARE(item->pos(), position);
+    QCOMPARE(window.document(), document);
+    QCOMPARE(window.scene()->undoStack()->count(), undoCount);
 }
 
 void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()

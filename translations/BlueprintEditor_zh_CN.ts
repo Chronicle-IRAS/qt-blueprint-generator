@@ -477,6 +477,14 @@
 <context>
     <name>QObject</name>
     <message>
+        <source>Input: %1</source>
+        <translation>输入：%1</translation>
+    </message>
+    <message>
+        <source>Output: %1</source>
+        <translation>输出：%1</translation>
+    </message>
+    <message>
         <location filename="../src/app/main_window.cpp" line="46"/>
         <source>Start</source>
         <translation>开始</translation>

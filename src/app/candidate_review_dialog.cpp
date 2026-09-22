@@ -8,6 +8,8 @@
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSplitter>
+#include <QGridLayout>
+#include "ui/theme.h"
 #include <QTextBlock>
 #include <QVBoxLayout>
 
@@ -88,7 +90,8 @@ struct CandidateReviewDialog::Impl {
             }
             editor->setExtraSelections(selections);
         };
-        highlight(current, candidate, QColor(255,220,220)); highlight(candidate, current, QColor(220,245,220));
+        highlight(current, candidate, EditorTheme::colors().diffRemoved);
+        highlight(candidate, current, EditorTheme::colors().diffAdded);
     }
     void select(int selected) {
         row = selected;
@@ -169,21 +172,27 @@ CandidateReviewDialog::CandidateReviewDialog(const BlueprintDocument &snapshot, 
     resize(1000, 650);
     auto *layout = new QVBoxLayout(this);
     auto *summary = new QLabel(result.summary, this); summary->setTextFormat(Qt::PlainText); summary->setWordWrap(true); layout->addWidget(summary);
-    d->list = new QListWidget(this); d->list->setObjectName("candidateFiles"); layout->addWidget(d->list, 1);
-    auto *splitter = new QSplitter(this); layout->addWidget(splitter, 3);
+    layout->setContentsMargins(EditorTheme::SpaceLarge, EditorTheme::SpaceLarge,
+                               EditorTheme::SpaceLarge, EditorTheme::SpaceLarge);
+    layout->setSpacing(EditorTheme::SpaceMedium);
+    d->list = new QListWidget(this); d->list->setObjectName("candidateFiles"); d->list->setMaximumHeight(112); layout->addWidget(d->list, 1);
+    auto *splitter = new QSplitter(this); splitter->setChildrenCollapsible(false); layout->addWidget(splitter, 3);
     auto addEditor = [splitter](QLabel *&label, QPlainTextEdit *&editor, const char *name) {
         auto *panel = new QWidget(splitter); auto *column = new QVBoxLayout(panel);
         label = new QLabel(panel); column->addWidget(label);
         editor = new QPlainTextEdit(panel); editor->setObjectName(name); column->addWidget(editor);
+        editor->setFont(EditorTheme::codeFont());
+        column->setContentsMargins(0, 0, 0, 0); column->setSpacing(EditorTheme::SpaceMedium);
     };
     addEditor(d->currentLabel, d->current, "currentEditor"); addEditor(d->candidateLabel, d->candidate, "candidateEditor");
     d->current->setReadOnly(true);
     d->conflict = new QLabel(this); d->conflict->setObjectName("conflictIndicator"); d->conflict->setTextFormat(Qt::PlainText); d->conflict->setWordWrap(true); layout->addWidget(d->conflict);
     d->status = new QLabel(this); d->status->setObjectName("reviewStatus"); d->status->setTextFormat(Qt::PlainText); d->status->setWordWrap(true); layout->addWidget(d->status);
-    auto *buttons = new QHBoxLayout; layout->addLayout(buttons);
-    auto addButton = [this, buttons](const char *name) { auto *b = new QPushButton(this); b->setObjectName(name); b->setAutoDefault(false); buttons->addWidget(b); return b; };
+    auto *buttons = new QGridLayout; layout->addLayout(buttons);
+    auto addButton = [this, buttons, index = 0](const char *name) mutable { auto *b = new QPushButton(this); b->setObjectName(name); b->setAutoDefault(false); buttons->addWidget(b, index / 3, index % 3); ++index; return b; };
     d->accept = addButton("acceptCandidateButton"); d->editAccept = addButton("editAcceptCandidateButton");
     d->reject = addButton("rejectCandidateButton"); d->refresh = addButton("refreshPreviewButton"); d->cancel = addButton("cancelRemainingButton");
+    d->accept->setProperty("role", "primary");
     for (const auto &file : result.files) { d->files.append({file.relativePath, {}, std::nullopt, false, false}); d->list->addItem(file.relativePath); }
     connect(d->list, &QListWidget::currentRowChanged, this, [this](int row) { d->select(row); });
     connect(d->candidate, &QPlainTextEdit::textChanged, this, [this] { if (d->row >= 0) d->files[d->row].draft = d->candidate->toPlainText(); d->diff(); });

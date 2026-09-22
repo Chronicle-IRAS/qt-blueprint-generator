@@ -1,4 +1,5 @@
 #include "app/main_window.h"
+#include "ui/theme.h"
 
 #include "app/ai_settings_dialog.h"
 #include "app/candidate_review_dialog.h"
@@ -263,6 +264,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_cancelGenerationAction->setObjectName(QStringLiteral("cancelGenerationAction"));
     m_blueprintToolbar->addSeparator();
     m_blueprintToolbar->addAction(m_generateAction);
+    m_blueprintToolbar->widgetForAction(m_generateAction)->setProperty("role", "primary");
     m_blueprintToolbar->addAction(m_cancelGenerationAction);
     m_generationStatus = new QLabel(this);
     m_generationStatus->setObjectName(QStringLiteral("generationStatus"));
@@ -294,6 +296,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     propertyLayout->addWidget(propertyScrollArea);
     m_applyPropertiesButton = new QPushButton(tr("Apply"), propertyWidget);
     m_applyPropertiesButton->setObjectName(QStringLiteral("applyNodePropertiesButton"));
+    m_applyPropertiesButton->setProperty("role", "primary");
     propertyLayout->addWidget(m_applyPropertiesButton);
     m_propertiesDock->setWidget(propertyWidget);
     addDockWidget(Qt::RightDockWidgetArea, m_propertiesDock);
@@ -320,10 +323,24 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_buildForm->addRow(tr("Empty export directory"), m_exportTargetEdit);
     m_buildForm->addRow(tr("CMake executable"), m_cmakeExecutableEdit);
     m_buildForm->addRow(tr("Configure arguments"), m_configureArgumentsEdit);
-    buildLayout->addLayout(m_buildForm);
+    auto *buildFormContents = new QWidget(buildWidget);
+    m_buildForm->setContentsMargins(EditorTheme::SpaceSmall, EditorTheme::SpaceSmall,
+                                   EditorTheme::SpaceSmall, EditorTheme::SpaceSmall);
+    m_buildForm->setSpacing(EditorTheme::SpaceMedium);
+    m_buildForm->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    buildFormContents->setLayout(m_buildForm);
+    auto *buildFormScroll = new QScrollArea(buildWidget);
+    buildFormScroll->setObjectName(QStringLiteral("buildFormScrollArea"));
+    buildFormScroll->setWidgetResizable(true);
+    buildFormScroll->setFrameShape(QFrame::NoFrame);
+    buildFormScroll->setMaximumHeight(112);
+    buildFormScroll->setWidget(buildFormContents);
+    buildLayout->setSpacing(EditorTheme::SpaceMedium);
+    buildLayout->addWidget(buildFormScroll);
     auto *buttons = new QHBoxLayout;
     m_buildProjectButton = new QPushButton(tr("Build"), buildWidget);
     m_buildProjectButton->setObjectName(QStringLiteral("buildProjectButton"));
+    m_buildProjectButton->setProperty("role", "primary");
     m_exportProjectButton = new QPushButton(tr("Export"), buildWidget);
     m_exportProjectButton->setObjectName(QStringLiteral("exportProjectButton"));
     buttons->addWidget(m_buildProjectButton);
@@ -333,11 +350,14 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_buildLog = new QPlainTextEdit(buildWidget);
     m_buildLog->setObjectName(QStringLiteral("buildLog"));
     m_buildLog->setReadOnly(true);
+    m_buildLog->setFont(EditorTheme::codeFont());
     m_buildLog->setPlaceholderText(tr("Configure, build, and export output appears here."));
     m_buildLog->setMaximumBlockCount(10000);
     buildLayout->addWidget(m_buildLog);
     m_buildDock->setWidget(buildWidget);
     addDockWidget(Qt::BottomDockWidgetArea, m_buildDock);
+    resizeDocks({m_propertiesDock}, {340}, Qt::Horizontal);
+    resizeDocks({m_buildDock}, {260}, Qt::Vertical);
 
     m_propertiesDockAction = m_propertiesDock->toggleViewAction();
     m_propertiesDockAction->setObjectName(QStringLiteral("propertiesDockAction"));
@@ -600,6 +620,10 @@ void MainWindow::retranslateUi()
     m_buildLog->setPlaceholderText(tr("Configure, build, and export output appears here."));
 
     statusBar()->clearMessage();
+    for (const auto &node : m_document.nodes) {
+        if (auto *item = m_scene->nodeItem(node.id))
+            item->refreshToolTip();
+    }
     m_scene->update();
 }
 
@@ -711,8 +735,8 @@ void MainWindow::resetWindowLayout()
     addDockWidget(Qt::BottomDockWidgetArea, m_buildDock);
     m_propertiesDock->show();
     m_buildDock->show();
-    resizeDocks({m_propertiesDock}, {300}, Qt::Horizontal);
-    resizeDocks({m_buildDock}, {220}, Qt::Vertical);
+    resizeDocks({m_propertiesDock}, {340}, Qt::Horizontal);
+    resizeDocks({m_buildDock}, {260}, Qt::Vertical);
 }
 
 void MainWindow::appendBuildLog(const QString &text)

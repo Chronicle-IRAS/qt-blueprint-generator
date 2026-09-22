@@ -1,6 +1,7 @@
 #include "editor/edge_item.h"
 
 #include "editor/node_item.h"
+#include "ui/theme.h"
 
 #include <QPainterPath>
 #include <QPainter>
@@ -40,7 +41,8 @@ EdgeItem::EdgeItem(QString edgeId, QString sourceId, QString targetId, NodeItem 
     , m_target(target)
     , m_label(std::move(label))
 {
-    setPen(QPen(QColor(71, 85, 105), 2.0));
+    setPen(QPen(EditorTheme::colors().edge, 2.0));
+    setToolTip(m_label);
     setZValue(-1.0);
     updatePath();
 }
@@ -129,12 +131,15 @@ void EdgeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, 
     }
     const QPolygonF arrow = arrowPolygon();
     painter->setPen(Qt::NoPen);
-    painter->setBrush(QColor(71, 85, 105));
+    painter->setBrush(EditorTheme::colors().edge);
     painter->drawPolygon(arrow);
     if (!m_label.isEmpty()) {
-        painter->setPen(QColor(30, 41, 59));
-        painter->setBrush(Qt::NoBrush);
-        painter->drawText(QRectF(m_labelPosition - QPointF(40.0, 12.0), QSizeF(80.0, 24.0)),
-                          Qt::AlignCenter, m_label);
+        const QRectF labelRect(m_labelPosition - QPointF(40.0, 12.0), QSizeF(80.0, 24.0));
+        painter->setPen(QPen(EditorTheme::colors().border, 1.0));
+        painter->setBrush(EditorTheme::colors().surface);
+        painter->drawRoundedRect(labelRect.adjusted(0.5, 0.5, -0.5, -0.5), 5.0, 5.0);
+        painter->setPen(EditorTheme::colors().text);
+        painter->drawText(labelRect.adjusted(6.0, 0.0, -6.0, 0.0), Qt::AlignCenter,
+                          painter->fontMetrics().elidedText(m_label, Qt::ElideRight, 68));
     }
 }

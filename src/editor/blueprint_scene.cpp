@@ -2,6 +2,8 @@
 
 #include "editor/edge_item.h"
 #include "editor/node_item.h"
+#include "ui/theme.h"
+#include <QPainter>
 
 #include <QGraphicsPathItem>
 #include <QGraphicsSceneMouseEvent>
@@ -59,6 +61,38 @@ private:
 };
 
 } // namespace
+
+void BlueprintScene::drawBackground(QPainter *painter, const QRectF &rect)
+{
+    const auto &colors = EditorTheme::colors();
+    painter->save();
+    painter->setClipRect(rect, Qt::IntersectClip);
+    painter->fillRect(rect, colors.canvas);
+    const QTransform transform = painter->worldTransform();
+    const qreal scale = std::hypot(transform.m11(), transform.m12());
+    if (scale > 0.0 && std::isfinite(scale)) {
+        qreal spacing = 24.0;
+        while (spacing * scale < 16.0 || rect.width() / spacing > 512.0
+               || rect.height() / spacing > 512.0)
+            spacing *= 2.0;
+        painter->setRenderHint(QPainter::Antialiasing, false);
+        const auto drawLines = [&](qreal step, const QColor &color) {
+            QPen pen(color, 0.0);
+            painter->setPen(pen);
+            const qreal startX = std::ceil(rect.left() / step) * step;
+            const qreal startY = std::ceil(rect.top() / step) * step;
+            for (int i = 0; i <= 512 && startX + i * step <= rect.right(); ++i)
+                painter->drawLine(QPointF(startX + i * step, rect.top()),
+                                  QPointF(startX + i * step, rect.bottom()));
+            for (int i = 0; i <= 512 && startY + i * step <= rect.bottom(); ++i)
+                painter->drawLine(QPointF(rect.left(), startY + i * step),
+                                  QPointF(rect.right(), startY + i * step));
+        };
+        drawLines(spacing, colors.gridMinor);
+        drawLines(spacing * 5.0, colors.gridMajor);
+    }
+    painter->restore();
+}
 
 BlueprintScene::BlueprintScene(BlueprintDocument *document, QObject *parent)
     : QGraphicsScene(parent)
@@ -525,7 +559,7 @@ void BlueprintScene::beginPortDrag(const QString &nodeId, int outputIndex)
     m_portDragSource = nodeId;
     m_portDragOutput = outputIndex;
     m_temporaryConnection = addPath(QPainterPath(),
-                                    QPen(QColor(37, 99, 235), 2.0, Qt::DashLine,
+                                    QPen(EditorTheme::colors().accent, 2.0, Qt::DashLine,
                                          Qt::RoundCap, Qt::RoundJoin));
     m_temporaryConnection->setData(0, QStringLiteral("portConnectionPreview"));
     m_temporaryConnection->setZValue(-0.5);

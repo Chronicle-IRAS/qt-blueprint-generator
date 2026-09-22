@@ -1,4 +1,5 @@
 #include "editor/node_item.h"
+#include "ui/theme.h"
 
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsScene>
@@ -23,6 +24,8 @@ NodeItem::NodeItem(QString nodeId, QString title, QGraphicsItem *parent)
     m_node.name = m_title;
     setFlags(ItemIsMovable | ItemIsSelectable | ItemSendsGeometryChanges);
     setCacheMode(NoCache);
+    setAcceptHoverEvents(true);
+    setToolTip(m_title);
 }
 
 QString NodeItem::nodeId() const
@@ -43,8 +46,18 @@ void NodeItem::setNode(const BlueprintNode &node)
     if (m_highlightedInputPort >= std::max(1, static_cast<int>(node.inputs.size()))) {
         m_highlightedInputPort = -1;
     }
-    setToolTip(node.description);
+    refreshToolTip();
     update();
+}
+
+void NodeItem::refreshToolTip()
+{
+    QStringList details{m_node.name, m_node.description};
+    for (const auto &port : m_node.inputs)
+        details.append(QObject::tr("Input: %1").arg(port.name));
+    for (const auto &port : m_node.outputs)
+        details.append(QObject::tr("Output: %1").arg(port.name));
+    setToolTip(details.join(QLatin1Char('\n')));
 }
 
 QPointF NodeItem::inputAnchor(int index) const
@@ -147,49 +160,61 @@ void NodeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, 
 {
     const QRectF body(0.0, 0.0, NodeWidth, NodeHeight);
     const bool selected = option->state.testFlag(QStyle::State_Selected);
-    painter->setPen(QPen(selected ? QColor(42, 130, 218) : QColor(71, 85, 105), selected ? 2.5 : 1.5));
-    painter->setBrush(QColor(248, 250, 252));
+    const bool hovered = option->state.testFlag(QStyle::State_MouseOver);
+    const auto &colors = EditorTheme::colors();
+    painter->save();
+    painter->setPen(QPen(selected ? colors.selection : hovered ? colors.nodeHover : colors.nodeBorder,
+                         selected ? 2.5 : hovered ? 2.0 : 1.5));
+    painter->setBrush(selected ? colors.nodeSelectedBody : colors.nodeBody);
     painter->drawRoundedRect(body, 8.0, 8.0);
 
     painter->setPen(Qt::NoPen);
-    painter->setBrush(QColor(37, 99, 235));
+    painter->setBrush(colors.nodeHeader);
     painter->drawRoundedRect(QRectF(0.0, 0.0, NodeWidth, 28.0), 8.0, 8.0);
     painter->drawRect(0, 18, static_cast<int>(NodeWidth), 10);
 
-    painter->setPen(Qt::white);
+    painter->setPen(colors.nodeHeaderText);
+    const QFont bodyFont = painter->font();
+    QFont titleFont = bodyFont;
+    titleFont.setWeight(QFont::DemiBold);
+    painter->setFont(titleFont);
     painter->drawText(QRectF(10.0, 0.0, NodeWidth - 20.0, 28.0), Qt::AlignVCenter | Qt::AlignLeft,
-                      m_title);
-    painter->setPen(QColor(71, 85, 105));
+                      painter->fontMetrics().elidedText(m_title, Qt::ElideRight, 160));
+    painter->setFont(bodyFont);
+    painter->setPen(colors.textMuted);
     painter->drawText(QRectF(10.0, 30.0, 75.0, 18.0), Qt::AlignLeft | Qt::AlignVCenter,
                       QObject::tr("Input"));
     painter->drawText(QRectF(NodeWidth - 85.0, 30.0, 75.0, 18.0),
                       Qt::AlignRight | Qt::AlignVCenter, QObject::tr("Output"));
-    painter->setPen(QColor(30, 41, 59));
+    painter->setPen(colors.text);
     for (int index = 0; index < m_node.inputs.size() && index < 2; ++index) {
         painter->drawText(QRectF(10.0, 48.0 + index * 18.0, 72.0, 18.0),
-                          Qt::AlignLeft | Qt::AlignVCenter, m_node.inputs.at(index).name);
+                          Qt::AlignLeft | Qt::AlignVCenter,
+                          painter->fontMetrics().elidedText(m_node.inputs.at(index).name, Qt::ElideRight, 72));
     }
     for (int index = 0; index < m_node.outputs.size() && index < 2; ++index) {
         painter->drawText(QRectF(NodeWidth - 82.0, 48.0 + index * 18.0, 72.0, 18.0),
-                          Qt::AlignRight | Qt::AlignVCenter, m_node.outputs.at(index).name);
+                          Qt::AlignRight | Qt::AlignVCenter,
+                          painter->fontMetrics().elidedText(m_node.outputs.at(index).name, Qt::ElideRight, 72));
     }
 
     const int inputCount = std::max(1, static_cast<int>(m_node.inputs.size()));
     for (int index = 0; index < inputCount; ++index) {
         const qreal y = NodeHeight * (index + 1.0) / (inputCount + 1.0);
         const bool highlighted = index == m_highlightedInputPort;
-        painter->setPen(QPen(highlighted ? QColor(22, 163, 74) : QColor(30, 41, 59),
+        painter->setPen(QPen(highlighted ? colors.portCompatible : colors.nodeBorder,
                              highlighted ? 2.5 : 1.0));
-        painter->setBrush(highlighted ? QColor(187, 247, 208) : QColor(226, 232, 240));
+        painter->setBrush(highlighted ? colors.portCompatibleFill : colors.portInput);
         painter->drawEllipse(QPointF(0.0, y), 5.0, 5.0);
     }
-    painter->setPen(QPen(QColor(30, 41, 59), 1.0));
-    painter->setBrush(QColor(226, 232, 240));
+    painter->setPen(QPen(colors.nodeBorder, 1.0));
+    painter->setBrush(colors.portOutput);
     const int outputCount = std::max(1, static_cast<int>(m_node.outputs.size()));
     for (int index = 0; index < outputCount; ++index) {
         const qreal y = NodeHeight * (index + 1.0) / (outputCount + 1.0);
         painter->drawEllipse(QPointF(NodeWidth, y), 5.0, 5.0);
     }
+    painter->restore();
 }
 
 QVariant NodeItem::itemChange(GraphicsItemChange change, const QVariant &value)

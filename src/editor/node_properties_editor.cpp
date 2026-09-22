@@ -1,4 +1,5 @@
 #include "editor/node_properties_editor.h"
+#include "ui/theme.h"
 
 #include <QAbstractItemView>
 #include <QFormLayout>
@@ -34,6 +35,8 @@ QTableWidget *createTable(int columns, const QString &objectName, QWidget *paren
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::SingleSelection);
     table->verticalHeader()->setVisible(false);
+    table->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    table->setAlternatingRowColors(true);
     table->setMinimumHeight(120);
     return table;
 }
@@ -52,7 +55,9 @@ NodePropertiesEditor::NodePropertiesEditor(const QString &objectNamePrefix, QWid
     setObjectName(objectNamePrefix + QStringLiteral("NodePropertiesEditor"));
 
     auto *layout = new QVBoxLayout(this);
+    layout->setSpacing(EditorTheme::SpaceMedium);
     auto *form = new QFormLayout;
+    form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     m_nameLabel = new QLabel(this);
     m_nameEdit = new QLineEdit(this);
     m_nameEdit->setObjectName(fieldPrefix(objectNamePrefix) + QStringLiteral("NameEdit"));
@@ -69,8 +74,8 @@ NodePropertiesEditor::NodePropertiesEditor(const QString &objectNamePrefix, QWid
     m_inputsGroup = createGroup(objectNamePrefix + QStringLiteral("NodeInputsEditor"), this);
     auto *inputsLayout = new QVBoxLayout(m_inputsGroup);
     m_inputsTable = createTable(4, QStringLiteral("portItemsTable"), m_inputsGroup);
-    m_inputsTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    m_inputsTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    m_inputsTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    m_inputsTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_inputsTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
     m_inputsTable->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
     m_addInputButton = new QPushButton(m_inputsGroup);
@@ -82,8 +87,8 @@ NodePropertiesEditor::NodePropertiesEditor(const QString &objectNamePrefix, QWid
     m_outputsGroup = createGroup(objectNamePrefix + QStringLiteral("NodeOutputsEditor"), this);
     auto *outputsLayout = new QVBoxLayout(m_outputsGroup);
     m_outputsTable = createTable(4, QStringLiteral("portItemsTable"), m_outputsGroup);
-    m_outputsTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    m_outputsTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    m_outputsTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    m_outputsTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_outputsTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
     m_outputsTable->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
     m_addOutputButton = new QPushButton(m_outputsGroup);
