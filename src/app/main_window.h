@@ -10,6 +10,7 @@
 
 #include "blueprint/blueprint_document.h"
 #include "app/generation_controller.h"
+#include "ui/theme.h"
 #include <QPointer>
 
 class BlueprintScene;
@@ -48,6 +49,7 @@ public:
     QGraphicsView *graphicsView() const;
     QString currentLanguage() const;
     bool setLanguage(const QString &languageCode);
+    void setTheme(EditorTheme::Theme theme);
     void setBuildToolConfiguration(const QString &cmakeExecutable,
                                    const QStringList &configureArguments,
                                    const QStringList &buildArguments = {});
@@ -57,8 +59,10 @@ protected:
 
 private:
     bool applyLanguage(const QString &languageCode, bool persist);
+    void applyTheme(EditorTheme::Theme theme, bool persist);
     void retranslateUi();
     void updateLanguageActions();
+    void updateThemeActions();
     void showCanvasContextMenu(QGraphicsItem *target, const QPoint &screenPosition,
                                const QPointF &scenePosition);
     void cancelConnection();
@@ -114,6 +118,10 @@ private:
     QMenu *m_languageMenu = nullptr;
     QAction *m_englishLanguageAction = nullptr;
     QAction *m_chineseLanguageAction = nullptr;
+    QMenu *m_themeMenu = nullptr;
+    QAction *m_lightThemeAction = nullptr;
+    QAction *m_darkThemeAction = nullptr;
+    EditorTheme::Theme m_theme = EditorTheme::Theme::Light;
     QDockWidget *m_propertiesDock = nullptr;
     NodePropertiesEditor *m_nodePropertiesEditor = nullptr;
     QPushButton *m_applyPropertiesButton = nullptr;

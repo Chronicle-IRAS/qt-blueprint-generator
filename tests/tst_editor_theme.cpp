@@ -15,12 +15,20 @@
 #include <QToolBar>
 #include <QAction>
 #include <QFontInfo>
+#include <QGraphicsView>
+#include <QImage>
 #include <QLineEdit>
+#include <QPainter>
+#include <QPixmap>
+#include <QVBoxLayout>
 #include <cmath>
 #include "ui/theme.h"
 #include "app/main_window.h"
 #include "app/ai_settings_dialog.h"
 #include "app/candidate_review_dialog.h"
+#include "editor/blueprint_scene.h"
+#include "editor/edge_item.h"
+#include "editor/node_item.h"
 #include "editor/node_properties_editor.h"
 
 class EditorThemeTest : public QObject {
@@ -42,16 +50,127 @@ private slots:
         if (QGuiApplication::platformName() == "windows")
             QVERIFY(QFontInfo(EditorTheme::codeFont()).fixedPitch());
     }
+    void darkPalette() {
+        // Identity values of the dark set, read straight from the theme so the slot stays
+        // independent of whatever theme is applied (and of any stored setting).
+        const auto &dark = EditorTheme::colors(EditorTheme::Theme::Dark);
+        QCOMPARE(dark.window, QColor("#0f172a"));
+        QCOMPARE(dark.canvas, QColor("#0b1220"));
+        QCOMPARE(dark.surface, QColor("#1e293b"));
+        QCOMPARE(dark.accent, QColor("#2563eb"));
+    }
+    void textContrast_data() {
+        QTest::addColumn<int>("theme");
+        QTest::newRow("Light") << static_cast<int>(EditorTheme::Theme::Light);
+        QTest::newRow("Dark") << static_cast<int>(EditorTheme::Theme::Dark);
+    }
     void textContrast() {
+        QFETCH(int, theme);
         auto luminance = [](QColor color) {
             auto channel = [](double value) { return value <= .04045 ? value / 12.92 : std::pow((value + .055) / 1.055, 2.4); };
             return .2126 * channel(color.redF()) + .7152 * channel(color.greenF()) + .0722 * channel(color.blueF());
         };
-        const auto &c = EditorTheme::colors();
-        for (auto pair : {qMakePair(c.text,c.surface), qMakePair(c.textMuted,c.window),
-                          qMakePair(c.onAccent,c.accent), qMakePair(c.disabledText,c.disabledSurface)}) {
-            const double first = luminance(pair.first), second = luminance(pair.second);
-            QVERIFY((qMax(first,second)+.05)/(qMin(first,second)+.05) >= 4.5);
+        const auto &c = EditorTheme::colors(static_cast<EditorTheme::Theme>(theme));
+        auto contrast = [&luminance](const QColor &first, const QColor &second) {
+            const double a = luminance(first), b = luminance(second);
+            return (qMax(a, b) + .05) / (qMin(a, b) + .05);
+        };
+        // WCAG AA for text on the surface it is painted on.
+        for (auto pair : {qMakePair(c.text, c.surface), qMakePair(c.textMuted, c.window),
+                          qMakePair(c.onAccent, c.accent), qMakePair(c.disabledText, c.disabledSurface),
+                          qMakePair(c.nodeHeaderText, c.nodeHeader), qMakePair(c.text, c.diffAdded),
+                          qMakePair(c.text, c.diffRemoved)}) {
+            QVERIFY(contrast(pair.first, pair.second) >= 4.5);
+        }
+        // Outlines, ports and selections only have to be told apart from the shape they belong to.
+        for (auto pair : {qMakePair(c.nodeBorder, c.nodeBody), qMakePair(c.edge, c.canvas),
+                          qMakePair(c.selection, c.nodeBody), qMakePair(c.selection, c.canvas),
+                          qMakePair(c.portInput, c.nodeBody), qMakePair(c.portOutput, c.nodeBody),
+                          qMakePair(c.portCompatible, c.nodeBody), qMakePair(c.textMuted, c.surfaceAlt)}) {
+            QVERIFY(contrast(pair.first, pair.second) >= 3.0);
+        }
+        // The grid lines and the node body stay deliberately soft against the canvas, and the
+        // borders stay soft against the window and the accent: the dark theme keeps them as
+        // subtle as the light one, so those pairs are excluded on purpose.
+    }
+    void customItemsFollowTheActiveTheme() {
+        BlueprintDocument document;
+        BlueprintScene scene(&document);
+        QGraphicsView view;
+        view.setScene(&scene);
+        BlueprintNode first;
+        first.id = QStringLiteral("first");
+        first.type = NodeType::LogicModule;
+        first.name = QStringLiteral("First");
+        BlueprintNode second = first;
+        second.id = QStringLiteral("second");
+        second.name = QStringLiteral("Second");
+        QVERIFY(scene.addNode(first, QPointF(0, 0)));
+        QVERIFY(scene.addNode(second, QPointF(320, 0)));
+        QVERIFY(scene.connectNodes(QStringLiteral("first"), QStringLiteral("second")));
+        QCOMPARE(document.edges.size(), 1);
+        QVERIFY(document.edges.constFirst().label.isEmpty());
+        NodeItem *firstItem = scene.nodeItem(QStringLiteral("first"));
+        EdgeItem *edge = scene.edgeItem(document.edges.constFirst().id);
+        QVERIFY(firstItem && edge);
+
+        // One scene unit maps to one image pixel, so a scene point can be sampled directly.
+        const QRectF region(0, 0, 700, 400);
+        auto render = [&scene, region](EditorTheme::Theme theme) {
+            EditorTheme::setTheme(*qApp, theme);
+            QImage image(700, 400, QImage::Format_ARGB32_Premultiplied);
+            image.fill(Qt::transparent);
+            QPainter painter(&image);
+            // Antialiasing off: every assertion samples a flat fill, not a blended edge.
+            painter.setRenderHint(QPainter::Antialiasing, false);
+            scene.render(&painter, region, region);
+            painter.end();
+            return image;
+        };
+        auto pixelAt = [](const QImage &image, const QPointF &point) {
+            return image.pixelColor(qRound(point.x()), qRound(point.y()));
+        };
+
+        for (auto theme : {EditorTheme::Theme::Light, EditorTheme::Theme::Dark}) {
+            const QImage image = render(theme);
+            const auto &c = EditorTheme::colors(theme);
+            // Inside the first node body: below the header band, clear of the text rows at
+            // y 30..84 and of the port circles on the left and right edge.
+            QCOMPARE(pixelAt(image, firstItem->scenePos() + QPointF(150, 70)), c.nodeBody);
+            // Empty canvas past both nodes, and off the grid lines drawn every 24 units.
+            QCOMPARE(pixelAt(image, QPointF(590, 290)), c.canvas);
+            // The edge runs from (180, 48) to (320, 48), so its midpoint lies on the stroke.
+            const QPointF midpoint = edge->path().pointAtPercent(0.5);
+            QCOMPARE(qRound(midpoint.y()), 48);
+            QCOMPARE(pixelAt(image, midpoint), c.edge);
+        }
+    }
+    // Reapplied after every slot: a failing assertion above must not leave the rest of the
+    // binary running under the dark theme.
+    void cleanup() { EditorTheme::setTheme(*qApp, EditorTheme::Theme::Light); }
+    void disabledControlsDoNotLookLikeEnabledOnes() {
+        for (auto theme : {EditorTheme::Theme::Light, EditorTheme::Theme::Dark}) {
+            EditorTheme::setTheme(*qApp, theme);
+            const auto &c = EditorTheme::colors(theme);
+            // The disabled state has to stay visible, so it may not reuse the enabled surface.
+            QVERIFY(c.disabledSurface != c.surface);
+            QVERIFY(c.disabledText != c.text);
+
+            QWidget container;
+            auto *layout = new QVBoxLayout(&container);
+            auto *enabled = new QPushButton(&container);
+            auto *disabled = new QPushButton(&container);
+            disabled->setEnabled(false);
+            enabled->setFixedSize(120, 32);
+            disabled->setFixedSize(120, 32);
+            layout->addWidget(enabled);
+            layout->addWidget(disabled);
+            container.resize(160, 96);
+            container.show();
+            QTest::qWait(20);
+            const QImage shot = container.grab().toImage();
+            QCOMPARE(shot.pixelColor(enabled->geometry().center()), c.surface);
+            QCOMPARE(shot.pixelColor(disabled->geometry().center()), c.disabledSurface);
         }
     }
     void inspectorBoundsTextColumns() {

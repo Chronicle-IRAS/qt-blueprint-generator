@@ -385,6 +385,24 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_viewMenu = menuBar()->addMenu(tr("View"));
     m_viewMenu->setObjectName(QStringLiteral("viewMenu"));
 
+    m_themeMenu = m_viewMenu->addMenu(tr("Theme"));
+    m_themeMenu->setObjectName(QStringLiteral("themeMenu"));
+    auto *themeGroup = new QActionGroup(this);
+    themeGroup->setExclusive(true);
+    m_lightThemeAction = m_themeMenu->addAction(tr("Light"));
+    m_lightThemeAction->setObjectName(QStringLiteral("themeLightAction"));
+    m_lightThemeAction->setCheckable(true);
+    themeGroup->addAction(m_lightThemeAction);
+    m_darkThemeAction = m_themeMenu->addAction(tr("Dark"));
+    m_darkThemeAction->setObjectName(QStringLiteral("themeDarkAction"));
+    m_darkThemeAction->setCheckable(true);
+    themeGroup->addAction(m_darkThemeAction);
+    connect(m_lightThemeAction, &QAction::triggered, this,
+            [this] { applyTheme(EditorTheme::Theme::Light, true); });
+    connect(m_darkThemeAction, &QAction::triggered, this,
+            [this] { applyTheme(EditorTheme::Theme::Dark, true); });
+    m_viewMenu->addSeparator();
+
     // Canvas entries live in the canvas context menu only; the issue keeps the menu bar
     // and toolbar structure untouched.
     m_selectAllAction = new QAction(tr("Select All"), this);
@@ -616,6 +634,13 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     if (!applyLanguage(savedLanguage, false)) {
         applyLanguage(QStringLiteral("en"), false);
     }
+
+    const QString savedTheme = QSettings().value(QStringLiteral("ui/theme"),
+                                                 QStringLiteral("light")).toString();
+    const EditorTheme::Theme restoredTheme = savedTheme == QStringLiteral("dark")
+                                                 ? EditorTheme::Theme::Dark
+                                                 : EditorTheme::Theme::Light;
+    applyTheme(restoredTheme, false);
 }
 
 MainWindow::~MainWindow()
@@ -709,6 +734,28 @@ bool MainWindow::applyLanguage(const QString &languageCode, bool persist)
     return true;
 }
 
+void MainWindow::setTheme(EditorTheme::Theme theme)
+{
+    applyTheme(theme, true);
+}
+
+void MainWindow::applyTheme(EditorTheme::Theme theme, bool persist)
+{
+    m_theme = theme;
+    EditorTheme::setTheme(*qApp, theme);
+
+    // Custom drawn items read the active colours while painting, so the scene has to be
+    // invalidated to repaint them with the new theme.
+    m_scene->update();
+
+    if (persist) {
+        QSettings().setValue(QStringLiteral("ui/theme"),
+                             theme == EditorTheme::Theme::Dark ? QStringLiteral("dark")
+                                                               : QStringLiteral("light"));
+    }
+    updateThemeActions();
+}
+
 void MainWindow::changeEvent(QEvent *event)
 {
     QMainWindow::changeEvent(event);
@@ -721,6 +768,12 @@ void MainWindow::updateLanguageActions()
 {
     m_englishLanguageAction->setChecked(m_currentLanguage == QStringLiteral("en"));
     m_chineseLanguageAction->setChecked(m_currentLanguage == QStringLiteral("zh_CN"));
+}
+
+void MainWindow::updateThemeActions()
+{
+    m_lightThemeAction->setChecked(m_theme == EditorTheme::Theme::Light);
+    m_darkThemeAction->setChecked(m_theme == EditorTheme::Theme::Dark);
 }
 
 void MainWindow::retranslateUi()
@@ -753,6 +806,9 @@ void MainWindow::retranslateUi()
     m_languageMenu->setTitle(tr("Language"));
     m_englishLanguageAction->setText(tr("English"));
     m_chineseLanguageAction->setText(tr("Chinese"));
+    m_themeMenu->setTitle(tr("Theme"));
+    m_lightThemeAction->setText(tr("Light"));
+    m_darkThemeAction->setText(tr("Dark"));
 
     m_propertiesDock->setWindowTitle(tr("Properties"));
     m_propertiesDockAction->setText(tr("Properties"));

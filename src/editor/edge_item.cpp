@@ -157,8 +157,10 @@ void EdgeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, 
     const auto &colors = EditorTheme::colors();
     const QColor strokeColor = selected ? colors.selection : colors.edge;
     QPen edgePen = pen();
+    // The stroke colour is read while painting so an edge follows a theme switch; the pen from
+    // the constructor only carries the width.
+    edgePen.setColor(strokeColor);
     if (selected) {
-        edgePen.setColor(strokeColor);
         edgePen.setWidthF(edgePen.widthF() + 1.5);
     }
 
