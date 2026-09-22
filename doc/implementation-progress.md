@@ -4,6 +4,10 @@
 
 ## 当前状态
 
+- 2026-09-22：Issue #31「显示节点类型」已实现，分支 `feature/issue-31-show-node-type`（基于远端 `main` 的 `6baa1c75`）。新增只读类型展示：共享映射 `nodeTypeDisplayName()`（`src/ui/node_type_display.h/.cpp`，统一使用 `QObject::tr` 复用现有 QObject 翻译上下文），`main_window.cpp` 删除重复的局部 `nodeTypeName()` 并改为调用它。Inspector 与双击对话框在“名称”与“描述”之间新增只读 `QLabel` 类型行（对象名 `nodeTypeValue` / `directNodeTypeValue`，可鼠标选中文本），`applyTo()` 不写 `type`，`clear()` 清空并标记无节点，`retranslateUi()` 同步标签与取值。画布节点卡片在原有固定 28px 标题带内改为两行：标题保持 DemiBold（上限 10pt，与主题基准一致），类型说明取 `titleFont - 2pt`（下限 7pt）并底对齐于同一带内；两个矩形的行高均来自各自 `QFontMetricsF::height()`，避免 Qt 按矩形裁剪字形。节点提示第二行固定为 `Type: <类型>`，端口行格式与顺序不变。`NodeWidth`/`NodeHeight`、锚点数学、端口绘制与 JSON Schema 均未改动。
+- 2026-09-22 Issue #31 验证：完整构建通过，CTest `22/22 passed`（44.50 秒）。新增/更新覆盖：`tst_node_properties_editor`（六种类型只读呈现、字号不可编辑、改名与清空、序列化键集合不变）、`tst_language_switch`（提示精确顺序、Inspector 与双击对话框在中英文下的类型取值与标签）、`tst_blueprint_scene`（画布提示、几何常量、同名字不同类型渲染结果必须不同、对话框保存后类型不变）。真实窗口截图在中英文下逐卡核对六个类型标签；另有一次性渲染检查证明 10/12/14/16/20pt 字体下 28px 标题带逐字节一致，仅小于 10pt 时随字体缩小，因此放大系统字体不会再裁剪标题或类型说明。
+- 2026-09-22 Issue #31 独立复核：功能要求全部满足，未改动 Schema、Serializer 或主题，无遗留的重复命名映射。复核发现初版把标题与类型说明画进低于字体行高的矩形，`QPainter::drawText` 会按矩形裁剪 `Logic Module`/`UI Page` 的 `g` 降部（默认 10pt 约 2px，更大系统字体可达 5px），现已按行高取矩形并去掉降低对比度的 alpha；同时删除两处恒真几何断言、刷新翻译文件中已迁移到 `node_type_display.cpp` 的位置并补齐 `Type: %1` 的位置与格式。复核级别剩余项为本地 `.gitignore` 修改，属用户未提交改动，未纳入本次提交。
+
 - 2026-09-22：Issue #19 已通过 PR #27 提交审核（`Closes #19`）：https://github.com/Chronicle-IRAS/qt-blueprint-generator/pull/27 ，实现提交 `c82fba0` 已推送，Issue 标记为 `in-review` 并保持开启。统一浅色主题、面板/对话框布局、节点悬停与选择、长文本提示和缩放网格已实现。独立规格审查与质量复审通过，无未解决阻塞项；AI 保存按钮强调样式、节点端口提示翻译与运行时刷新反馈均已通过失败测试复现并修正。停止等待用户审核，不自动合并或开始下一任务。
 - 最终完整构建与 CTest `22/22 passed`（124.44 秒）；中英文、100%/125%/150%/200% 共 32 个离屏截图的按钮/输入框几何检查无异常，代表性截图已复验。160 条翻译与源码提取完全一致、无未完成项，密钥模式扫描无命中。未调用真实 AI。原生 Qt 专项测试已通过；离屏缩放模拟不等同于实际显示器/多屏完整人工验收，检查步骤见 `doc/visual-style-verification.md`。
 - 2026-09-21：用户已合并 PR #26，远端主分支为 `d94db17`，Issue #18 已关闭。Issue #19「编辑器视觉样式」已从最新主分支建立 `feature/issue-19-editor-visual-style`，远端标记 `in-progress`；计划见 `doc/plans/2026-09-21-issue-19-visual-style.md`。当前正在实施统一浅色主题与布局，尚未验收或交付。

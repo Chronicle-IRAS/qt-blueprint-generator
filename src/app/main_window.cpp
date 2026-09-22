@@ -1,4 +1,5 @@
 #include "app/main_window.h"
+#include "ui/node_type_display.h"
 #include "ui/theme.h"
 
 #include "app/ai_settings_dialog.h"
@@ -43,25 +44,6 @@
 #include <algorithm>
 
 namespace {
-
-QString nodeTypeName(NodeType type)
-{
-    switch (type) {
-    case NodeType::Start:
-        return QObject::tr("Start");
-    case NodeType::End:
-        return QObject::tr("End");
-    case NodeType::UiPage:
-        return QObject::tr("UI Page");
-    case NodeType::LogicModule:
-        return QObject::tr("Logic Module");
-    case NodeType::Decision:
-        return QObject::tr("Decision");
-    case NodeType::ExternalCode:
-        return QObject::tr("External Code");
-    }
-    return {};
-}
 
 QString nodeTypeActionObjectName(NodeType type)
 {
@@ -216,7 +198,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
         NodeType::ExternalCode,
     };
     for (const NodeType type : nodeTypes) {
-        QAction *action = m_addNodeMenu->addAction(nodeTypeName(type));
+        QAction *action = m_addNodeMenu->addAction(nodeTypeDisplayName(type));
         action->setObjectName(nodeTypeActionObjectName(type));
         m_addNodeActions.append({type, action});
         connect(action, &QAction::triggered, this, [this, type] { addNodeOfType(type); });
@@ -491,7 +473,7 @@ bool MainWindow::addNodeOfType(NodeType type)
     BlueprintNode node;
     node.id = id;
     node.type = type;
-    node.name = nodeTypeName(type);
+    node.name = nodeTypeDisplayName(type);
     const QPointF center = m_view->mapToScene(m_view->viewport()->rect().center());
     const qsizetype ordinal = m_document.nodes.size();
     const QPointF position = center + QPointF((ordinal % 3) * 220.0, (ordinal / 3) * 140.0);
@@ -575,7 +557,7 @@ void MainWindow::retranslateUi()
     m_blueprintToolbar->setWindowTitle(tr("Blueprint"));
     m_addNodeButton->setText(tr("Add node"));
     for (const auto &[type, action] : m_addNodeActions) {
-        action->setText(nodeTypeName(type));
+        action->setText(nodeTypeDisplayName(type));
     }
     m_connectionLabelEdit->setPlaceholderText(tr("Edge label (optional)"));
     m_connectionLabelEdit->setToolTip(tr("Label for the next source-to-target connection"));

@@ -5,6 +5,7 @@
 #include <QDockWidget>
 #include <QGraphicsPathItem>
 #include <QGraphicsView>
+#include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
 #include <QPlainTextEdit>
@@ -62,6 +63,7 @@ class BlueprintSceneTest : public QObject
 
 private slots:
     void canvasPolishPreservesGeometryAndFullText();
+    void nodeCardSurfacesTypeWithoutChangingGeometry();
     void canvasGridRendersWithoutItemsAtDifferentZooms();
     void addingNodeUpdatesDocumentAndSupportsUndo();
     void movingNodeUpdatesLayoutWithoutChangingSemanticDocument();
@@ -128,6 +130,41 @@ void BlueprintSceneTest::canvasPolishPreservesGeometryAndFullText()
     const QString label(100, QLatin1Char('L'));
     QVERIFY(scene.connectNodes(draft.id, QStringLiteral("target"), label));
     QCOMPARE(scene.edgeItem(document.edges.first().id)->toolTip(), label);
+}
+
+void BlueprintSceneTest::nodeCardSurfacesTypeWithoutChangingGeometry()
+{
+    BlueprintDocument document;
+    BlueprintScene scene(&document);
+    BlueprintNode login = node(QStringLiteral("login"), QStringLiteral("LoginService"));
+    login.type = NodeType::LogicModule;
+    QVERIFY(scene.addNode(login, {}));
+    NodeItem *loginItem = scene.nodeItem(login.id);
+    QVERIFY(loginItem);
+    QVERIFY(loginItem->toolTip().contains(QStringLiteral("Type: Logic Module")));
+    QCOMPARE(loginItem->boundingRect(), QRectF(-6, -6, 192, 108));
+    QCOMPARE(loginItem->outputAnchor(0), QPointF(180, 48));
+
+    BlueprintNode decision = node(QStringLiteral("decision"), QStringLiteral("LoginService"));
+    decision.type = NodeType::Decision;
+    QVERIFY(scene.addNode(decision, QPointF(300, 0)));
+    NodeItem *decisionItem = scene.nodeItem(decision.id);
+    QVERIFY(decisionItem);
+    QVERIFY(decisionItem->toolTip().contains(QStringLiteral("Type: Decision")));
+    QCOMPARE(decisionItem->boundingRect(), QRectF(-6, -6, 192, 108));
+    QCOMPARE(decisionItem->outputAnchor(0) - decisionItem->pos(), QPointF(180, 48));
+
+    auto render = [](NodeItem *target) {
+        QImage image(200, 120, QImage::Format_ARGB32_Premultiplied);
+        image.fill(Qt::transparent);
+        QPainter painter(&image);
+        painter.translate(10, 10);
+        QStyleOptionGraphicsItem option;
+        option.state = QStyle::State_None;
+        target->paint(&painter, &option, nullptr);
+        return image;
+    };
+    QVERIFY(render(loginItem) != render(decisionItem));
 }
 
 void BlueprintSceneTest::canvasGridRendersWithoutItemsAtDifferentZooms()
@@ -744,7 +781,8 @@ void BlueprintSceneTest::directNodeEditorSaveSynchronizesDocumentCanvasInspector
         QStringLiteral("inspectorNodePropertiesEditor"));
     QVERIFY(inspectorName && inspector);
 
-    QTimer::singleShot(0, &window, [&window] {
+    QString dialogTypeText;
+    QTimer::singleShot(0, &window, [&window, &dialogTypeText] {
         auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
         QVERIFY(dialog);
         QCOMPARE(dialog->objectName(), QStringLiteral("nodeEditDialog"));
@@ -756,6 +794,12 @@ void BlueprintSceneTest::directNodeEditorSaveSynchronizesDocumentCanvasInspector
             dialog->reject();
         }
         QVERIFY(editorComplete);
+        auto *directType = editor->findChild<QLabel *>(QStringLiteral("directNodeTypeValue"));
+        if (!directType) {
+            dialog->reject();
+        }
+        QVERIFY(directType);
+        dialogTypeText = directType->text();
         BlueprintNode edited;
         edited.name = QStringLiteral("Canvas configured");
         edited.description = QStringLiteral("Edited without leaving the blueprint");
@@ -780,7 +824,9 @@ void BlueprintSceneTest::directNodeEditorSaveSynchronizesDocumentCanvasInspector
     QApplication::processEvents();
 
     const BlueprintNode edited = window.document().nodes.constFirst();
+    QCOMPARE(dialogTypeText, QStringLiteral("Logic Module"));
     QCOMPARE(edited.name, QStringLiteral("Canvas configured"));
+    QCOMPARE(edited.type, NodeType::LogicModule);
     QCOMPARE(edited.description, QStringLiteral("Edited without leaving the blueprint"));
     QCOMPARE(edited.inputs.constFirst().name, QStringLiteral("request"));
     QCOMPARE(edited.outputs.constFirst().type, QStringLiteral("bool"));
@@ -797,6 +843,8 @@ void BlueprintSceneTest::directNodeEditorSaveSynchronizesDocumentCanvasInspector
 
     window.scene()->undoStack()->undo();
     QCOMPARE(window.document().nodes.constFirst(), original);
+    QCOMPARE(window.document().nodes.constFirst().name, original.name);
+    QCOMPARE(window.document().nodes.constFirst().type, NodeType::LogicModule);
     QCOMPARE(window.scene()->nodeItem(id)->node(), original);
     QCOMPARE(inspectorName->text(), original.name);
     window.scene()->undoStack()->redo();

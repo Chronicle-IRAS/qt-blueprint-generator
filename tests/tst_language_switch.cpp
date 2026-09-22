@@ -1,10 +1,13 @@
 #include <QtTest/QtTest>
 
 #include <QAction>
+#include <QComboBox>
 #include <QDialog>
 #include <QDockWidget>
+#include <QFormLayout>
 #include <QGraphicsView>
 #include <QGroupBox>
+#include <QLabel>
 #include <QMenu>
 #include <QLineEdit>
 #include <QPushButton>
@@ -16,6 +19,7 @@
 #include "app/main_window.h"
 #include "editor/blueprint_scene.h"
 #include "editor/node_item.h"
+#include "editor/node_properties_editor.h"
 
 class LanguageSwitchTest : public QObject
 {
@@ -26,6 +30,7 @@ private slots:
     void cleanupTestCase();
     void switchesBetweenEnglishAndChineseAndPersistsChoice();
     void refreshesExistingNodeTooltips();
+    void showsReadOnlyNodeTypeAndFollowsLanguageSwitch();
 
 private:
     QTemporaryDir m_settingsDirectory;
@@ -53,6 +58,7 @@ void LanguageSwitchTest::refreshesExistingNodeTooltips()
     QVERIFY(window.setLanguage(QStringLiteral("en")));
     BlueprintNode node;
     node.id = QStringLiteral("tooltip-node");
+    node.type = NodeType::LogicModule;
     node.name = QStringLiteral("Processor");
     node.description = QStringLiteral("User description");
     node.inputs = {{QStringLiteral("request"), QStringLiteral("string"), {}}};
@@ -63,15 +69,54 @@ void LanguageSwitchTest::refreshesExistingNodeTooltips()
     QVERIFY(item);
     const auto document = window.document();
     const int undoCount = window.scene()->undoStack()->count();
-    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nUser description\nInput: request\nOutput: response"));
+    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nType: Logic Module\nUser description\nInput: request\nOutput: response"));
     QVERIFY(window.setLanguage(QStringLiteral("zh_CN")));
-    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nUser description\n输入：request\n输出：response"));
+    QCOMPARE(item->toolTip(), QStringLiteral("Processor\n类型：逻辑模块\nUser description\n输入：request\n输出：response"));
     QVERIFY(window.setLanguage(QStringLiteral("en")));
-    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nUser description\nInput: request\nOutput: response"));
+    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nType: Logic Module\nUser description\nInput: request\nOutput: response"));
     QCOMPARE(window.scene()->nodeItem(node.id), item);
     QCOMPARE(item->pos(), position);
     QCOMPARE(window.document(), document);
     QCOMPARE(window.scene()->undoStack()->count(), undoCount);
+}
+
+void LanguageSwitchTest::showsReadOnlyNodeTypeAndFollowsLanguageSwitch()
+{
+    MainWindow window;
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    QVERIFY(window.addNodeOfType(NodeType::LogicModule));
+    const QString id = window.document().nodes.constFirst().id;
+    window.scene()->nodeItem(id)->setSelected(true);
+
+    auto *editor = window.findChild<NodePropertiesEditor *>(
+        QStringLiteral("inspectorNodePropertiesEditor"));
+    QVERIFY(editor);
+    auto *typeValue = editor->findChild<QLabel *>(QStringLiteral("nodeTypeValue"));
+    auto *form = editor->findChild<QFormLayout *>();
+    QVERIFY(typeValue && form);
+    auto *typeLabel = qobject_cast<QLabel *>(form->labelForField(typeValue));
+    QVERIFY(typeLabel);
+    QCOMPARE(typeLabel->text(), QStringLiteral("Type"));
+    QCOMPARE(typeValue->text(), QStringLiteral("Logic Module"));
+    QCOMPARE(editor->findChildren<QComboBox *>().size(), 0);
+
+    auto *nameEdit = window.findChild<QLineEdit *>(QStringLiteral("nodeNameEdit"));
+    auto *applyButton = window.findChild<QPushButton *>(
+        QStringLiteral("applyNodePropertiesButton"));
+    QVERIFY(nameEdit && applyButton);
+    nameEdit->setText(QStringLiteral("LoginService"));
+    QTest::mouseClick(applyButton, Qt::LeftButton);
+    QCOMPARE(window.document().nodes.constFirst().name, QStringLiteral("LoginService"));
+    QCOMPARE(window.document().nodes.constFirst().type, NodeType::LogicModule);
+    QCOMPARE(typeValue->text(), QStringLiteral("Logic Module"));
+
+    QVERIFY(window.setLanguage(QStringLiteral("zh_CN")));
+    QCOMPARE(typeValue->text(), QStringLiteral("逻辑模块"));
+    QCOMPARE(typeLabel->text(), QStringLiteral("类型"));
+
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    QCOMPARE(typeValue->text(), QStringLiteral("Logic Module"));
+    QCOMPARE(typeLabel->text(), QStringLiteral("Type"));
 }
 
 void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
@@ -134,6 +179,8 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
         QString dialogTitle;
         QString saveText;
         QString cancelText;
+        bool dialogTypeCaptured = false;
+        QString dialogTypeText;
         QTimer::singleShot(0, &window, [&] {
             auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
             if (!dialog) {
@@ -141,6 +188,11 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
             }
             dialogOpened = true;
             dialogTitle = dialog->windowTitle();
+            if (auto *typeValue = dialog->findChild<QLabel *>(
+                    QStringLiteral("directNodeTypeValue"))) {
+                dialogTypeCaptured = true;
+                dialogTypeText = typeValue->text();
+            }
             auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveNodeEditButton"));
             auto *cancel = dialog->findChild<QPushButton *>(QStringLiteral("cancelNodeEditButton"));
             if (save) {
@@ -163,6 +215,8 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
         QCOMPARE(dialogTitle, QStringLiteral("编辑节点"));
         QCOMPARE(saveText, QStringLiteral("保存"));
         QCOMPARE(cancelText, QStringLiteral("取消"));
+        QVERIFY(dialogTypeCaptured);
+        QCOMPARE(dialogTypeText, QStringLiteral("逻辑模块"));
 
         nameDraft->setText(QStringLiteral("未提交草稿"));
         QTest::mouseClick(addInput, Qt::LeftButton);

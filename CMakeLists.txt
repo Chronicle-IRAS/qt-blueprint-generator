@@ -15,6 +15,8 @@ find_package(Qt6 REQUIRED COMPONENTS LinguistTools Network Widgets)
 qt_standard_project_setup()
 
 qt_add_library(BlueprintEditorCore STATIC
+    src/ui/node_type_display.cpp
+    src/ui/node_type_display.h
     src/ui/theme.cpp
     src/ui/theme.h
     src/ai/ai_connection_tester.cpp
