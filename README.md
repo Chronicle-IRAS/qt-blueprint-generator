@@ -18,6 +18,7 @@ Qt Blueprint Generator 是一个面向 Qt 6 Widgets 项目的可视化蓝图编�
 - 外部 C/C++ 代码的黑盒导入、接口契约绑定和完整性复验。
 - 独立 CMake 构建、日志采集和空目录导出。
 - 英文与简体中文界面运行时切换。
+- 统一的浅色界面主题，包含菜单、工具栏、停靠面板、AI 设置与候选审核；画布使用协调的节点、端口和网格样式。
 - 可恢复的 Properties、Build and Export 面板，以及复用现有构建与导出操作的工具栏入口。
 
 ## 使用边界
@@ -52,6 +53,7 @@ project/
 │  ├─ blueprint/        # 蓝图模型、序列化和校验
 │  ├─ editor/           # 画布、节点和连线图元
 │  ├─ generation/       # IR、提示词、工程骨架和候选管理
+│  ├─ ui/               # 集中式界面主题与语义颜色
 │  └─ workspace/        # 外部代码导入、构建和导出
 ├─ tools/               # 需显式启用的人工 AI 集成工具
 └─ tests/               # Qt Test 自动化测试和离线示例
@@ -86,6 +88,7 @@ try {
 ## 文档
 
 - [项目说明与使用指南](doc/project-usage-guide.md)
+- [界面样式与缩放验收指南](doc/visual-style-verification.md)
 - [MVP 实施计划](doc/mvp-implementation-plan.md)
 - [实现进度](doc/implementation-progress.md)
 - [中英文界面切换计划](doc/plans/2026-09-09-bilingual-ui.md)

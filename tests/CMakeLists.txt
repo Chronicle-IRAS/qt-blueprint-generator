@@ -1,5 +1,17 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
 
+set(editor_theme_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_editor_theme.moc")
+add_custom_command(OUTPUT "${editor_theme_moc}"
+    COMMAND Qt6::moc -o tst_editor_theme.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_editor_theme.cpp"
+    DEPENDS tst_editor_theme.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_editor_theme tst_editor_theme.cpp "${editor_theme_moc}")
+set_target_properties(tst_editor_theme PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_editor_theme PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_editor_theme PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME editor_theme COMMAND tst_editor_theme)
+set_tests_properties(editor_theme PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 set(generation_workflow_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_generation_workflow.moc")
 add_custom_command(OUTPUT "${generation_workflow_moc}"
     COMMAND Qt6::moc -o tst_generation_workflow.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_generation_workflow.cpp"

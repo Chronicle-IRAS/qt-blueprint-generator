@@ -7,6 +7,7 @@
 #include <QDialogButtonBox>
 #include <QEvent>
 #include <QFormLayout>
+#include "ui/theme.h"
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -47,29 +48,35 @@ AiSettingsDialog::AiSettingsDialog(ClientFactory clientFactory, QWidget *parent)
     resize(620, 300);
 
     auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(EditorTheme::SpaceLarge, EditorTheme::SpaceLarge,
+                               EditorTheme::SpaceLarge, EditorTheme::SpaceLarge);
+    layout->setSpacing(EditorTheme::SpaceMedium);
     m_form = new QFormLayout;
+    m_form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    m_form->setSpacing(EditorTheme::SpaceMedium);
 
     m_providerCombo = new QComboBox(this);
     m_providerCombo->setObjectName(QStringLiteral("aiProviderCombo"));
     m_providerCombo->addItem(QString(), QStringLiteral("openai-compatible"));
-    m_form->addRow({}, m_providerCombo);
+    m_form->addRow(new QLabel(this), m_providerCombo);
 
     m_endpointEdit = new QLineEdit(this);
     m_endpointEdit->setObjectName(QStringLiteral("aiEndpointEdit"));
-    m_form->addRow({}, m_endpointEdit);
+    m_form->addRow(new QLabel(this), m_endpointEdit);
 
     m_modelEdit = new QLineEdit(this);
     m_modelEdit->setObjectName(QStringLiteral("aiModelEdit"));
-    m_form->addRow({}, m_modelEdit);
+    m_form->addRow(new QLabel(this), m_modelEdit);
 
     m_apiKeySourceCombo = new QComboBox(this);
     m_apiKeySourceCombo->setObjectName(QStringLiteral("aiApiKeySourceCombo"));
     m_apiKeySourceCombo->addItem(QString(), QStringLiteral("environment"));
-    m_form->addRow({}, m_apiKeySourceCombo);
+    m_form->addRow(new QLabel(this), m_apiKeySourceCombo);
 
     m_apiKeyStatusLabel = new QLabel(this);
+    m_apiKeyStatusLabel->setWordWrap(true);
     m_apiKeyStatusLabel->setObjectName(QStringLiteral("aiApiKeyStatusLabel"));
-    m_form->addRow({}, m_apiKeyStatusLabel);
+    m_form->addRow(new QLabel(this), m_apiKeyStatusLabel);
 
     auto *connectionWidget = new QWidget(this);
     auto *connectionLayout = new QHBoxLayout(connectionWidget);
@@ -77,15 +84,18 @@ AiSettingsDialog::AiSettingsDialog(ClientFactory clientFactory, QWidget *parent)
     m_testConnectionButton = new QPushButton(connectionWidget);
     m_testConnectionButton->setObjectName(QStringLiteral("aiTestConnectionButton"));
     m_connectionStatusLabel = new QLabel(connectionWidget);
+    m_connectionStatusLabel->setWordWrap(true);
     m_connectionStatusLabel->setObjectName(QStringLiteral("aiConnectionStatusLabel"));
     connectionLayout->addWidget(m_testConnectionButton);
     connectionLayout->addWidget(m_connectionStatusLabel, 1);
-    m_form->addRow({}, connectionWidget);
+    m_form->addRow(new QLabel(this), connectionWidget);
     layout->addLayout(m_form);
 
     auto *buttons = new QDialogButtonBox(this);
-    m_saveButton = buttons->addButton(QString(), QDialogButtonBox::AcceptRole);
+    m_saveButton = new QPushButton;
     m_saveButton->setObjectName(QStringLiteral("aiSettingsSaveButton"));
+    m_saveButton->setProperty("role", "primary");
+    buttons->addButton(m_saveButton, QDialogButtonBox::AcceptRole);
     m_cancelButton = buttons->addButton(QString(), QDialogButtonBox::RejectRole);
     m_cancelButton->setObjectName(QStringLiteral("aiSettingsCancelButton"));
     layout->addWidget(buttons);

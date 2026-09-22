@@ -1,10 +1,13 @@
 # 实现进度
 
-更新时间：2026-09-21（Asia/Shanghai）
+更新时间：2026-09-22（Asia/Shanghai）
 
 ## 当前状态
 
-- Issue #18 已通过 PR #26 提交审核（`Closes #18`）：https://github.com/Chronicle-IRAS/qt-blueprint-generator/pull/26 。实现提交 `afdd055`、`11c6fe1` 均已推送；远端 Issue 为 `in-review`，仍保持打开，等待用户审核合并。未自动合并，未开始下一 Issue。
+- 2026-09-22：Issue #19 已通过 PR #27 提交审核（`Closes #19`）：https://github.com/Chronicle-IRAS/qt-blueprint-generator/pull/27 ，实现提交 `c82fba0` 已推送，Issue 标记为 `in-review` 并保持开启。统一浅色主题、面板/对话框布局、节点悬停与选择、长文本提示和缩放网格已实现。独立规格审查与质量复审通过，无未解决阻塞项；AI 保存按钮强调样式、节点端口提示翻译与运行时刷新反馈均已通过失败测试复现并修正。停止等待用户审核，不自动合并或开始下一任务。
+- 最终完整构建与 CTest `22/22 passed`（124.44 秒）；中英文、100%/125%/150%/200% 共 32 个离屏截图的按钮/输入框几何检查无异常，代表性截图已复验。160 条翻译与源码提取完全一致、无未完成项，密钥模式扫描无命中。未调用真实 AI。原生 Qt 专项测试已通过；离屏缩放模拟不等同于实际显示器/多屏完整人工验收，检查步骤见 `doc/visual-style-verification.md`。
+- 2026-09-21：用户已合并 PR #26，远端主分支为 `d94db17`，Issue #18 已关闭。Issue #19「编辑器视觉样式」已从最新主分支建立 `feature/issue-19-editor-visual-style`，远端标记 `in-progress`；计划见 `doc/plans/2026-09-21-issue-19-visual-style.md`。当前正在实施统一浅色主题与布局，尚未验收或交付。
+- 此前 Issue #18 通过 PR #26 提交审核（`Closes #18`）：https://github.com/Chronicle-IRAS/qt-blueprint-generator/pull/26 。实现提交 `afdd055`、`11c6fe1` 均已推送；当时标记 `in-review` 并停止等待用户审核，现已合并。
 - 2026-09-21 最终验收：提示词契约路径修正后完整构建与 CTest 再次通过，`21/21 passed`（140.53 秒）。第二次真实 GUI 调用退出码 0，批次 `generation_812fd4d7e9d74a73a2dcad648ee32046`，模型 `deepseek-flash`；1 个 pending 文件、0 个接受文件，已确认候选引用 `modules/logic/contract.h`。生成代码未被自动接受、编译或执行；验收范围为真实生成、严格校验、持久化及 GUI 审核展示，不保证任意模型输出业务正确。
 - 2026-09-21：Issue #18 候选审核与主窗口接入已实现：工具栏/AI 菜单生成、节点状态及取消、双栏逐行对照、原候选/编辑草稿接受、拒绝、取消剩余、持久冲突提示与显式覆盖确认。修改蓝图语义或工作目录会使旧请求/审核失效；中英文切换保留草稿和状态。
 - 新增离线测试覆盖真实 MainWindow 到审核窗口的 Fake 流程、同步返回、过期响应、三类可生成节点、文件修改冲突与旧预览拒绝。候选审核专项 18 项、GUI 专项 9 项通过；独立规格审查与质量审查均通过，无未解决阻塞项。完整构建与第一轮 CTest `21/21 passed`（178.77 秒），158 条翻译全部完成，源码/文档密钥模式扫描无命中。

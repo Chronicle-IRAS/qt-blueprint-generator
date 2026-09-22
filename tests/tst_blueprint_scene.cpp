@@ -14,6 +14,8 @@
 #include <QTimer>
 #include <QToolBar>
 #include <QWheelEvent>
+#include <QPainter>
+#include <QStyleOptionGraphicsItem>
 
 #include "app/main_window.h"
 #include "blueprint/blueprint_document.h"
@@ -59,6 +61,8 @@ class BlueprintSceneTest : public QObject
     Q_OBJECT
 
 private slots:
+    void canvasPolishPreservesGeometryAndFullText();
+    void canvasGridRendersWithoutItemsAtDifferentZooms();
     void addingNodeUpdatesDocumentAndSupportsUndo();
     void movingNodeUpdatesLayoutWithoutChangingSemanticDocument();
     void connectingNodesUpdatesDocumentAndSupportsUndo();
@@ -92,6 +96,58 @@ private slots:
     void mainWindowRestoresClosedDocksAndDefaultLayout();
     void mainWindowExposesBuildAndExportInToolbar();
 };
+
+void BlueprintSceneTest::canvasPolishPreservesGeometryAndFullText()
+{
+    BlueprintDocument document;
+    BlueprintScene scene(&document);
+    auto draft = node(QStringLiteral("long"), QString(100, QLatin1Char('W')));
+    draft.description = QStringLiteral("Full description");
+    draft.inputs = {{QString(80, QLatin1Char('I')), {}, {}}};
+    QVERIFY(scene.addNode(draft, {}));
+    NodeItem *item = scene.nodeItem(draft.id);
+    QVERIFY(item->toolTip().contains(draft.name));
+    QVERIFY(item->toolTip().contains(draft.description));
+    QVERIFY(item->toolTip().contains(draft.inputs.first().name));
+    QVERIFY(item->acceptHoverEvents());
+    QCOMPARE(item->boundingRect(), QRectF(-6, -6, 192, 108));
+    QCOMPARE(item->outputAnchor(), QPointF(180, 48));
+    auto render = [&](QStyle::State state) {
+        QImage image(200, 120, QImage::Format_ARGB32_Premultiplied);
+        image.fill(Qt::transparent);
+        QPainter painter(&image);
+        painter.translate(10, 10);
+        QStyleOptionGraphicsItem option;
+        option.state = state;
+        item->paint(&painter, &option, nullptr);
+        return image;
+    };
+    QVERIFY(render(QStyle::State_None) != render(QStyle::State_MouseOver));
+    QVERIFY(render(QStyle::State_None) != render(QStyle::State_Selected));
+    QVERIFY(scene.addNode(node(QStringLiteral("target"), QStringLiteral("Target")), {300, 0}));
+    const QString label(100, QLatin1Char('L'));
+    QVERIFY(scene.connectNodes(draft.id, QStringLiteral("target"), label));
+    QCOMPARE(scene.edgeItem(document.edges.first().id)->toolTip(), label);
+}
+
+void BlueprintSceneTest::canvasGridRendersWithoutItemsAtDifferentZooms()
+{
+    BlueprintDocument document;
+    BlueprintScene scene(&document);
+    for (qreal extent : {256.0, 1024.0, 1000000.0}) {
+        QImage image(256, 256, QImage::Format_ARGB32_Premultiplied);
+        image.fill(Qt::transparent);
+        QPainter painter(&image);
+        scene.render(&painter, QRectF(0, 0, 256, 256), QRectF(0, 0, extent, extent));
+        painter.end();
+        QVERIFY(image.pixelColor(10, 10).alpha() > 0);
+        bool variation = false;
+        for (int x = 1; x < 256; ++x)
+            variation |= image.pixelColor(x, 10) != image.pixelColor(0, 10);
+        QVERIFY(variation);
+        QVERIFY(scene.items().isEmpty());
+    }
+}
 
 void BlueprintSceneTest::addingNodeUpdatesDocumentAndSupportsUndo()
 {

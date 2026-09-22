@@ -45,6 +45,7 @@ signals:
     void nodeEditRequested(const QString &nodeId);
 
 protected:
+    void drawBackground(QPainter *painter, const QRectF &rect) override;
     void keyPressEvent(QKeyEvent *event) override;
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
 

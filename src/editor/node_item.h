@@ -21,6 +21,7 @@ public:
 
     QString nodeId() const;
     const BlueprintNode &node() const;
+    void refreshToolTip();
     QPointF inputAnchor(int index = 0) const;
     QPointF outputAnchor(int index = 0) const;
     int inputPortAt(const QPointF &localPosition) const;

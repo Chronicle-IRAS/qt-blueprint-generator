@@ -15,6 +15,8 @@ find_package(Qt6 REQUIRED COMPONENTS LinguistTools Network Widgets)
 qt_standard_project_setup()
 
 qt_add_library(BlueprintEditorCore STATIC
+    src/ui/theme.cpp
+    src/ui/theme.h
     src/ai/ai_connection_tester.cpp
     src/ai/ai_connection_tester.h
     src/ai/ai_client.h
@@ -103,7 +105,7 @@ endif()
 
 set(translation_targets BlueprintEditor)
 if(BUILD_TESTING)
-    list(APPEND translation_targets tst_language_switch tst_ai_settings_dialog tst_generation_workflow tst_candidate_review_dialog)
+    list(APPEND translation_targets tst_language_switch tst_ai_settings_dialog tst_generation_workflow tst_candidate_review_dialog tst_editor_theme)
 endif()
 
 qt_add_translations(
