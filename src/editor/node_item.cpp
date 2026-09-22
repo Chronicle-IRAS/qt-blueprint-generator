@@ -1,6 +1,8 @@
 #include "editor/node_item.h"
+#include "ui/node_type_display.h"
 #include "ui/theme.h"
 
+#include <QFontMetricsF>
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsScene>
 #include <QLineF>
@@ -52,7 +54,9 @@ void NodeItem::setNode(const BlueprintNode &node)
 
 void NodeItem::refreshToolTip()
 {
-    QStringList details{m_node.name, m_node.description};
+    QStringList details{m_node.name,
+                        QObject::tr("Type: %1").arg(nodeTypeDisplayName(m_node.type)),
+                        m_node.description};
     for (const auto &port : m_node.inputs)
         details.append(QObject::tr("Input: %1").arg(port.name));
     for (const auto &port : m_node.outputs)
@@ -175,11 +179,35 @@ void NodeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, 
 
     painter->setPen(colors.nodeHeaderText);
     const QFont bodyFont = painter->font();
+    const QString typeLabel = nodeTypeDisplayName(m_node.type);
+    // A default node name already is the localized type name, so a caption below the
+    // title would only repeat it.
+    const bool showTypeCaption = typeLabel != m_title;
+
     QFont titleFont = bodyFont;
     titleFont.setWeight(QFont::DemiBold);
+    if (showTypeCaption) {
+        // Keep the title's own line height plus the caption inside the fixed head band.
+        titleFont.setPointSizeF(std::min(bodyFont.pointSizeF(), 10.0));
+    }
     painter->setFont(titleFont);
-    painter->drawText(QRectF(10.0, 0.0, NodeWidth - 20.0, 28.0), Qt::AlignVCenter | Qt::AlignLeft,
-                      painter->fontMetrics().elidedText(m_title, Qt::ElideRight, 160));
+    const QFontMetricsF titleMetrics(painter->fontMetrics());
+    painter->drawText(QRectF(10.0, 0.0, NodeWidth - 20.0,
+                             showTypeCaption ? titleMetrics.height() : 28.0),
+                      Qt::AlignVCenter | Qt::AlignLeft,
+                      titleMetrics.elidedText(m_title, Qt::ElideRight, 160));
+
+    if (showTypeCaption) {
+        QFont typeFont = bodyFont;
+        typeFont.setPointSizeF(std::max(7.0, titleFont.pointSizeF() - 2.0));
+        typeFont.setWeight(QFont::Normal);
+        painter->setFont(typeFont);
+        const QFontMetricsF typeMetrics(painter->fontMetrics());
+        painter->drawText(QRectF(10.0, 28.0 - typeMetrics.height(), NodeWidth - 20.0,
+                                 typeMetrics.height()),
+                          Qt::AlignVCenter | Qt::AlignLeft,
+                          typeMetrics.elidedText(typeLabel, Qt::ElideRight, 160));
+    }
     painter->setFont(bodyFont);
     painter->setPen(colors.textMuted);
     painter->drawText(QRectF(10.0, 30.0, 75.0, 18.0), Qt::AlignLeft | Qt::AlignVCenter,

@@ -3,12 +3,17 @@
 #include <QAction>
 #include <QDialog>
 #include <QDockWidget>
+#include <QFormLayout>
 #include <QGraphicsView>
 #include <QGroupBox>
+#include <QImage>
+#include <QLabel>
 #include <QMenu>
 #include <QLineEdit>
+#include <QPainter>
 #include <QPushButton>
 #include <QSettings>
+#include <QStyleOptionGraphicsItem>
 #include <QTemporaryDir>
 #include <QTableWidget>
 #include <QTimer>
@@ -16,6 +21,50 @@
 #include "app/main_window.h"
 #include "editor/blueprint_scene.h"
 #include "editor/node_item.h"
+#include "editor/node_properties_editor.h"
+#include "ui/theme.h"
+
+namespace {
+
+constexpr int CardHeadHeight = 28;
+constexpr int CardOffset = 10;
+
+// Lowest row of the card head that carries text ink, or -1 when the head only shows its
+// background. Antialiased pixels count as ink when they are closer to the header text
+// colour than to the header background.
+int lowestHeadTextRow(NodeItem *item)
+{
+    QImage image(220, 120, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    QPainter painter(&image);
+    painter.translate(CardOffset, CardOffset);
+    QStyleOptionGraphicsItem option;
+    option.state = QStyle::State_None;
+    item->paint(&painter, &option, nullptr);
+    painter.end();
+
+    const QColor head = EditorTheme::colors().nodeHeader;
+    const QColor text = EditorTheme::colors().nodeHeaderText;
+    const int fullDistance = qAbs(text.red() - head.red()) + qAbs(text.green() - head.green())
+                             + qAbs(text.blue() - head.blue());
+    for (int row = CardHeadHeight - 1; row >= 0; --row) {
+        for (int x = CardOffset + 12; x < CardOffset + 170; ++x) {
+            const QRgb pixel = image.pixel(x, CardOffset + row);
+            if (qAlpha(pixel) == 0) {
+                continue;
+            }
+            const int headDistance = qAbs(qRed(pixel) - head.red())
+                                     + qAbs(qGreen(pixel) - head.green())
+                                     + qAbs(qBlue(pixel) - head.blue());
+            if (headDistance > fullDistance / 2) {
+                return row;
+            }
+        }
+    }
+    return -1;
+}
+
+} // namespace
 
 class LanguageSwitchTest : public QObject
 {
@@ -26,6 +75,9 @@ private slots:
     void cleanupTestCase();
     void switchesBetweenEnglishAndChineseAndPersistsChoice();
     void refreshesExistingNodeTooltips();
+    void showsReadOnlyNodeTypeAndFollowsLanguageSwitch();
+    void nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName_data();
+    void nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName();
 
 private:
     QTemporaryDir m_settingsDirectory;
@@ -53,6 +105,7 @@ void LanguageSwitchTest::refreshesExistingNodeTooltips()
     QVERIFY(window.setLanguage(QStringLiteral("en")));
     BlueprintNode node;
     node.id = QStringLiteral("tooltip-node");
+    node.type = NodeType::LogicModule;
     node.name = QStringLiteral("Processor");
     node.description = QStringLiteral("User description");
     node.inputs = {{QStringLiteral("request"), QStringLiteral("string"), {}}};
@@ -63,15 +116,126 @@ void LanguageSwitchTest::refreshesExistingNodeTooltips()
     QVERIFY(item);
     const auto document = window.document();
     const int undoCount = window.scene()->undoStack()->count();
-    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nUser description\nInput: request\nOutput: response"));
+    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nType: Logic Module\nUser description\nInput: request\nOutput: response"));
     QVERIFY(window.setLanguage(QStringLiteral("zh_CN")));
-    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nUser description\n输入：request\n输出：response"));
+    QCOMPARE(item->toolTip(), QStringLiteral("Processor\n类型：逻辑模块\nUser description\n输入：request\n输出：response"));
     QVERIFY(window.setLanguage(QStringLiteral("en")));
-    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nUser description\nInput: request\nOutput: response"));
+    QCOMPARE(item->toolTip(), QStringLiteral("Processor\nType: Logic Module\nUser description\nInput: request\nOutput: response"));
     QCOMPARE(window.scene()->nodeItem(node.id), item);
     QCOMPARE(item->pos(), position);
     QCOMPARE(window.document(), document);
     QCOMPARE(window.scene()->undoStack()->count(), undoCount);
+}
+
+void LanguageSwitchTest::showsReadOnlyNodeTypeAndFollowsLanguageSwitch()
+{
+    MainWindow window;
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    QVERIFY(window.addNodeOfType(NodeType::LogicModule));
+    const QString id = window.document().nodes.constFirst().id;
+    window.scene()->nodeItem(id)->setSelected(true);
+
+    auto *editor = window.findChild<NodePropertiesEditor *>(
+        QStringLiteral("inspectorNodePropertiesEditor"));
+    QVERIFY(editor);
+    auto *typeValue = editor->findChild<QLabel *>(QStringLiteral("nodeTypeValue"));
+    auto *form = editor->findChild<QFormLayout *>();
+    QVERIFY(typeValue && form);
+    auto *typeLabel = qobject_cast<QLabel *>(form->labelForField(typeValue));
+    QVERIFY(typeLabel);
+    QCOMPARE(typeLabel->text(), QStringLiteral("Type"));
+    QCOMPARE(typeValue->text(), QStringLiteral("Logic Module"));
+
+    auto *nameEdit = window.findChild<QLineEdit *>(QStringLiteral("nodeNameEdit"));
+    auto *applyButton = window.findChild<QPushButton *>(
+        QStringLiteral("applyNodePropertiesButton"));
+    QVERIFY(nameEdit && applyButton);
+    nameEdit->setText(QStringLiteral("LoginService"));
+    QTest::mouseClick(applyButton, Qt::LeftButton);
+    QCOMPARE(window.document().nodes.constFirst().name, QStringLiteral("LoginService"));
+    QCOMPARE(window.document().nodes.constFirst().type, NodeType::LogicModule);
+    QCOMPARE(typeValue->text(), QStringLiteral("Logic Module"));
+
+    QVERIFY(window.setLanguage(QStringLiteral("zh_CN")));
+    QCOMPARE(typeValue->text(), QStringLiteral("逻辑模块"));
+    QCOMPARE(typeLabel->text(), QStringLiteral("类型"));
+
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    QCOMPARE(typeValue->text(), QStringLiteral("Logic Module"));
+    QCOMPARE(typeLabel->text(), QStringLiteral("Type"));
+}
+
+void LanguageSwitchTest::nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName_data()
+{
+    QTest::addColumn<NodeType>("type");
+    QTest::addColumn<QString>("englishType");
+    QTest::addColumn<QString>("chineseType");
+
+    QTest::newRow("Start") << NodeType::Start << QStringLiteral("Start")
+                           << QStringLiteral("开始");
+    QTest::newRow("End") << NodeType::End << QStringLiteral("End")
+                         << QStringLiteral("结束");
+    QTest::newRow("UiPage") << NodeType::UiPage << QStringLiteral("UI Page")
+                            << QStringLiteral("界面页面");
+    QTest::newRow("LogicModule") << NodeType::LogicModule << QStringLiteral("Logic Module")
+                                 << QStringLiteral("逻辑模块");
+    QTest::newRow("Decision") << NodeType::Decision << QStringLiteral("Decision")
+                              << QStringLiteral("判断");
+    QTest::newRow("ExternalCode") << NodeType::ExternalCode
+                                  << QStringLiteral("External Code") << QStringLiteral("外部代码");
+}
+
+void LanguageSwitchTest::nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName()
+{
+    QFETCH(NodeType, type);
+    QFETCH(QString, englishType);
+    QFETCH(QString, chineseType);
+
+    MainWindow window;
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    auto addNode = [&window, type](const QString &id, const QString &name,
+                                   const QPointF &position) {
+        BlueprintNode node;
+        node.id = id;
+        node.type = type;
+        node.name = name;
+        return window.scene()->addNode(node, position);
+    };
+    // The default name a node gets while the UI is English, the one it gets while the UI
+    // is Chinese, and a user chosen name.
+    QVERIFY(addNode(QStringLiteral("english-default"), englishType, {}));
+    QVERIFY(addNode(QStringLiteral("chinese-default"), chineseType, QPointF(240, 0)));
+    QVERIFY(addNode(QStringLiteral("renamed"), QStringLiteral("LoginService"), QPointF(480, 0)));
+
+    NodeItem *englishDefault = window.scene()->nodeItem(QStringLiteral("english-default"));
+    NodeItem *chineseDefault = window.scene()->nodeItem(QStringLiteral("chinese-default"));
+    NodeItem *renamed = window.scene()->nodeItem(QStringLiteral("renamed"));
+    QVERIFY(englishDefault && chineseDefault && renamed);
+
+    const int englishHead = lowestHeadTextRow(englishDefault);
+    QVERIFY(englishHead >= 0);
+    // Only the card whose name repeats the English type label stays on a single line.
+    QVERIFY(lowestHeadTextRow(chineseDefault) > englishHead + 3);
+    QVERIFY(lowestHeadTextRow(renamed) > englishHead + 3);
+    QVERIFY(englishDefault->toolTip().contains(QStringLiteral("Type: ") + englishType));
+    QVERIFY(chineseDefault->toolTip().contains(QStringLiteral("Type: ") + englishType));
+    QVERIFY(renamed->toolTip().contains(QStringLiteral("Type: ") + englishType));
+
+    // The inspector keeps reporting the type even while the card hides the duplicate.
+    englishDefault->setSelected(true);
+    auto *editor = window.findChild<NodePropertiesEditor *>(
+        QStringLiteral("inspectorNodePropertiesEditor"));
+    QVERIFY(editor);
+    auto *typeValue = editor->findChild<QLabel *>(QStringLiteral("nodeTypeValue"));
+    QVERIFY(typeValue);
+    QCOMPARE(typeValue->text(), englishType);
+
+    QVERIFY(window.setLanguage(QStringLiteral("zh_CN")));
+    const int chineseHead = lowestHeadTextRow(chineseDefault);
+    QVERIFY(chineseHead >= 0);
+    QVERIFY(lowestHeadTextRow(englishDefault) > chineseHead + 3);
+    QVERIFY(lowestHeadTextRow(renamed) > chineseHead + 3);
+    QCOMPARE(typeValue->text(), chineseType);
 }
 
 void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
@@ -134,6 +298,8 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
         QString dialogTitle;
         QString saveText;
         QString cancelText;
+        bool dialogTypeCaptured = false;
+        QString dialogTypeText;
         QTimer::singleShot(0, &window, [&] {
             auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
             if (!dialog) {
@@ -141,6 +307,11 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
             }
             dialogOpened = true;
             dialogTitle = dialog->windowTitle();
+            if (auto *typeValue = dialog->findChild<QLabel *>(
+                    QStringLiteral("directNodeTypeValue"))) {
+                dialogTypeCaptured = true;
+                dialogTypeText = typeValue->text();
+            }
             auto *save = dialog->findChild<QPushButton *>(QStringLiteral("saveNodeEditButton"));
             auto *cancel = dialog->findChild<QPushButton *>(QStringLiteral("cancelNodeEditButton"));
             if (save) {
@@ -163,6 +334,8 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
         QCOMPARE(dialogTitle, QStringLiteral("编辑节点"));
         QCOMPARE(saveText, QStringLiteral("保存"));
         QCOMPARE(cancelText, QStringLiteral("取消"));
+        QVERIFY(dialogTypeCaptured);
+        QCOMPARE(dialogTypeText, QStringLiteral("逻辑模块"));
 
         nameDraft->setText(QStringLiteral("未提交草稿"));
         QTest::mouseClick(addInput, Qt::LeftButton);

@@ -493,32 +493,37 @@
         <translation>输出：%1</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="46"/>
+        <location filename="../src/editor/node_item.cpp" line="58"/>
+        <source>Type: %1</source>
+        <translation>类型：%1</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/node_type_display.cpp" line="9"/>
         <source>Start</source>
         <translation>开始</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="48"/>
+        <location filename="../src/ui/node_type_display.cpp" line="11"/>
         <source>End</source>
         <translation>结束</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="50"/>
+        <location filename="../src/ui/node_type_display.cpp" line="13"/>
         <source>UI Page</source>
         <translation>界面页面</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="52"/>
+        <location filename="../src/ui/node_type_display.cpp" line="15"/>
         <source>Logic Module</source>
         <translation>逻辑模块</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="54"/>
+        <location filename="../src/ui/node_type_display.cpp" line="17"/>
         <source>Decision</source>
         <translation>判断</translation>
     </message>
     <message>
-        <location filename="../src/app/main_window.cpp" line="56"/>
+        <location filename="../src/ui/node_type_display.cpp" line="19"/>
         <source>External Code</source>
         <translation>外部代码</translation>
     </message>

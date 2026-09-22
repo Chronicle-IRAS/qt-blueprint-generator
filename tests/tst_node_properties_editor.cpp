@@ -1,6 +1,10 @@
 #include <QtTest/QtTest>
 
 #include <QGroupBox>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -8,6 +12,8 @@
 
 #include "editor/node_properties_editor.h"
 #include "blueprint/blueprint_serializer.h"
+
+Q_DECLARE_METATYPE(NodeType)
 
 namespace {
 
@@ -53,6 +59,10 @@ private slots:
     void portCollectionsSupportAddEditAndDelete();
     void stringCollectionsSupportAddEditAndDelete();
     void emptyCollectionsAndRetranslationPreserveDrafts();
+    void nodeTypeRowIsReadOnly_data();
+    void nodeTypeRowIsReadOnly();
+    void renameAndClearKeepTheReadOnlyType();
+    void blueprintJsonSchemaKeepsTheNodeKeys();
 };
 
 void NodePropertiesEditorTest::roundTripPreservesEditableFieldsWithoutChangingIdentity()
@@ -184,6 +194,114 @@ void NodePropertiesEditorTest::emptyCollectionsAndRetranslationPreserveDrafts()
     QCOMPARE(result.outputs, QVector<PortSpec>{});
     QCOMPARE(result.constraints, QStringList{QString()});
     QCOMPARE(result.acceptanceCriteria, QStringList{});
+}
+
+void NodePropertiesEditorTest::nodeTypeRowIsReadOnly_data()
+{
+    QTest::addColumn<NodeType>("type");
+    QTest::addColumn<QString>("expectedText");
+
+    QTest::newRow("Start") << NodeType::Start << QStringLiteral("Start");
+    QTest::newRow("End") << NodeType::End << QStringLiteral("End");
+    QTest::newRow("UiPage") << NodeType::UiPage << QStringLiteral("UI Page");
+    QTest::newRow("LogicModule") << NodeType::LogicModule << QStringLiteral("Logic Module");
+    QTest::newRow("Decision") << NodeType::Decision << QStringLiteral("Decision");
+    QTest::newRow("ExternalCode") << NodeType::ExternalCode << QStringLiteral("External Code");
+}
+
+void NodePropertiesEditorTest::nodeTypeRowIsReadOnly()
+{
+    QFETCH(NodeType, type);
+    QFETCH(QString, expectedText);
+
+    NodePropertiesEditor editor(QStringLiteral("test"));
+    BlueprintNode source;
+    source.id = QStringLiteral("typed-node");
+    source.type = type;
+    source.name = QStringLiteral("Typed node");
+    editor.setNode(source);
+
+    auto *typeValue = qobject_cast<QLabel *>(
+        editor.findChild<QLabel *>(QStringLiteral("testNodeTypeValue")));
+    QVERIFY(typeValue);
+    QCOMPARE(typeValue->text(), expectedText);
+    QVERIFY(!(typeValue->textInteractionFlags() & Qt::TextEditable));
+
+    const NodeType untouchedType =
+        type == NodeType::Start ? NodeType::End : NodeType::Start;
+    BlueprintNode target;
+    target.id = QStringLiteral("target-node");
+    target.type = untouchedType;
+    editor.applyTo(&target);
+    QCOMPARE(target.type, untouchedType);
+    QCOMPARE(target.name, QStringLiteral("Typed node"));
+}
+
+void NodePropertiesEditorTest::renameAndClearKeepTheReadOnlyType()
+{
+    NodePropertiesEditor editor(QStringLiteral("test"));
+    BlueprintNode source;
+    source.id = QStringLiteral("login-id");
+    source.type = NodeType::LogicModule;
+    source.name = QStringLiteral("LoginService");
+    editor.setNode(source);
+
+    auto *typeValue = editor.findChild<QLabel *>(QStringLiteral("testNodeTypeValue"));
+    auto *nameEdit = editor.findChild<QLineEdit *>(QStringLiteral("testNodeNameEdit"));
+    QVERIFY(typeValue && nameEdit);
+    QCOMPARE(typeValue->text(), QStringLiteral("Logic Module"));
+
+    nameEdit->setText(QStringLiteral("MainWindow"));
+    BlueprintNode target;
+    target.type = NodeType::Decision;
+    editor.applyTo(&target);
+    QCOMPARE(target.name, QStringLiteral("MainWindow"));
+    QCOMPARE(target.type, NodeType::Decision);
+    QCOMPARE(typeValue->text(), QStringLiteral("Logic Module"));
+
+    source.name = QStringLiteral("MainWindow");
+    editor.setNode(source);
+    QCOMPARE(nameEdit->text(), QStringLiteral("MainWindow"));
+    QCOMPARE(typeValue->text(), QStringLiteral("Logic Module"));
+
+    editor.clear();
+    QCOMPARE(typeValue->text(), QString());
+}
+
+void NodePropertiesEditorTest::blueprintJsonSchemaKeepsTheNodeKeys()
+{
+    BlueprintDocument document;
+    document.projectId = QStringLiteral("node-type-schema");
+    document.projectName = QStringLiteral("Node Type Schema");
+    document.target = QStringLiteral("qt6-widgets-cpp17-cmake");
+    BlueprintNode node;
+    node.id = QStringLiteral("login-id");
+    node.type = NodeType::LogicModule;
+    node.name = QStringLiteral("LoginService");
+    node.description = QStringLiteral("Handles sign in");
+    document.nodes = {node};
+
+    const QByteArray json = BlueprintSerializer::toJson(document);
+    QString error;
+    const std::optional<BlueprintDocument> restored =
+        BlueprintSerializer::fromJson(json, &error);
+    QVERIFY2(restored.has_value(), qPrintable(error));
+    QCOMPARE(restored.value().nodes.constFirst().type, NodeType::LogicModule);
+
+    const QJsonDocument parsed = QJsonDocument::fromJson(json);
+    QVERIFY(parsed.isObject());
+    const QJsonArray nodes = parsed.object().value(QStringLiteral("nodes")).toArray();
+    QCOMPARE(nodes.size(), 1);
+    QStringList keys = nodes.at(0).toObject().keys();
+    keys.sort();
+    QCOMPARE(keys, QStringList({QStringLiteral("acceptanceCriteria"),
+                                QStringLiteral("constraints"),
+                                QStringLiteral("description"),
+                                QStringLiteral("id"),
+                                QStringLiteral("inputs"),
+                                QStringLiteral("name"),
+                                QStringLiteral("outputs"),
+                                QStringLiteral("type")}));
 }
 
 QTEST_MAIN(NodePropertiesEditorTest)

@@ -5,6 +5,7 @@
 ## 当前状态
 
 - 2026-09-22：完成 Issue #30，生成前的蓝图校验失败不再只显示一条泛化提示，改为在独立对话框中列出全部 BlueprintValidator 诊断（含 nodeId / edgeId），并与 AI 服务失败明确区分；补充 Controller 与 GUI 回归测试。
+- 2026-09-22：完成 Issue #31，节点卡片、Properties Inspector 与双击编辑对话框以只读方式展示真实 NodeType，支持中英文切换；节点名称与类型显示名相同时卡片只显示名称，避免重复副标题，并补充相关 GUI 回归测试。
 - 2026-09-22：Issue #19 已通过 PR #27 提交审核（`Closes #19`）：https://github.com/Chronicle-IRAS/qt-blueprint-generator/pull/27 ，实现提交 `c82fba0` 已推送，Issue 标记为 `in-review` 并保持开启。统一浅色主题、面板/对话框布局、节点悬停与选择、长文本提示和缩放网格已实现。独立规格审查与质量复审通过，无未解决阻塞项；AI 保存按钮强调样式、节点端口提示翻译与运行时刷新反馈均已通过失败测试复现并修正。停止等待用户审核，不自动合并或开始下一任务。
 - 最终完整构建与 CTest `22/22 passed`（124.44 秒）；中英文、100%/125%/150%/200% 共 32 个离屏截图的按钮/输入框几何检查无异常，代表性截图已复验。160 条翻译与源码提取完全一致、无未完成项，密钥模式扫描无命中。未调用真实 AI。原生 Qt 专项测试已通过；离屏缩放模拟不等同于实际显示器/多屏完整人工验收，检查步骤见 `doc/visual-style-verification.md`。
 - 2026-09-21：用户已合并 PR #26，远端主分支为 `d94db17`，Issue #18 已关闭。Issue #19「编辑器视觉样式」已从最新主分支建立 `feature/issue-19-editor-visual-style`，远端标记 `in-progress`；计划见 `doc/plans/2026-09-21-issue-19-visual-style.md`。当前正在实施统一浅色主题与布局，尚未验收或交付。
