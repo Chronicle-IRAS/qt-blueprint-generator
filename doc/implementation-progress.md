@@ -4,6 +4,7 @@
 
 ## 当前状态
 
+- 2026-09-22：完成 Issue #29，画布空白处、节点和连线分别提供右键菜单（添加节点/全选/适应视图/重置视图、编辑/生成/删除、删除连线）；菜单复用现有 QAction 与业务逻辑，删除统一走 `BlueprintScene::deleteSelectedItems()`，右键未选中对象时切换为唯一选中、右键已选对象时保留多选、右键空白不改变选择，并补充菜单与语言切换回归测试。
 - 2026-09-22：完成 Issue #34，画布选中节点或连线后可按 `Delete` 直接删除，连线支持点击选中并显示选中高亮；工具栏与键盘共用 `BlueprintScene::deleteSelectedItems()` 删除入口，删除继续进入既有 Undo/Redo，文本输入控件中的 `Delete` 仍用于编辑自身内容。
 - 2026-09-22：完成 Issue #30，生成前的蓝图校验失败不再只显示一条泛化提示，改为在独立对话框中列出全部 BlueprintValidator 诊断（含 nodeId / edgeId），并与 AI 服务失败明确区分；补充 Controller 与 GUI 回归测试。
 - 2026-09-22：完成 Issue #31，节点卡片、Properties Inspector 与双击编辑对话框以只读方式展示真实 NodeType，支持中英文切换；节点名称与类型显示名相同时卡片只显示名称，避免重复副标题，并补充相关 GUI 回归测试。

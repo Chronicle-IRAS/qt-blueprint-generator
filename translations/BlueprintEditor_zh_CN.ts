@@ -141,6 +141,9 @@
     <message><source>Failed: %1</source><translation>失败：%1</translation></message>
     <message><source>Cancelled</source><translation>已取消</translation></message>
     <message><source>%1: %2</source><translation>%1：%2</translation></message>
+    <message><source>Select All</source><translation>全选</translation></message>
+    <message><source>Fit View</source><translation>适应视图</translation></message>
+    <message><source>Reset View</source><translation>重置视图</translation></message>
     <message>
         <location filename="../src/app/main_window.cpp" line="180"/>
         <location filename="../src/app/main_window.cpp" line="490"/>

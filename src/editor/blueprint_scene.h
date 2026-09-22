@@ -11,6 +11,7 @@
 class EdgeItem;
 class NodeItem;
 class QGraphicsPathItem;
+class QGraphicsSceneContextMenuEvent;
 class QGraphicsSceneMouseEvent;
 class QKeyEvent;
 
@@ -32,6 +33,8 @@ public:
     bool editNodeText(const QString &nodeId, const QString &name, const QString &description);
     bool editNode(const QString &nodeId, const BlueprintNode &node);
     bool isRepresentable() const;
+    // Selects every canvas object, nodes and edges alike.
+    void selectAllItems();
 
     bool beginConnection(const QString &label = {});
     bool chooseConnectionNode(const QString &nodeId);
@@ -47,9 +50,14 @@ public:
 
 signals:
     void nodeEditRequested(const QString &nodeId);
+    // Emitted for a right click on the canvas. target is the NodeItem, EdgeItem or nullptr
+    // for empty canvas; the host owns the menu itself.
+    void contextMenuRequested(QGraphicsItem *target, const QPoint &screenPos,
+                              const QPointF &scenePos);
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rect) override;
+    void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
 

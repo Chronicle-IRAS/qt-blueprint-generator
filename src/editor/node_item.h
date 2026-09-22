@@ -45,8 +45,7 @@ private:
     void setClickedHandler(std::function<void(const QString &)> handler);
     void setPortDragHandlers(std::function<void(const QString &, int)> started,
                              std::function<void(const QPointF &)> moved,
-                             std::function<void(const QPointF &)> finished,
-                             std::function<void()> cancelled);
+                             std::function<void(const QPointF &)> finished);
     void setHighlightedInputPort(int index);
     void cancelPortDrag();
     void setDoubleClickedHandler(std::function<void(const QString &)> handler);
@@ -65,7 +64,6 @@ private:
     std::function<void(const QString &, int)> m_portDragStartedHandler;
     std::function<void(const QPointF &)> m_portDragMovedHandler;
     std::function<void(const QPointF &)> m_portDragFinishedHandler;
-    std::function<void()> m_portDragCancelledHandler;
     std::function<void(const QString &)> m_doubleClickedHandler;
     std::function<void(const QString &, const QPointF &, const QPointF &)> m_moveFinishedHandler;
     BlueprintNode m_node;

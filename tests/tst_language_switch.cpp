@@ -1,11 +1,14 @@
 #include <QtTest/QtTest>
 
 #include <QAction>
+#include <QApplication>
+#include <QContextMenuEvent>
 #include <QDialog>
 #include <QDockWidget>
 #include <QFormLayout>
 #include <QGraphicsView>
 #include <QGroupBox>
+#include <QHash>
 #include <QImage>
 #include <QLabel>
 #include <QMenu>
@@ -64,6 +67,43 @@ int lowestHeadTextRow(NodeItem *item)
     return -1;
 }
 
+struct MenuTexts {
+    bool opened = false;
+    QStringList entries;
+    QHash<QString, QStringList> submenus;
+};
+
+// Opens a real context menu and records its localized entry texts.
+MenuTexts openContextMenu(QWidget *widget, const QPoint &position)
+{
+    MenuTexts captured;
+    QTimer::singleShot(0, [&captured] {
+        auto *menu = qobject_cast<QMenu *>(QApplication::activePopupWidget());
+        if (!menu) {
+            return;
+        }
+        captured.opened = true;
+        for (QAction *action : menu->actions()) {
+            if (action->isSeparator()) {
+                captured.entries.append(QStringLiteral("---"));
+                continue;
+            }
+            captured.entries.append(action->text());
+            if (QMenu *submenu = action->menu()) {
+                QStringList submenuEntries;
+                for (QAction *submenuAction : submenu->actions()) {
+                    submenuEntries.append(submenuAction->text());
+                }
+                captured.submenus.insert(action->text(), submenuEntries);
+            }
+        }
+        menu->close();
+    });
+    QContextMenuEvent event(QContextMenuEvent::Mouse, position, widget->mapToGlobal(position));
+    QApplication::sendEvent(widget, &event);
+    return captured;
+}
+
 } // namespace
 
 class LanguageSwitchTest : public QObject
@@ -78,6 +118,7 @@ private slots:
     void showsReadOnlyNodeTypeAndFollowsLanguageSwitch();
     void nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName_data();
     void nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName();
+    void contextMenusFollowTheLanguageSwitch();
 
 private:
     QTemporaryDir m_settingsDirectory;
@@ -365,6 +406,61 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
     QCOMPARE(restoredWindow.currentLanguage(), QStringLiteral("en"));
     QCOMPARE(QSettings().value(QStringLiteral("ui/language")).toString(),
              QStringLiteral("en"));
+}
+
+void LanguageSwitchTest::contextMenusFollowTheLanguageSwitch()
+{
+    MainWindow window;
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    // The scene is still empty here, so the view centre is a canvas position.
+    const QPoint centre = view->viewport()->rect().center();
+
+    MenuTexts menu = openContextMenu(view->viewport(), centre);
+    QVERIFY(menu.opened);
+    QCOMPARE(menu.entries,
+             QStringList({QStringLiteral("Add node"), QStringLiteral("---"),
+                          QStringLiteral("Select All"), QStringLiteral("Fit View"),
+                          QStringLiteral("Reset View")}));
+    QCOMPARE(menu.submenus.value(QStringLiteral("Add node")),
+             QStringList({QStringLiteral("Start"), QStringLiteral("End"), QStringLiteral("UI Page"),
+                          QStringLiteral("Logic Module"), QStringLiteral("Decision"),
+                          QStringLiteral("External Code")}));
+
+    QVERIFY(window.addNodeOfType(NodeType::LogicModule));
+    const QString id = window.document().nodes.constFirst().id;
+    const QPoint nodePoint = view->mapFromScene(
+        window.scene()->nodeItem(id)->sceneBoundingRect().center());
+    menu = openContextMenu(view->viewport(), nodePoint);
+    QVERIFY(menu.opened);
+    QCOMPARE(menu.entries,
+             QStringList({QStringLiteral("Edit node"), QStringLiteral("Generate selected node"),
+                          QStringLiteral("---"), QStringLiteral("Delete")}));
+
+    QVERIFY(window.setLanguage(QStringLiteral("zh_CN")));
+    menu = openContextMenu(view->viewport(), nodePoint);
+    QVERIFY(menu.opened);
+    QCOMPARE(menu.entries,
+             QStringList({QStringLiteral("编辑节点"), QStringLiteral("生成选中节点"),
+                          QStringLiteral("---"), QStringLiteral("删除")}));
+
+    const QPoint blank(16, 16);
+    menu = openContextMenu(view->viewport(), blank);
+    QVERIFY(menu.opened);
+    QCOMPARE(menu.entries,
+             QStringList({QStringLiteral("添加节点"), QStringLiteral("---"), QStringLiteral("全选"),
+                          QStringLiteral("适应视图"), QStringLiteral("重置视图")}));
+    QCOMPARE(menu.submenus.value(QStringLiteral("添加节点")),
+             QStringList({QStringLiteral("开始"), QStringLiteral("结束"), QStringLiteral("界面页面"),
+                          QStringLiteral("逻辑模块"), QStringLiteral("判断"),
+                          QStringLiteral("外部代码")}));
+
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    menu = openContextMenu(view->viewport(), blank);
+    QVERIFY(menu.opened);
+    QCOMPARE(menu.entries.constFirst(), QStringLiteral("Add node"));
 }
 
 QTEST_MAIN(LanguageSwitchTest)
