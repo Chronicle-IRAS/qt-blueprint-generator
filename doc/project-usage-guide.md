@@ -157,8 +157,9 @@ cmake --build $buildRoot
 | 节点 | `Edit node / 编辑节点`、`Generate selected node / 生成选中节点`、`Delete / 删除` |
 | 连线 | `Delete / 删除` |
 
-- 右键一个尚未选中的节点或连线时，它会成为当前操作对象；右键已经在多选中的对象时保留原有多选，因此 `Delete` 仍然删除全部选中对象，而 `Edit node`、`Generate selected node` 只针对右键的那个节点。右键空白画布不会改变当前选择。
-- `Generate selected node` 与工具栏共用同一个动作，所以只有在恰好选中一个 `UI Page`、`Logic Module` 或 `Decision` 节点时才可用，其他类型显示为不可用。
+- 右键一个尚未选中的节点或连线时，它会替代原选择成为当前操作对象；右键已经在多选中的节点或连线时保留原有多选；右键空白画布不改变当前选择。
+- 菜单项的作用范围与顶部入口保持一致：`Delete / 删除` 作用于当前 selection（多选时会删除全部选中对象），`Edit node / 编辑节点` 打开右键点击的那个节点，`Generate selected node / 生成选中节点` 与工具栏共用同一个动作。
+- `Generate selected node` 只对 `UI Page`、`Logic Module` 或 `Decision` 节点可用，并且要求当前恰好选中一个对象：右键 `Start`、`End`、`External Code` 节点或当前是多选时，该菜单项显示为不可用。
 - 从空白画布菜单添加节点时，新节点出现在右键点击的位置，而不是画布中央。
 - `Select All` 选中画布上的全部节点和连线；`Fit View` 按全部节点范围调整视图并保留 25%–300% 的缩放限制；`Reset View` 恢复 100% 缩放和初始位置。
 
