@@ -1314,15 +1314,25 @@ void BlueprintSceneTest::clickingAnEdgeSelectsItAndDeleteKeepsItsNodes()
     QApplication::processEvents();
     EdgeItem *edge = scene.edgeItem(QStringLiteral("flow"));
     QVERIFY(edge != nullptr);
+    // The scene index filters mouse hits by boundingRect(), so the widened hit stroke has to
+    // stay inside it or the outer band of the click area would silently not be clickable.
+    QVERIFY(edge->boundingRect().contains(edge->shape().boundingRect()));
 
-    // A few pixels off the curve still hit the line, so a thin edge stays clickable.
+    // Five pixels off the curve still hit the line, so a thin edge stays clickable.
     const QPointF curve = edge->path().pointAtPercent(0.5);
     QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
-                      view.mapFromScene(curve + QPointF(0.0, 3.0)));
+                      view.mapFromScene(curve + QPointF(0.0, 5.0)));
     QVERIFY(edge->isSelected());
     QCOMPARE(scene.selectedItems().size(), 1);
     QVERIFY(scene.selectedItems().constFirst() == edge);
     QVERIFY(!scene.nodeItem(QStringLiteral("source"))->isSelected());
+
+    // Outside the widened stroke the curve is not picked up any more.
+    scene.clearSelection();
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      view.mapFromScene(curve + QPointF(0.0, 8.0)));
+    QVERIFY(!edge->isSelected());
+    QVERIFY(scene.selectedItems().isEmpty());
 
     const auto render = [&](QStyle::State state) {
         QImage image(300, 120, QImage::Format_ARGB32_Premultiplied);

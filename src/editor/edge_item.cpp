@@ -122,6 +122,9 @@ void EdgeItem::updatePath()
 QRectF EdgeItem::boundingRect() const
 {
     QRectF result = QGraphicsPathItem::boundingRect().adjusted(-2.0, -2.0, 2.0, 2.0);
+    // The scene index filters mouse hits by boundingRect(), so the widened hit stroke used by
+    // shape() must be inside it instead of relying on the base implementation to include it.
+    result = result.united(m_hitPath.boundingRect());
     const QPolygonF arrow = arrowPolygon();
     if (!arrow.isEmpty()) {
         result = result.united(arrow.boundingRect());
