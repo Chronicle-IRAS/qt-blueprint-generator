@@ -1,10 +1,13 @@
 #include <QtTest/QtTest>
 
 #include <QAction>
+#include <QApplication>
+#include <QContextMenuEvent>
 #include <QDialog>
 #include <QDockWidget>
 #include <QGraphicsPathItem>
 #include <QGraphicsView>
+#include <QHash>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
@@ -17,6 +20,8 @@
 #include <QWheelEvent>
 #include <QPainter>
 #include <QStyleOptionGraphicsItem>
+
+#include <functional>
 
 #include "app/main_window.h"
 #include "blueprint/blueprint_document.h"
@@ -53,6 +58,92 @@ void dragPort(QGraphicsView *view, const QPointF &source, const QPointF &target)
     QTest::mousePress(view->viewport(), Qt::LeftButton, Qt::NoModifier, sourcePoint);
     QTest::mouseMove(view->viewport(), targetPoint, 20);
     QTest::mouseRelease(view->viewport(), Qt::LeftButton, Qt::NoModifier, targetPoint);
+}
+
+struct ContextMenuProbe {
+    bool opened = false;
+    QStringList entries;
+    QList<QAction *> actions;
+    QHash<QString, QStringList> submenus;
+};
+
+QString entryLabel(QAction *action)
+{
+    return action->isEnabled() ? action->text() : action->text() + QStringLiteral("|disabled");
+}
+
+// Opens the widget's real context menu, records it, optionally activates an entry while it
+// is open and closes it again.
+ContextMenuProbe probeContextMenu(QWidget *widget, const QPoint &position,
+                                  const std::function<void(QMenu *)> &interact = {})
+{
+    ContextMenuProbe probe;
+    QTimer::singleShot(0, [&probe, &interact] {
+        auto *menu = qobject_cast<QMenu *>(QApplication::activePopupWidget());
+        if (!menu) {
+            return;
+        }
+        probe.opened = true;
+        probe.actions = menu->actions();
+        for (QAction *action : menu->actions()) {
+            if (action->isSeparator()) {
+                probe.entries.append(QStringLiteral("---"));
+                continue;
+            }
+            probe.entries.append(entryLabel(action));
+            if (QMenu *submenu = action->menu()) {
+                QStringList submenuEntries;
+                for (QAction *submenuAction : submenu->actions()) {
+                    submenuEntries.append(entryLabel(submenuAction));
+                }
+                probe.submenus.insert(action->text(), submenuEntries);
+            }
+        }
+        if (interact) {
+            interact(menu);
+        }
+        menu->close();
+    });
+    QContextMenuEvent event(QContextMenuEvent::Mouse, position, widget->mapToGlobal(position));
+    QApplication::sendEvent(widget, &event);
+    return probe;
+}
+
+void triggerMenuAction(QMenu *menu, const QString &objectName)
+{
+    for (QAction *action : menu->actions()) {
+        if (action->objectName() == objectName) {
+            action->trigger();
+            return;
+        }
+    }
+}
+
+void triggerAddNodeEntry(QMenu *menu)
+{
+    for (QAction *action : menu->actions()) {
+        QMenu *submenu = action->menu();
+        if (!submenu || submenu->objectName() != QStringLiteral("canvasAddNodeMenu")
+            || submenu->actions().isEmpty()) {
+            continue;
+        }
+        submenu->actions().constFirst()->trigger();
+        return;
+    }
+}
+
+// First viewport point without a canvas item, so tests do not hard-code the window layout.
+QPoint blankViewportPoint(QGraphicsView *view, const BlueprintScene &scene)
+{
+    for (int y = 24; y < view->viewport()->height() - 8; y += 16) {
+        for (int x = 24; x < view->viewport()->width() - 8; x += 16) {
+            const QPoint point(x, y);
+            if (!scene.itemAt(view->mapToScene(point), QTransform())) {
+                return point;
+            }
+        }
+    }
+    return {-1, -1};
 }
 
 } // namespace
@@ -103,6 +194,15 @@ private slots:
     void keyboardDeleteHandlesMixedNodeAndEdgeSelection();
     void deleteKeyInsideTextEditorsDoesNotDeleteCanvasItems();
     void toolbarDeleteSharesTheKeyboardDeletionPath();
+    void canvasContextMenuOffersCanvasEntries();
+    void canvasContextMenuAddsNodeAtRightClickPosition();
+    void nodeContextMenuFollowsGenerateEligibility();
+    void nodeContextMenuKeepsTheCurrentSelectionForDelete();
+    void edgeContextMenuDeletesOnlyThatEdge();
+    void selectAllCanvasEntriesSelectNodesAndEdges();
+    void fitViewBringsEveryNodeIntoTheViewport();
+    void fitViewKeepsTheZoomLimit();
+    void resetViewRestoresTheInitialTransform();
 };
 
 void BlueprintSceneTest::canvasPolishPreservesGeometryAndFullText()
@@ -1482,6 +1582,304 @@ void BlueprintSceneTest::toolbarDeleteSharesTheKeyboardDeletionPath()
     selectBoth();
     deleteAction->trigger();
     QCOMPARE(window.document(), afterKeyboard);
+}
+
+void BlueprintSceneTest::canvasContextMenuOffersCanvasEntries()
+{
+    MainWindow window;
+    window.show();
+    QApplication::processEvents();
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    QGraphicsView *view = window.graphicsView();
+    const QString nodeId = window.document().nodes.constFirst().id;
+    window.scene()->nodeItem(nodeId)->setSelected(true);
+    const QPoint blank = blankViewportPoint(view, *window.scene());
+    QVERIFY(blank.x() >= 0);
+
+    // A real right press must not drop the selection before the menu even opens.
+    QTest::mousePress(view->viewport(), Qt::RightButton, Qt::NoModifier, blank);
+    QTest::mouseRelease(view->viewport(), Qt::RightButton, Qt::NoModifier, blank);
+    QVERIFY(window.scene()->nodeItem(nodeId)->isSelected());
+
+    const ContextMenuProbe probe = probeContextMenu(view->viewport(), blank);
+    QVERIFY(probe.opened);
+    QCOMPARE(probe.entries,
+             QStringList({QStringLiteral("Add node"), QStringLiteral("---"),
+                          QStringLiteral("Select All"), QStringLiteral("Fit View"),
+                          QStringLiteral("Reset View")}));
+    QCOMPARE(probe.submenus.value(QStringLiteral("Add node")),
+             QStringList({QStringLiteral("Start"), QStringLiteral("End"), QStringLiteral("UI Page"),
+                          QStringLiteral("Logic Module"), QStringLiteral("Decision"),
+                          QStringLiteral("External Code")}));
+    // A right click on empty canvas must not disturb the current selection.
+    QVERIFY(window.scene()->nodeItem(nodeId)->isSelected());
+    QCOMPARE(window.document().nodes.size(), 1);
+}
+
+void BlueprintSceneTest::canvasContextMenuAddsNodeAtRightClickPosition()
+{
+    MainWindow window;
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    const QPoint blank = blankViewportPoint(view, *window.scene());
+    QVERIFY(blank.x() >= 0);
+    const QPointF clickPosition = view->mapToScene(blank);
+
+    const ContextMenuProbe probe = probeContextMenu(view->viewport(), blank, triggerAddNodeEntry);
+    QVERIFY(probe.opened);
+    QCOMPARE(window.document().nodes.size(), 1);
+    QCOMPARE(window.document().nodes.constFirst().type, NodeType::Start);
+    const QString id = window.document().nodes.constFirst().id;
+    QVERIFY(window.scene()->nodeItem(id)->isSelected());
+    // The node appears where the click happened instead of at the view centre.
+    QVERIFY(QLineF(window.scene()->nodePosition(id), clickPosition).length() <= 60.0);
+
+    window.scene()->undoStack()->undo();
+    QVERIFY(window.document().nodes.isEmpty());
+    QVERIFY(window.scene()->nodeItem(id) == nullptr);
+}
+
+void BlueprintSceneTest::nodeContextMenuFollowsGenerateEligibility()
+{
+    const auto generatable = [](NodeType type) {
+        return type == NodeType::UiPage || type == NodeType::LogicModule || type == NodeType::Decision;
+    };
+    const QVector<NodeType> types{NodeType::Start, NodeType::End, NodeType::UiPage,
+                                  NodeType::LogicModule, NodeType::Decision, NodeType::ExternalCode};
+    for (const NodeType type : types) {
+        MainWindow window;
+        window.show();
+        QApplication::processEvents();
+        QVERIFY(window.addNodeOfType(type));
+        QGraphicsView *view = window.graphicsView();
+        const QString id = window.document().nodes.constFirst().id;
+        NodeItem *item = window.scene()->nodeItem(id);
+        window.scene()->clearSelection();
+
+        const ContextMenuProbe probe = probeContextMenu(
+            view->viewport(), view->mapFromScene(item->sceneBoundingRect().center()));
+        QVERIFY(probe.opened);
+        QStringList expected{QStringLiteral("Edit node")};
+        expected.append(generatable(type) ? QStringLiteral("Generate selected node")
+                                          : QStringLiteral("Generate selected node|disabled"));
+        expected.append(QStringLiteral("---"));
+        expected.append(QStringLiteral("Delete"));
+        QCOMPARE(probe.entries, expected);
+        // Right clicking an unselected node makes it the current object.
+        QVERIFY(item->isSelected());
+        // The menu reuses the shared toolbar actions instead of duplicating them.
+        auto *deleteAction = window.findChild<QAction *>(QStringLiteral("deleteSelectionAction"));
+        auto *generateAction = window.findChild<QAction *>(QStringLiteral("generateSelectedNodeAction"));
+        QVERIFY(deleteAction && generateAction);
+        QVERIFY(probe.actions.contains(deleteAction));
+        QVERIFY(probe.actions.contains(generateAction));
+        QCOMPARE(generateAction->isEnabled(), generatable(type));
+    }
+}
+
+void BlueprintSceneTest::nodeContextMenuKeepsTheCurrentSelectionForDelete()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::LogicModule));
+    QVERIFY(window.addNodeOfType(NodeType::Decision));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    const BlueprintDocument before = window.document();
+    const QString first = before.nodes.at(0).id;
+    const QString second = before.nodes.at(1).id;
+    NodeItem *firstItem = window.scene()->nodeItem(first);
+    NodeItem *secondItem = window.scene()->nodeItem(second);
+    const QPoint firstPoint = view->mapFromScene(firstItem->sceneBoundingRect().center());
+
+    window.scene()->clearSelection();
+    secondItem->setSelected(true);
+    ContextMenuProbe probe = probeContextMenu(view->viewport(), firstPoint);
+    QVERIFY(probe.opened);
+    QVERIFY(firstItem->isSelected());
+    QVERIFY(!secondItem->isSelected());
+
+    // A node that already belongs to a multi selection keeps it, so Delete removes every
+    // selected object instead of only the clicked one.
+    secondItem->setSelected(true);
+    probe = probeContextMenu(view->viewport(), firstPoint, [](QMenu *menu) {
+        triggerMenuAction(menu, QStringLiteral("deleteSelectionAction"));
+    });
+    QVERIFY(probe.opened);
+    QVERIFY(window.document().nodes.isEmpty());
+    QVERIFY(window.scene()->nodeItem(first) == nullptr);
+    QVERIFY(window.scene()->nodeItem(second) == nullptr);
+
+    window.scene()->undoStack()->undo();
+    window.scene()->undoStack()->undo();
+    QCOMPARE(window.document(), before);
+    QVERIFY(window.scene()->nodeItem(first) != nullptr);
+    QVERIFY(window.scene()->nodeItem(second) != nullptr);
+}
+
+void BlueprintSceneTest::edgeContextMenuDeletesOnlyThatEdge()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    QVERIFY(window.addNodeOfType(NodeType::End));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    const BlueprintDocument before = window.document();
+    QVERIFY(window.scene()->connectNodes(before.nodes.at(0).id, before.nodes.at(1).id,
+                                         QStringLiteral("next")));
+    const QString edgeId = window.document().edges.constFirst().id;
+    EdgeItem *edge = window.scene()->edgeItem(edgeId);
+    QVERIFY(edge != nullptr);
+    window.scene()->clearSelection();
+
+    const QPointF curve = edge->path().pointAtPercent(0.5);
+    // Right clicking the unselected edge makes it the current object.
+    ContextMenuProbe probe = probeContextMenu(view->viewport(), view->mapFromScene(curve));
+    QVERIFY(probe.opened);
+    QCOMPARE(probe.entries, QStringList({QStringLiteral("Delete")}));
+    QVERIFY(edge->isSelected());
+    QVERIFY(!window.scene()->nodeItem(before.nodes.at(0).id)->isSelected());
+
+    // Delete removes only the edge and keeps both nodes.
+    probe = probeContextMenu(view->viewport(), view->mapFromScene(curve), [](QMenu *menu) {
+        triggerMenuAction(menu, QStringLiteral("deleteSelectionAction"));
+    });
+    QVERIFY(probe.opened);
+    QVERIFY(window.document().edges.isEmpty());
+    QCOMPARE(window.document().nodes.size(), 2);
+    QVERIFY(window.scene()->nodeItem(before.nodes.at(0).id) != nullptr);
+    QVERIFY(window.scene()->nodeItem(before.nodes.at(1).id) != nullptr);
+    QVERIFY(window.scene()->edgeItem(edgeId) == nullptr);
+
+    window.scene()->undoStack()->undo();
+    QCOMPARE(window.document().edges.size(), 1);
+    EdgeItem *restored = window.scene()->edgeItem(edgeId);
+    QVERIFY(restored != nullptr);
+    window.scene()->undoStack()->redo();
+    QVERIFY(window.document().edges.isEmpty());
+    QVERIFY(window.scene()->edgeItem(edgeId) == nullptr);
+
+    // A right click on an edge that is already part of a multi selection keeps it, so the
+    // shared Delete would act on every selected object.
+    window.scene()->undoStack()->undo();
+    restored = window.scene()->edgeItem(edgeId);
+    QVERIFY(restored != nullptr);
+    window.scene()->nodeItem(before.nodes.at(0).id)->setSelected(true);
+    restored->setSelected(true);
+    probe = probeContextMenu(view->viewport(),
+                             view->mapFromScene(restored->path().pointAtPercent(0.5)));
+    QVERIFY(probe.opened);
+    QCOMPARE(window.scene()->selectedItems().size(), 2);
+}
+
+void BlueprintSceneTest::selectAllCanvasEntriesSelectNodesAndEdges()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    QVERIFY(window.addNodeOfType(NodeType::End));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    QVERIFY(window.document().nodes.size() == 2);
+    QVERIFY(window.scene()->connectNodes(window.document().nodes.at(0).id,
+                                         window.document().nodes.at(1).id));
+    const BlueprintDocument before = window.document();
+    const QString edgeId = before.edges.constFirst().id;
+    window.scene()->clearSelection();
+    const QPoint blank = blankViewportPoint(view, *window.scene());
+    QVERIFY(blank.x() >= 0);
+
+    const ContextMenuProbe probe = probeContextMenu(view->viewport(), blank, [](QMenu *menu) {
+        triggerMenuAction(menu, QStringLiteral("selectAllCanvasAction"));
+    });
+    QVERIFY(probe.opened);
+    // Select All covers nodes and edges, matching what Delete and the edge menus work on.
+    QCOMPARE(window.scene()->selectedItems().size(), 3);
+    QVERIFY(window.scene()->edgeItem(edgeId)->isSelected());
+
+    view->setFocus();
+    QTest::keyClick(view->viewport(), Qt::Key_Delete);
+    QVERIFY(window.document().nodes.isEmpty());
+    QVERIFY(window.document().edges.isEmpty());
+
+    for (int step = 0; step < 3; ++step) {
+        window.scene()->undoStack()->undo();
+    }
+    QCOMPARE(window.document(), before);
+}
+
+void BlueprintSceneTest::fitViewBringsEveryNodeIntoTheViewport()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    QVERIFY(window.addNodeOfType(NodeType::End));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    const BlueprintDocument before = window.document();
+    QVERIFY(window.scene()->moveNode(before.nodes.at(0).id, QPointF(-400.0, -300.0)));
+    QVERIFY(window.scene()->moveNode(before.nodes.at(1).id, QPointF(700.0, 480.0)));
+    const QPoint blank = blankViewportPoint(view, *window.scene());
+    QVERIFY(blank.x() >= 0);
+
+    const ContextMenuProbe probe = probeContextMenu(view->viewport(), blank, [](QMenu *menu) {
+        triggerMenuAction(menu, QStringLiteral("fitCanvasViewAction"));
+    });
+    QVERIFY(probe.opened);
+    for (const BlueprintNode &node : window.document().nodes) {
+        const QRect nodeRect = view->mapFromScene(
+            window.scene()->nodeItem(node.id)->sceneBoundingRect()).boundingRect();
+        QVERIFY(view->viewport()->rect().contains(nodeRect));
+    }
+    // The zoom stays inside the limits the wheel already enforces.
+    QVERIFY(view->transform().m11() >= 0.25);
+    QVERIFY(view->transform().m11() <= 3.0);
+}
+
+void BlueprintSceneTest::fitViewKeepsTheZoomLimit()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    QVERIFY(window.addNodeOfType(NodeType::End));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    const BlueprintDocument before = window.document();
+    // Far enough apart that fitting them would zoom far below the wheel limit.
+    QVERIFY(window.scene()->moveNode(before.nodes.at(0).id, QPointF(-20000.0, -20000.0)));
+    QVERIFY(window.scene()->moveNode(before.nodes.at(1).id, QPointF(20000.0, 20000.0)));
+    const QPoint blank = blankViewportPoint(view, *window.scene());
+    QVERIFY(blank.x() >= 0);
+
+    const ContextMenuProbe probe = probeContextMenu(view->viewport(), blank, [](QMenu *menu) {
+        triggerMenuAction(menu, QStringLiteral("fitCanvasViewAction"));
+    });
+    QVERIFY(probe.opened);
+    QCOMPARE(view->transform().m11(), 0.25);
+}
+
+void BlueprintSceneTest::resetViewRestoresTheInitialTransform()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    view->scale(2.0, 2.0);
+    view->centerOn(QPointF(600.0, 600.0));
+    QCOMPARE(view->transform().m11(), 2.0);
+    const QPoint blank = blankViewportPoint(view, *window.scene());
+    QVERIFY(blank.x() >= 0);
+
+    const ContextMenuProbe probe = probeContextMenu(view->viewport(), blank, [](QMenu *menu) {
+        triggerMenuAction(menu, QStringLiteral("resetCanvasViewAction"));
+    });
+    QVERIFY(probe.opened);
+    QCOMPARE(view->transform().m11(), 1.0);
+    const QPointF centre = view->mapToScene(view->viewport()->rect().center());
+    QVERIFY(QLineF(centre, window.scene()->sceneRect().center()).length() < 5.0);
 }
 
 QTEST_MAIN(BlueprintSceneTest)

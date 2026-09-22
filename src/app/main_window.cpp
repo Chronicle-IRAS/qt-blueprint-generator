@@ -8,6 +8,7 @@
 #include <QUuid>
 
 #include "editor/blueprint_scene.h"
+#include "editor/edge_item.h"
 #include "editor/node_item.h"
 #include "editor/node_properties_editor.h"
 #include "workspace/build_service.h"
@@ -89,6 +90,59 @@ void setFormLabel(QFormLayout *form, QWidget *field, const QString &text)
     }
 }
 
+// Single source for the add-node entries of the toolbar menu and the canvas context menu.
+const QVector<NodeType> &blueprintNodeTypes()
+{
+    static const QVector<NodeType> types{
+        NodeType::Start,
+        NodeType::End,
+        NodeType::UiPage,
+        NodeType::LogicModule,
+        NodeType::Decision,
+        NodeType::ExternalCode,
+    };
+    return types;
+}
+
+constexpr qreal MinZoom = 0.25;
+constexpr qreal MaxZoom = 3.0;
+
+// Fitting a single node would otherwise zoom far closer than the wheel allows.
+void clampViewZoom(QGraphicsView *view)
+{
+    const qreal zoom = view->transform().m11();
+    if (zoom > MaxZoom) {
+        view->scale(MaxZoom / zoom, MaxZoom / zoom);
+    } else if (zoom < MinZoom) {
+        view->scale(MinZoom / zoom, MinZoom / zoom);
+    }
+}
+
+// Fits every node instead of scene()->itemsBoundingRect(), so one far away edge or label
+// cannot shrink the whole blueprint into a corner.
+void fitViewToNodeItems(QGraphicsView *view)
+{
+    QRectF bounds;
+    for (QGraphicsItem *item : view->scene()->items()) {
+        if (!dynamic_cast<NodeItem *>(item)) {
+            continue;
+        }
+        bounds = bounds.isNull() ? item->sceneBoundingRect() : bounds.united(item->sceneBoundingRect());
+    }
+    if (bounds.isNull()) {
+        return;
+    }
+    constexpr qreal Margin = 24.0;
+    view->fitInView(bounds.adjusted(-Margin, -Margin, Margin, Margin), Qt::KeepAspectRatio);
+    clampViewZoom(view);
+}
+
+void resetCanvasView(QGraphicsView *view)
+{
+    view->resetTransform();
+    view->centerOn(view->scene()->sceneRect().center());
+}
+
 class NodeEditDialog final : public QDialog
 {
 public:
@@ -149,8 +203,6 @@ public:
 protected:
     void wheelEvent(QWheelEvent *event) override
     {
-        constexpr qreal MinZoom = 0.25;
-        constexpr qreal MaxZoom = 3.0;
         const qreal factor = event->angleDelta().y() > 0 ? 1.15 : 1.0 / 1.15;
         const qreal nextZoom = transform().m11() * factor;
         if (nextZoom >= MinZoom && nextZoom <= MaxZoom) {
@@ -190,15 +242,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_addNodeButton->setText(tr("Add node"));
     m_addNodeButton->setPopupMode(QToolButton::InstantPopup);
     m_addNodeMenu = new QMenu(m_addNodeButton);
-    const QVector<NodeType> nodeTypes{
-        NodeType::Start,
-        NodeType::End,
-        NodeType::UiPage,
-        NodeType::LogicModule,
-        NodeType::Decision,
-        NodeType::ExternalCode,
-    };
-    for (const NodeType type : nodeTypes) {
+    for (const NodeType type : blueprintNodeTypes()) {
         QAction *action = m_addNodeMenu->addAction(nodeTypeDisplayName(type));
         action->setObjectName(nodeTypeActionObjectName(type));
         m_addNodeActions.append({type, action});
@@ -237,6 +281,18 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
 
     m_viewMenu = menuBar()->addMenu(tr("View"));
     m_viewMenu->setObjectName(QStringLiteral("viewMenu"));
+
+    // Canvas entries live in the canvas context menu only; the issue keeps the menu bar
+    // and toolbar structure untouched.
+    m_selectAllAction = new QAction(tr("Select All"), this);
+    m_selectAllAction->setObjectName(QStringLiteral("selectAllCanvasAction"));
+    connect(m_selectAllAction, &QAction::triggered, m_scene, &BlueprintScene::selectAllItems);
+    m_fitViewAction = new QAction(tr("Fit View"), this);
+    m_fitViewAction->setObjectName(QStringLiteral("fitCanvasViewAction"));
+    connect(m_fitViewAction, &QAction::triggered, this, [this] { fitViewToNodeItems(m_view); });
+    m_resetViewAction = new QAction(tr("Reset View"), this);
+    m_resetViewAction->setObjectName(QStringLiteral("resetCanvasViewAction"));
+    connect(m_resetViewAction, &QAction::triggered, this, [this] { resetCanvasView(m_view); });
 
     m_aiMenu = menuBar()->addMenu(tr("AI"));
     m_aiMenu->setObjectName(QStringLiteral("aiMenu"));
@@ -438,6 +494,10 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     });
     connect(m_scene, &BlueprintScene::nodeEditRequested, this,
             [this](const QString &nodeId) { editNodeFromCanvas(nodeId); });
+    connect(m_scene, &BlueprintScene::contextMenuRequested, this,
+            [this](QGraphicsItem *target, const QPoint &screenPosition, const QPointF &scenePosition) {
+                showCanvasContextMenu(target, screenPosition, scenePosition);
+            });
     connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] {
         updatePropertyEditor();
         updateGenerationUi();
@@ -469,6 +529,13 @@ MainWindow::~MainWindow()
 
 bool MainWindow::addNodeOfType(NodeType type)
 {
+    const QPointF center = m_view->mapToScene(m_view->viewport()->rect().center());
+    const qsizetype ordinal = m_document.nodes.size();
+    return addNodeOfTypeAt(type, center + QPointF((ordinal % 3) * 220.0, (ordinal / 3) * 140.0));
+}
+
+bool MainWindow::addNodeOfTypeAt(NodeType type, const QPointF &scenePosition)
+{
     int number = 1;
     QString id;
     do {
@@ -479,10 +546,7 @@ bool MainWindow::addNodeOfType(NodeType type)
     node.id = id;
     node.type = type;
     node.name = nodeTypeDisplayName(type);
-    const QPointF center = m_view->mapToScene(m_view->viewport()->rect().center());
-    const qsizetype ordinal = m_document.nodes.size();
-    const QPointF position = center + QPointF((ordinal % 3) * 220.0, (ordinal / 3) * 140.0);
-    const bool added = m_scene->addNode(node, position);
+    const bool added = m_scene->addNode(node, scenePosition);
     if (added) {
         m_scene->clearSelection();
         m_scene->nodeItem(id)->setSelected(true);
@@ -575,6 +639,9 @@ void MainWindow::retranslateUi()
     m_menuUndoAction->setText(tr("Undo"));
     m_menuRedoAction->setText(tr("Redo"));
     m_viewMenu->setTitle(tr("View"));
+    m_selectAllAction->setText(tr("Select All"));
+    m_fitViewAction->setText(tr("Fit View"));
+    m_resetViewAction->setText(tr("Reset View"));
     m_aiMenu->setTitle(tr("AI"));
     m_aiSettingsAction->setText(tr("AI Settings..."));
     m_generateAction->setText(tr("Generate selected node"));
@@ -744,6 +811,39 @@ void MainWindow::appendBuildLog(const QString &text)
     m_buildLog->moveCursor(QTextCursor::End);
     m_buildLog->insertPlainText(text);
     m_buildLog->moveCursor(QTextCursor::End);
+}
+
+void MainWindow::showCanvasContextMenu(QGraphicsItem *target, const QPoint &screenPosition,
+                                       const QPointF &scenePosition)
+{
+    // The scene already made the clicked object the current one, so every entry can keep
+    // reusing the shared actions: Delete acts on the selection, Edit on the clicked node.
+    QMenu menu(this);
+    menu.setObjectName(QStringLiteral("canvasContextMenu"));
+    if (auto *node = dynamic_cast<NodeItem *>(target)) {
+        const QString nodeId = node->nodeId();
+        QAction *editAction = menu.addAction(tr("Edit node"));
+        editAction->setObjectName(QStringLiteral("contextEditNodeAction"));
+        connect(editAction, &QAction::triggered, this, [this, nodeId] { editNodeFromCanvas(nodeId); });
+        menu.addAction(m_generateAction);
+        menu.addSeparator();
+        menu.addAction(m_deleteAction);
+    } else if (dynamic_cast<EdgeItem *>(target)) {
+        menu.addAction(m_deleteAction);
+    } else {
+        QMenu *addNodeMenu = menu.addMenu(tr("Add node"));
+        addNodeMenu->setObjectName(QStringLiteral("canvasAddNodeMenu"));
+        for (const NodeType type : blueprintNodeTypes()) {
+            QAction *action = addNodeMenu->addAction(nodeTypeDisplayName(type));
+            connect(action, &QAction::triggered, this,
+                    [this, type, scenePosition] { addNodeOfTypeAt(type, scenePosition); });
+        }
+        menu.addSeparator();
+        menu.addAction(m_selectAllAction);
+        menu.addAction(m_fitViewAction);
+        menu.addAction(m_resetViewAction);
+    }
+    menu.exec(screenPosition);
 }
 
 void MainWindow::editNodeFromCanvas(const QString &nodeId)

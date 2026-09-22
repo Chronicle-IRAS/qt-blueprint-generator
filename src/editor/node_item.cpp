@@ -119,13 +119,11 @@ void NodeItem::setClickedHandler(std::function<void(const QString &)> handler)
 
 void NodeItem::setPortDragHandlers(std::function<void(const QString &, int)> started,
                                    std::function<void(const QPointF &)> moved,
-                                   std::function<void(const QPointF &)> finished,
-                                   std::function<void()> cancelled)
+                                   std::function<void(const QPointF &)> finished)
 {
     m_portDragStartedHandler = std::move(started);
     m_portDragMovedHandler = std::move(moved);
     m_portDragFinishedHandler = std::move(finished);
-    m_portDragCancelledHandler = std::move(cancelled);
 }
 
 void NodeItem::setHighlightedInputPort(int index)
@@ -266,13 +264,6 @@ void NodeItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
 
 void NodeItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-    if (event->button() == Qt::RightButton && m_portDragActive) {
-        if (m_portDragCancelledHandler) {
-            m_portDragCancelledHandler();
-        }
-        event->accept();
-        return;
-    }
     if (event->button() == Qt::LeftButton) {
         const int outputIndex = outputPortAt(event->pos());
         if (outputIndex >= 0 && m_portDragStartedHandler) {

@@ -2,6 +2,7 @@
 
 #include <QMainWindow>
 #include <QPair>
+#include <QPointF>
 #include <QString>
 #include <QStringList>
 #include <QTranslator>
@@ -20,6 +21,7 @@ class QAction;
 class QDockWidget;
 class QEvent;
 class QFormLayout;
+class QGraphicsItem;
 class QGraphicsView;
 class QLineEdit;
 class QMenu;
@@ -38,6 +40,9 @@ public:
     ~MainWindow() override;
 
     bool addNodeOfType(NodeType type);
+    // Places a node with its top left corner at scenePosition; the toolbar entry keeps
+    // using the view centre through addNodeOfType().
+    bool addNodeOfTypeAt(NodeType type, const QPointF &scenePosition);
     const BlueprintDocument &document() const;
     BlueprintScene *scene() const;
     QGraphicsView *graphicsView() const;
@@ -54,6 +59,8 @@ private:
     bool applyLanguage(const QString &languageCode, bool persist);
     void retranslateUi();
     void updateLanguageActions();
+    void showCanvasContextMenu(QGraphicsItem *target, const QPoint &screenPosition,
+                               const QPointF &scenePosition);
     void cancelConnection();
     void editNodeFromCanvas(const QString &nodeId);
     void applyProperties();
@@ -96,6 +103,9 @@ private:
     QAction *m_menuUndoAction = nullptr;
     QAction *m_menuRedoAction = nullptr;
     QMenu *m_viewMenu = nullptr;
+    QAction *m_selectAllAction = nullptr;
+    QAction *m_fitViewAction = nullptr;
+    QAction *m_resetViewAction = nullptr;
     QMenu *m_aiMenu = nullptr;
     QAction *m_aiSettingsAction = nullptr;
     QAction *m_propertiesDockAction = nullptr;

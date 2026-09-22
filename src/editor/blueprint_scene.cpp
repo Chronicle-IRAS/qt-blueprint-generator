@@ -6,6 +6,7 @@
 #include <QPainter>
 
 #include <QGraphicsPathItem>
+#include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsSceneMouseEvent>
 #include <QKeyEvent>
 #include <QPainterPath>
@@ -358,6 +359,39 @@ void BlueprintScene::setSemanticChangeHandler(std::function<void()> handler)
     m_semanticChangeHandler = std::move(handler);
 }
 
+void BlueprintScene::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
+{
+    QGraphicsItem *target = itemAt(event->scenePos(), QTransform());
+    // A right click makes an unselected object the current one without discarding a
+    // selection the object already belongs to, so Delete keeps working on a multi selection.
+    const auto selectIfUnselected = [this](QGraphicsItem *item) {
+        if (!item->isSelected()) {
+            clearSelection();
+            item->setSelected(true);
+        }
+    };
+    if (auto *node = dynamic_cast<NodeItem *>(target)) {
+        selectIfUnselected(node);
+    } else if (auto *edge = dynamic_cast<EdgeItem *>(target)) {
+        selectIfUnselected(edge);
+    } else {
+        target = nullptr;
+    }
+    // The listener runs a nested menu loop, so hand the event back to the view first.
+    event->accept();
+    emit contextMenuRequested(target, event->screenPos(), event->scenePos());
+}
+
+void BlueprintScene::selectAllItems()
+{
+    for (NodeItem *node : m_nodes) {
+        node->setSelected(true);
+    }
+    for (EdgeItem *edge : m_edges) {
+        edge->setSelected(true);
+    }
+}
+
 void BlueprintScene::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Escape && m_temporaryConnection) {
@@ -379,7 +413,10 @@ void BlueprintScene::keyPressEvent(QKeyEvent *event)
 
 void BlueprintScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-    if (event->button() == Qt::RightButton && m_temporaryConnection) {
+    // The right button only opens the context menu. Qt's default press handling clears the
+    // selection when the press lands on empty canvas, which would silently drop a selection
+    // the canvas menu still offers to act on.
+    if (event->button() == Qt::RightButton) {
         cancelPortDrag();
         event->accept();
         return;
@@ -430,8 +467,7 @@ void BlueprintScene::createNodeItem(const BlueprintNode &node, const QPointF &po
     item->setPortDragHandlers(
         [this](const QString &id, int outputIndex) { beginPortDrag(id, outputIndex); },
         [this](const QPointF &position) { updatePortDrag(position); },
-        [this](const QPointF &position) { finishPortDrag(position); },
-        [this] { cancelPortDrag(); });
+        [this](const QPointF &position) { finishPortDrag(position); });
     item->setDoubleClickedHandler([this](const QString &id) { handleNodeDoubleClicked(id); });
     item->setPositionChangedHandler([this](const QString &id) { handleItemPositionChanged(id); });
     item->setMoveFinishedHandler(
