@@ -32,6 +32,14 @@
     <message><source>Reject all remaining candidates and close? Accepted files will be retained.</source><translation>拒绝所有剩余候选并关闭吗？已经接受的文件会保留。</translation></message>
 </context>
 <context>
+    <name>ValidationDiagnosticsDialog</name>
+    <message><source>Blueprint validation failed</source><translation>蓝图校验失败</translation></message>
+    <message><source>Fix these blueprint problems before generating:</source><translation>生成代码前请先修正以下蓝图问题：</translation></message>
+    <message><source>Close</source><translation>关闭</translation></message>
+    <message><source>node: %1</source><translation>节点：%1</translation></message>
+    <message><source>edge: %1</source><translation>连线：%1</translation></message>
+</context>
+<context>
     <name>GenerationController</name>
     <message><source>Select a UI page, logic module, or decision node.</source><translation>请选择一个界面页面、逻辑模块或条件分支节点。</translation></message>
     <message><source>AI provider settings are invalid.</source><translation>AI 服务设置无效。</translation></message>

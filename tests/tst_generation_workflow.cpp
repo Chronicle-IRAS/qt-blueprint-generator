@@ -131,6 +131,72 @@ private slots:
         QVERIFY(generate->isEnabled());
         QVERIFY(!readFile(dir.path()+"/generation-manifest.json").contains("pending"));
     }
+    void invalidBlueprintReportsDiagnosticsWithoutCallingProvider()
+    {
+        QTemporaryDir dir;
+        int calls = 0;
+        MainWindow window([&](const AiProviderSettings &, QObject *parent) {
+            ++calls;
+            auto *fake = new FakeAiClient(parent);
+            fake->setSuccessfulResponse(response());
+            return fake;
+        });
+        prepare(window, dir.path());
+        // The reported scenario: one extra End node that nothing connects to.
+        BlueprintNode extraEnd;
+        extraEnd.id = "extra-end";
+        extraEnd.type = NodeType::End;
+        extraEnd.name = "ExtraEnd";
+        extraEnd.description = "Extra end node";
+        QVERIFY(window.scene()->addNode(extraEnd, QPointF(320, 0)));
+
+        auto *generate = window.findChild<QAction *>("generateSelectedNodeAction");
+        auto *status = window.findChild<QLabel *>("generationStatus");
+        window.scene()->clearSelection();
+        window.scene()->nodeItem("logic")->setSelected(true);
+        QVERIFY(generate->isEnabled());
+
+        QString title;
+        QString details;
+        QTimer::singleShot(0, [&] {
+            auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            if (!dialog) {
+                return;
+            }
+            title = dialog->windowTitle();
+            if (auto *text = dialog->findChild<QPlainTextEdit *>("validationDiagnosticsText")) {
+                details = text->toPlainText();
+            }
+            if (auto *close = dialog->findChild<QPushButton *>("closeValidationDiagnosticsButton")) {
+                close->click();
+            } else {
+                dialog->reject();
+            }
+        });
+        generate->trigger();
+        QApplication::processEvents();
+
+        QVERIFY(!QApplication::activeModalWidget());
+        QVERIFY(!title.isEmpty());
+        QCOMPARE(calls, 0);
+        QVERIFY(status->text().contains("Failed"));
+        // Both concrete problems of the offending node are reported, not one generic line.
+        QVERIFY(details.contains(QStringLiteral("extra-end")));
+        QVERIFY(details.contains(QStringLiteral("Non-Start node must have an incoming edge")));
+        QVERIFY(details.contains(QStringLiteral("Node is not reachable from Start")));
+
+        // Fixing the blueprint lets the same window generate again.
+        QVERIFY(window.scene()->deleteNode(QStringLiteral("extra-end")));
+        window.scene()->clearSelection();
+        window.scene()->nodeItem("logic")->setSelected(true);
+        generate->trigger();
+        QTRY_VERIFY(window.findChild<CandidateReviewDialog *>());
+        QCOMPARE(calls, 1);
+        confirmNextDialog();
+        window.findChild<CandidateReviewDialog *>()
+            ->findChild<QPushButton *>("cancelRemainingButton")->click();
+        QTRY_VERIFY(!window.findChild<CandidateReviewDialog *>());
+    }
     void selectionEligibilityAndCancellation()
     {
         QTemporaryDir dir;

@@ -46,6 +46,7 @@ bool GenerationController::start(BlueprintDocument document, QString nodeId,
 {
     if (m_state == State::Generating) return false;
     m_batch.reset();
+    m_diagnostics.clear();
     const auto fail = [this](const char *message) { finish(State::Failed, message); return false; };
     bool generatable = false;
     for (const auto &node : document.nodes) {
@@ -57,8 +58,12 @@ bool GenerationController::start(BlueprintDocument document, QString nodeId,
     if (!provider.validate()) return fail(QT_TR_NOOP("AI provider settings are invalid."));
     if (!QDir::isAbsolutePath(workspace) || !QFileInfo(workspace).isDir())
         return fail(QT_TR_NOOP("Select an existing absolute workspace directory."));
-    if (!BlueprintValidator::validate(document, {workspace}).isEmpty())
+    const QVector<BlueprintDiagnostic> validationDiagnostics =
+        BlueprintValidator::validate(document, {workspace});
+    if (!validationDiagnostics.isEmpty()) {
+        m_diagnostics = validationDiagnostics;
         return fail(QT_TR_NOOP("Fix blueprint validation errors before generating."));
+    }
     if (!ProjectScaffolder::create(document, workspace))
         return fail(QT_TR_NOOP("The workspace scaffold could not be initialized or does not match the blueprint."));
 

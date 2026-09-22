@@ -60,6 +60,55 @@ private slots:
         QCOMPARE(calls, 0);
         QCOMPARE(c.state(), GenerationController::State::Failed);
     }
+    void validationFailureExposesDiagnostics()
+    {
+        int calls = 0;
+        GenerationController c([&](const AiProviderSettings &, QObject *p) { ++calls; return new FakeAiClient(p); });
+        QTemporaryDir dir;
+
+        // An edge pointing at a missing node leaves both node and edge level problems.
+        auto invalid = document();
+        invalid.edges = {{"broken", "ghost", "logic", {}}, {"b", "logic", "end", {}}};
+        QVERIFY(!c.start(invalid, "logic", dir.path(), {}));
+        QCOMPARE(calls, 0);
+        QCOMPARE(c.state(), GenerationController::State::Failed);
+
+        const QVector<BlueprintDiagnostic> diagnostics = c.diagnostics();
+        QVERIFY(!diagnostics.isEmpty());
+        QVERIFY(diagnostics.size() > 1);
+        bool sawEdgeDiagnostic = false;
+        bool sawNodeDiagnostic = false;
+        for (const BlueprintDiagnostic &diagnostic : diagnostics) {
+            QVERIFY(!diagnostic.message.isEmpty());
+            sawEdgeDiagnostic = sawEdgeDiagnostic || !diagnostic.edgeId.isEmpty();
+            sawNodeDiagnostic = sawNodeDiagnostic || !diagnostic.nodeId.isEmpty();
+        }
+        QVERIFY(sawEdgeDiagnostic);
+        QVERIFY(sawNodeDiagnostic);
+
+        // A provider side failure must stay distinguishable from a blueprint failure.
+        GenerationController providerController([](const AiProviderSettings &, QObject *p) {
+            auto *fake = new FakeAiClient(p);
+            fake->setFailure({AiErrorKind::Authentication, 401, "provider detail"});
+            return fake;
+        });
+        QVERIFY(providerController.start(document(), "logic", dir.path(), {}));
+        QTRY_COMPARE(providerController.state(), GenerationController::State::Failed);
+        QVERIFY(providerController.diagnostics().isEmpty());
+
+        // Stale diagnostics never leak into a later session.
+        GenerationController recovered([&](const AiProviderSettings &, QObject *p) {
+            auto *fake = new FakeAiClient(p);
+            fake->setSuccessfulResponse(response());
+            return fake;
+        });
+        QVERIFY(!recovered.start(invalid, "logic", dir.path(), {}));
+        QVERIFY(!recovered.diagnostics().isEmpty());
+        QVERIFY(recovered.start(document(), "logic", dir.path(), {}));
+        QVERIFY(recovered.diagnostics().isEmpty());
+        QTRY_COMPARE(recovered.state(), GenerationController::State::Success);
+        QVERIFY(recovered.diagnostics().isEmpty());
+    }
     void fakeSuccessPendingOnly()
     {
         FakeAiClient *client = nullptr;

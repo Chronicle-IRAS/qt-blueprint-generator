@@ -2,6 +2,7 @@
 
 #include "ai/ai_provider_settings.h"
 #include "blueprint/blueprint_document.h"
+#include "blueprint/blueprint_validator.h"
 #include "generation/generation_service.h"
 #include <functional>
 
@@ -32,6 +33,9 @@ public:
     void invalidateContext(const BlueprintDocument &document, const QString &workspace);
     State state() const { return m_state; }
     QString errorMessage() const { return m_error ? tr(m_error) : QString(); }
+    // Blueprint validation diagnostics of the last failed start(); empty for every
+    // other failure (provider, workspace, selection) and for a successful session.
+    QVector<BlueprintDiagnostic> diagnostics() const { return m_diagnostics; }
     std::optional<CandidateBatch> candidateBatch() const { return m_batch; }
 signals:
     void stateChanged(GenerationController::State state);
@@ -45,5 +49,6 @@ private:
     QUuid m_token;
     BlueprintDocument m_document;
     QString m_workspace;
+    QVector<BlueprintDiagnostic> m_diagnostics;
     std::optional<CandidateBatch> m_batch;
 };
