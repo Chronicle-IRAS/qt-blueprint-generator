@@ -133,6 +133,7 @@
 </context>
 <context>
     <name>MainWindow</name>
+    <message><source>Workspace Editor</source><translation>工作区编辑器</translation></message>
     <message><source>Generate selected node</source><translation>生成选中节点</translation></message>
     <message><source>Cancel generation</source><translation>取消生成</translation></message>
     <message><source>Ready to generate</source><translation>可以开始生成</translation></message>
@@ -555,5 +556,23 @@
         <source>Output</source>
         <translation>输出</translation>
     </message>
+</context>
+<context>
+    <name>WorkspaceBrowserWidget</name>
+    <message><source>Refresh</source><translation>刷新</translation></message>
+    <message><source>No file selected</source><translation>未选择文件</translation></message>
+    <message><source>No generated-project directory. Set an existing workspace root in Build and export.</source><translation>尚无 generated-project 目录。请在“构建与导出”中设置已有的工作区根目录。</translation></message>
+    <message><source>The generated-project directory is empty.</source><translation>generated-project 目录为空。</translation></message>
+    <message><source>Double-click a file to preview it. All files are read-only.</source><translation>双击文件进行预览。所有文件均为只读。</translation></message>
+    <message><source>The file tree limit was reached (2,000 entries / 32 levels).</source><translation>已达到文件树上限（2,000 个条目 / 32 层）。</translation></message>
+    <message><source>Cannot open file: missing file or unsafe workspace path. Refresh the file tree.</source><translation>无法打开文件：文件不存在或工作区路径不安全。请刷新文件树。</translation></message>
+    <message><source>Cannot read this file.</source><translation>无法读取此文件。</translation></message>
+    <message><source>Preview is not supported for this file type or encoding. UTF-8 text is required.</source><translation>不支持预览此文件类型或编码。仅支持 UTF-8 文本。</translation></message>
+    <message><source>File is too large to preview (limit: 1 MiB).</source><translation>文件过大，无法预览（上限：1 MiB）。</translation></message>
+    <message><source>Empty file. Read-only.</source><translation>空文件。只读。</translation></message>
+    <message><source>Read-only preview — ordinary project file.</source><translation>只读预览 — 普通工程文件。</translation></message>
+    <message><source>Read-only preview — protected scaffold / contract.</source><translation>只读预览 — 受保护的骨架 / 契约文件。</translation></message>
+    <message><source>Read-only preview — protected external code.</source><translation>只读预览 — 受保护的外部代码。</translation></message>
+    <message><source>Read-only preview — protection metadata is unavailable.</source><translation>只读预览 — 保护元数据不可用。</translation></message>
 </context>
 </TS>
