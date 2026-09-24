@@ -22,6 +22,7 @@ class NodePropertiesEditor;
 class QAction;
 class QDockWidget;
 class QEvent;
+class QCloseEvent;
 class QFormLayout;
 class QGraphicsItem;
 class QGraphicsView;
@@ -57,6 +58,8 @@ public:
 
 protected:
     void changeEvent(QEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     bool applyLanguage(const QString &languageCode, bool persist);
@@ -115,6 +118,7 @@ private:
     QAction *m_aiSettingsAction = nullptr;
     QAction *m_propertiesDockAction = nullptr;
     QAction *m_buildDockAction = nullptr;
+    QAction *m_workspaceDockAction = nullptr;
     QAction *m_resetLayoutAction = nullptr;
     QMenu *m_languageMenu = nullptr;
     QAction *m_englishLanguageAction = nullptr;

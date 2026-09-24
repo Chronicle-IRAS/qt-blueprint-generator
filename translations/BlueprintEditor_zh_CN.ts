@@ -563,17 +563,32 @@
 <context>
     <name>WorkspaceBrowserWidget</name>
     <message><source>Refresh</source><translation>刷新</translation></message>
+    <message><source>Save</source><translation>保存</translation></message>
+    <message><source>Unsaved changes</source><translation>未保存修改</translation></message>
+    <message><source>Save changes to %1?</source><translation>是否保存对 %1 的修改？</translation></message>
+    <message><source>Discard</source><translation>放弃</translation></message>
+    <message><source>Cancel</source><translation>取消</translation></message>
+    <message><source>File changed on disk</source><translation>文件已在磁盘上发生变化</translation></message>
+    <message><source>File changed on disk. Reload and discard your changes?</source><translation>磁盘文件已改变。是否重新加载并放弃当前修改？</translation></message>
+    <message><source>Reload</source><translation>重新加载</translation></message>
+    <message><source>The file or its protection status changed.</source><translation>文件或其保护状态已改变。</translation></message>
+    <message><source>Cannot verify the current disk file.</source><translation>无法验证当前磁盘文件。</translation></message>
+    <message><source>Save failed: %1</source><translation>保存失败：%1</translation></message>
+    <message><source>Reload failed; local edits were kept.</source><translation>重新加载失败；本地修改已保留。</translation></message>
+    <message><source>File changed on disk.</source><translation>磁盘文件已改变。</translation></message>
+    <message><source>Double-click a file to open it.</source><translation>双击文件打开。</translation></message>
+    <message><source>Empty file. Editable.</source><translation>空文件。可编辑。</translation></message>
+    <message><source>Editable project file.</source><translation>可编辑的工程文件。</translation></message>
+    <message><source> Modified.</source><translation> 已修改。</translation></message>
     <message><source>No file selected</source><translation>未选择文件</translation></message>
     <message><source>No generated-project directory. Set an existing workspace root in Build and export.</source><translation>尚无 generated-project 目录。请在“构建与导出”中设置已有的工作区根目录。</translation></message>
     <message><source>The generated-project directory is empty.</source><translation>generated-project 目录为空。</translation></message>
-    <message><source>Double-click a file to preview it. All files are read-only.</source><translation>双击文件进行预览。所有文件均为只读。</translation></message>
     <message><source>The file tree limit was reached (2,000 entries / 32 levels).</source><translation>已达到文件树上限（2,000 个条目 / 32 层）。</translation></message>
     <message><source>Cannot open file: missing file or unsafe workspace path. Refresh the file tree.</source><translation>无法打开文件：文件不存在或工作区路径不安全。请刷新文件树。</translation></message>
     <message><source>Cannot read this file.</source><translation>无法读取此文件。</translation></message>
     <message><source>Preview is not supported for this file type or encoding. UTF-8 text is required.</source><translation>不支持预览此文件类型或编码。仅支持 UTF-8 文本。</translation></message>
     <message><source>File is too large to preview (limit: 1 MiB).</source><translation>文件过大，无法预览（上限：1 MiB）。</translation></message>
     <message><source>Empty file. Read-only.</source><translation>空文件。只读。</translation></message>
-    <message><source>Read-only preview — ordinary project file.</source><translation>只读预览 — 普通工程文件。</translation></message>
     <message><source>Read-only preview — protected scaffold / contract.</source><translation>只读预览 — 受保护的骨架 / 契约文件。</translation></message>
     <message><source>Read-only preview — protected external code.</source><translation>只读预览 — 受保护的外部代码。</translation></message>
     <message><source>Read-only preview — protection metadata is unavailable.</source><translation>只读预览 — 保护元数据不可用。</translation></message>
