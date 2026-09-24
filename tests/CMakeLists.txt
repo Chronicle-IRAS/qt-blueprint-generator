@@ -1,4 +1,15 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
+set(workspace_browser_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_workspace_browser.moc")
+add_custom_command(OUTPUT "${workspace_browser_moc}"
+    COMMAND Qt6::moc -o tst_workspace_browser.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_workspace_browser.cpp"
+    DEPENDS tst_workspace_browser.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_workspace_browser tst_workspace_browser.cpp "${workspace_browser_moc}")
+set_target_properties(tst_workspace_browser PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_workspace_browser PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_workspace_browser PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME workspace_browser COMMAND tst_workspace_browser)
+set_tests_properties(workspace_browser PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
 
 set(editor_theme_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_editor_theme.moc")
 add_custom_command(OUTPUT "${editor_theme_moc}"

@@ -14,6 +14,7 @@
 
 class BlueprintScene;
 class BuildService;
+class WorkspaceBrowserWidget;
 class CandidateReviewDialog;
 class QLabel;
 class NodePropertiesEditor;
@@ -119,6 +120,8 @@ private:
     QPushButton *m_applyPropertiesButton = nullptr;
     BuildService *m_buildService = nullptr;
     QDockWidget *m_buildDock = nullptr;
+    QDockWidget *m_workspaceDock = nullptr;
+    WorkspaceBrowserWidget *m_workspaceBrowser = nullptr;
     QFormLayout *m_buildForm = nullptr;
     QLineEdit *m_workspacePathEdit = nullptr;
     QLineEdit *m_buildDirectoryEdit = nullptr;

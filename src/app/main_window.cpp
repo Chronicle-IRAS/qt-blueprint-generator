@@ -1,4 +1,5 @@
 #include "app/main_window.h"
+#include "app/workspace_browser_widget.h"
 #include "ui/node_type_display.h"
 #include "ui/theme.h"
 
@@ -405,6 +406,23 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_buildDockAction->setObjectName(QStringLiteral("buildExportDockAction"));
     m_viewMenu->addAction(m_propertiesDockAction);
     m_viewMenu->addAction(m_buildDockAction);
+    m_workspaceDock = new QDockWidget(tr("Workspace Editor"), this);
+    m_workspaceDock->setObjectName(QStringLiteral("workspaceEditorDock"));
+    m_workspaceBrowser = new WorkspaceBrowserWidget(m_workspaceDock);
+    m_workspaceDock->setWidget(m_workspaceBrowser);
+    addDockWidget(Qt::BottomDockWidgetArea, m_workspaceDock, Qt::Vertical);
+    m_workspaceDock->hide();
+    m_workspaceDock->toggleViewAction()->setObjectName(QStringLiteral("workspaceEditorAction"));
+    m_viewMenu->addAction(m_workspaceDock->toggleViewAction());
+    connect(m_workspaceDock->toggleViewAction(), &QAction::triggered, this, [this](bool visible) {
+        if (visible) {
+            m_workspaceBrowser->setWorkspacePath(m_workspacePathEdit->text().trimmed());
+            m_workspaceBrowser->refresh();
+        }
+    });
+    connect(m_workspacePathEdit, &QLineEdit::textChanged, this, [this](const QString &path) {
+        m_workspaceBrowser->setWorkspacePath(path.trimmed());
+    });
     m_viewMenu->addSeparator();
     m_resetLayoutAction = m_viewMenu->addAction(tr("Reset Layout"));
     m_resetLayoutAction->setObjectName(QStringLiteral("resetLayoutAction"));
@@ -657,6 +675,7 @@ void MainWindow::retranslateUi()
     m_applyPropertiesButton->setText(tr("Apply"));
 
     m_buildDock->setWindowTitle(tr("Build and export"));
+    m_workspaceDock->setWindowTitle(tr("Workspace Editor"));
     m_buildDockAction->setText(tr("Build and export"));
     m_resetLayoutAction->setText(tr("Reset Layout"));
     m_workspacePathEdit->setToolTip(tr("Workspace root containing generated-project"));
@@ -794,6 +813,11 @@ void MainWindow::exportProject()
 
 void MainWindow::resetWindowLayout()
 {
+    m_workspaceDock->hide();
+    m_workspaceDock->setFloating(false);
+    removeDockWidget(m_workspaceDock);
+    addDockWidget(Qt::BottomDockWidgetArea, m_workspaceDock, Qt::Vertical);
+    m_workspaceDock->hide();
     for (QDockWidget *dock : {m_propertiesDock, m_buildDock}) {
         dock->setFloating(false);
         removeDockWidget(dock);

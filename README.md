@@ -17,6 +17,7 @@ Qt Blueprint Generator 是一个面向 Qt 6 Widgets 项目的可视化蓝图编�
 - Qt/CMake 工程骨架、公共契约、生成记录及文件 SHA-256 校验。
 - 外部 C/C++ 代码的黑盒导入、接口契约绑定和完整性复验。
 - 独立 CMake 构建、日志采集和空目录导出。
+- 通过 Workspace Editor 浏览 `generated-project` 文件树并只读预览文本源码；暂不支持编辑或保存。
 - 英文与简体中文界面运行时切换。
 - 统一的浅色界面主题，包含菜单、工具栏、停靠面板、AI 设置与候选审核；画布使用协调的节点、端口和网格样式。
 - 可恢复的 Properties、Build and Export 面板，以及复用现有构建与导出操作的工具栏入口。
