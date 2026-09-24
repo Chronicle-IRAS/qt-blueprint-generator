@@ -257,6 +257,51 @@ private slots:
         widget.refresh(); widget.openFile("src/custom.cpp");
         QVERIFY(editor->isReadOnly()); QVERIFY(!save->isEnabled());
     }
+    void ordinaryTypingBackToCleanDoesNotPrompt()
+    {
+        QTemporaryDir dir; QVERIFY(scaffold(dir.path()));
+        QVERIFY(write(dir.path() + "/generated-project/src/one.cpp", "abc"));
+        QVERIFY(write(dir.path() + "/generated-project/src/two.cpp", "other"));
+        MainWindow window; window.setLanguage("en"); window.show();
+        window.findChild<QLineEdit *>("workspacePathEdit")->setText(dir.path());
+        window.findChild<QAction *>("workspaceEditorAction")->trigger();
+        auto *widget = window.findChild<WorkspaceBrowserWidget *>(); QVERIFY(widget);
+        widget->openFile("src/one.cpp");
+        auto *editor = preview(*widget);
+        auto *save = widget->findChild<QPushButton *>("workspaceSaveButton"); QVERIFY(editor && save);
+        auto *path = widget->findChild<QLabel *>("workspaceCurrentPath"); QVERIFY(path);
+        bool prompted = false;
+        QTimer promptGuard; promptGuard.setSingleShot(true);
+        QObject::connect(&promptGuard, &QTimer::timeout, &window, [&] {
+            auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+            if (!box) return;
+            prompted = true;
+            for (auto *button : box->buttons())
+                if (box->buttonRole(button) == QMessageBox::RejectRole) {
+                    QTest::mouseClick(button, Qt::LeftButton);
+                    return;
+                }
+        });
+        auto restoreByTyping = [&] {
+            editor->setFocus(); typeAtEnd(editor, "X");
+            QVERIFY(widget->hasUnsavedChanges());
+            QVERIFY(save->isEnabled());
+            QCOMPARE(path->text(), QString("src/one.cpp *"));
+            QTest::keyClick(editor, Qt::Key_Backspace);
+            QCOMPARE(editor->toPlainText(), QString("abc"));
+            QVERIFY(!widget->hasUnsavedChanges());
+            QVERIFY(!save->isEnabled());
+            QCOMPARE(path->text(), QString("src/one.cpp"));
+        };
+        restoreByTyping();
+        promptGuard.start(0); widget->openFile("src/two.cpp"); promptGuard.stop();
+        QVERIFY(!prompted);
+        QCOMPARE(editor->toPlainText(), QString("other"));
+        widget->openFile("src/one.cpp");
+        restoreByTyping();
+        promptGuard.start(0); QVERIFY(window.close()); promptGuard.stop();
+        QVERIFY(!prompted);
+    }
     void utf8CrLfAndEmptyFile()
     {
         QTemporaryDir dir; QVERIFY(scaffold(dir.path()));

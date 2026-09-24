@@ -185,7 +185,10 @@ void WorkspaceBrowserWidget::trackTextChange()
         if (it != m_removedLineEndings.cend() && it->index == index && it->styles.size() == added)
             for (qsizetype i = 0; i < added; ++i) m_lineEndings[index + i] = it->styles.at(i);
     }
-    if (current == m_cleanText) m_lineEndings = m_cleanLineEndings;
+    if (current == m_cleanText) {
+        m_lineEndings = m_cleanLineEndings;
+        m_preview->document()->setModified(false);
+    }
     if (removed) m_removedLineEndings.insert(QCryptographicHash::hash(current.toUtf8(), QCryptographicHash::Sha256), {index, removedStyles});
     m_observedText = current;
 }
