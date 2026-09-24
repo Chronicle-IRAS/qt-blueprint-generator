@@ -18,6 +18,7 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QCloseEvent>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDockWidget>
@@ -36,6 +37,7 @@
 #include <QProcess>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QSettings>
 #include <QStatusBar>
 #include <QToolBar>
@@ -531,18 +533,40 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_workspaceDock->setObjectName(QStringLiteral("workspaceEditorDock"));
     m_workspaceBrowser = new WorkspaceBrowserWidget(m_workspaceDock);
     m_workspaceDock->setWidget(m_workspaceBrowser);
+    m_workspaceDock->installEventFilter(this);
     addDockWidget(Qt::BottomDockWidgetArea, m_workspaceDock, Qt::Vertical);
     m_workspaceDock->hide();
-    m_workspaceDock->toggleViewAction()->setObjectName(QStringLiteral("workspaceEditorAction"));
-    m_viewMenu->addAction(m_workspaceDock->toggleViewAction());
-    connect(m_workspaceDock->toggleViewAction(), &QAction::triggered, this, [this](bool visible) {
+    m_workspaceDockAction = m_viewMenu->addAction(tr("Workspace Editor"));
+    m_workspaceDockAction->setObjectName(QStringLiteral("workspaceEditorAction"));
+    m_workspaceDockAction->setCheckable(true);
+    connect(m_workspaceDockAction, &QAction::triggered, this, [this](bool visible) {
         if (visible) {
-            m_workspaceBrowser->setWorkspacePath(m_workspacePathEdit->text().trimmed());
-            m_workspaceBrowser->refresh();
+            if (!m_workspaceBrowser->setWorkspacePath(m_workspacePathEdit->text().trimmed())) {
+                m_workspaceDockAction->setChecked(false);
+                return;
+            }
+            if (!m_workspaceBrowser->refresh()) {
+                m_workspaceDockAction->setChecked(false);
+                return;
+            }
+            m_workspaceDock->show();
+        } else {
+            if (!m_workspaceBrowser->requestCanDiscardChanges()) {
+                m_workspaceDockAction->setChecked(true);
+                return;
+            }
+            m_workspaceDock->hide();
         }
     });
-    connect(m_workspacePathEdit, &QLineEdit::textChanged, this, [this](const QString &path) {
-        m_workspaceBrowser->setWorkspacePath(path.trimmed());
+    connect(m_workspaceDock, &QDockWidget::visibilityChanged, this, [this](bool visible) {
+        m_workspaceDockAction->setChecked(visible);
+    });
+    connect(m_workspacePathEdit, &QLineEdit::editingFinished, this, [this] {
+        const QString path = m_workspacePathEdit->text().trimmed();
+        if (!m_workspaceBrowser->setWorkspacePath(path)) {
+            const QSignalBlocker blocked(m_workspacePathEdit);
+            m_workspacePathEdit->setText(m_workspaceBrowser->workspacePath());
+        }
     });
     m_viewMenu->addSeparator();
     m_resetLayoutAction = m_viewMenu->addAction(tr("Reset Layout"));
@@ -835,6 +859,7 @@ void MainWindow::retranslateUi()
 
     m_buildDock->setWindowTitle(tr("Build and export"));
     m_workspaceDock->setWindowTitle(tr("Workspace Editor"));
+    m_workspaceDockAction->setText(tr("Workspace Editor"));
     m_buildDockAction->setText(tr("Build and export"));
     m_resetLayoutAction->setText(tr("Reset Layout"));
     m_workspacePathEdit->setToolTip(tr("Workspace root containing generated-project"));
@@ -972,6 +997,7 @@ void MainWindow::exportProject()
 
 void MainWindow::resetWindowLayout()
 {
+    if (!m_workspaceBrowser->requestCanDiscardChanges()) return;
     m_workspaceDock->hide();
     m_workspaceDock->setFloating(false);
     removeDockWidget(m_workspaceDock);
@@ -987,6 +1013,25 @@ void MainWindow::resetWindowLayout()
     m_buildDock->show();
     resizeDocks({m_propertiesDock}, {340}, Qt::Horizontal);
     resizeDocks({m_buildDock}, {260}, Qt::Vertical);
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_workspaceDock && event->type() == QEvent::Close
+        && !m_workspaceBrowser->requestCanDiscardChanges()) {
+        static_cast<QCloseEvent *>(event)->ignore();
+        return true;
+    }
+    return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (!m_workspaceBrowser->requestCanDiscardChanges()) {
+        event->ignore();
+        return;
+    }
+    QMainWindow::closeEvent(event);
 }
 
 void MainWindow::appendBuildLog(const QString &text)

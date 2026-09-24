@@ -1,6 +1,7 @@
 #include "workspace/workspace_file_policy.h"
 #include "generation/workspace_io.h"
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
 #ifdef Q_OS_WIN
@@ -8,6 +9,8 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#else
+#include <sys/stat.h>
 #endif
 
 namespace WorkspaceFilePolicy {
@@ -53,6 +56,27 @@ bool resolve(const QString &workspace, const QString &expectedRoot, const QStrin
     absolute = cursor;
     return true;
 }
+QString entryIdentity(const QString &absolute)
+{
+#ifdef Q_OS_WIN
+    const QString native = QDir::toNativeSeparators(absolute);
+    HANDLE handle = CreateFileW(reinterpret_cast<LPCWSTR>(native.utf16()), FILE_READ_ATTRIBUTES,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                                OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return {};
+    BY_HANDLE_FILE_INFORMATION info{};
+    const bool ok = GetFileInformationByHandle(handle, &info);
+    CloseHandle(handle);
+    if (!ok) return {};
+    return QStringLiteral("%1:%2:%3").arg(info.dwVolumeSerialNumber)
+        .arg(info.nFileIndexHigh).arg(info.nFileIndexLow);
+#else
+    struct stat info{};
+    const QByteArray encoded = QFile::encodeName(absolute);
+    if (::stat(encoded.constData(), &info) != 0) return {};
+    return QStringLiteral("%1:%2").arg(qulonglong(info.st_dev)).arg(qulonglong(info.st_ino));
+#endif
+}
 bool internal(const QString &relative)
 {
     const auto parts = relative.toLower().split('/');
@@ -76,6 +100,7 @@ Kind classify(const QString &relative, const QJsonObject &metadata)
     const QString path = relative.toLower();
     if (path == "external" || path.startsWith("external/") || path == "src/external" || path.startsWith("src/external/"))
         return Kind::ExternalProtected;
+    if (path == "src/contracts" || path.startsWith("src/contracts/")) return Kind::ProtectedScaffold;
     static const QRegularExpression scaffold("^(cmakelists\\.txt|readme\\.md|src/main\\.cpp|tests/scaffold_smoke\\.cpp|src/contracts/(blueprint\\.json|source-blueprint\\.json|types\\.h)|src/modules/[^/]+/(contract\\.h|implementation/placeholder\\.h)|tests/[^/]+/placeholder\\.h)$");
     if (scaffold.match(path).hasMatch()) return Kind::ProtectedScaffold;
     const auto protectedFiles = metadata.value("protectedFiles").toObject();
