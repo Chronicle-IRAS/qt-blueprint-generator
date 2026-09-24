@@ -133,10 +133,12 @@ void triggerAddNodeEntry(QMenu *menu)
 }
 
 // First viewport point without a canvas item, so tests do not hard-code the window layout.
-QPoint blankViewportPoint(QGraphicsView *view, const BlueprintScene &scene)
+// The inset keeps the point away from the viewport edge when a drag starts there.
+QPoint blankViewportPoint(QGraphicsView *view, const BlueprintScene &scene,
+                          const QPoint &inset = QPoint(24, 24))
 {
-    for (int y = 24; y < view->viewport()->height() - 8; y += 16) {
-        for (int x = 24; x < view->viewport()->width() - 8; x += 16) {
+    for (int y = inset.y(); y < view->viewport()->height() - 8; y += 16) {
+        for (int x = inset.x(); x < view->viewport()->width() - 8; x += 16) {
             const QPoint point(x, y);
             if (!scene.itemAt(view->mapToScene(point), QTransform())) {
                 return point;
@@ -144,6 +146,43 @@ QPoint blankViewportPoint(QGraphicsView *view, const BlueprintScene &scene)
         }
     }
     return {-1, -1};
+}
+
+// Scene position the viewport centre currently shows, which is what panning changes.
+QPointF viewSceneCentre(QGraphicsView *view)
+{
+    return view->mapToScene(view->viewport()->rect().center());
+}
+
+// Puts a node's centre on a viewport point, so pointer driven tests do not depend on where the
+// window layout puts the canvas.
+void placeNodeCentreAtViewportPoint(QGraphicsView *view, NodeItem *item, const QPoint &viewportPoint)
+{
+    const QPointF offset = item->sceneBoundingRect().center() - item->pos();
+    item->setPos(view->mapToScene(viewportPoint) - offset);
+}
+
+void sendWheel(QGraphicsView *view, const QPoint &position, int angleDelta)
+{
+    QWheelEvent event(QPointF(position), QPointF(view->viewport()->mapToGlobal(position)), QPoint(),
+                      QPoint(0, angleDelta), Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+    QApplication::sendEvent(view->viewport(), &event);
+}
+
+// QTest::mouseMove() sends no event at all while no button is held, so a move that arrives after
+// the release was lost has to be delivered by hand.
+void sendButtonlessMouseMove(QGraphicsView *view, const QPoint &position)
+{
+    QMouseEvent event(QEvent::MouseMove, QPointF(position),
+                      QPointF(view->viewport()->mapToGlobal(position)), Qt::NoButton, Qt::NoButton,
+                      Qt::NoModifier);
+    QApplication::sendEvent(view->viewport(), &event);
+}
+
+// Distance in viewport pixels between where a scene point should still be and where it ended up.
+qreal viewportDrift(QGraphicsView *view, const QPoint &viewportPoint, const QPointF &scenePoint)
+{
+    return QLineF(view->mapFromScene(scenePoint), viewportPoint).length();
 }
 
 } // namespace
@@ -203,6 +242,16 @@ private slots:
     void fitViewBringsEveryNodeIntoTheViewport();
     void fitViewKeepsTheZoomLimit();
     void resetViewRestoresTheInitialTransform();
+    void emptyCanvasDragPansTheView();
+    void emptyCanvasClickAndRightDragDoNotMoveTheView();
+    void lostButtonReleaseDoesNotLeaveTheViewPanning();
+    void nodeDragMovesOnlyTheNode();
+    void portDragStillCreatesAConnectionWithoutPanning();
+    void draggingAnEdgeDoesNotPanTheView();
+    void shiftDragOnEmptyCanvasKeepsRubberBandSelection();
+    void wheelZoomKeepsTheScenePointUnderTheCursor();
+    void wheelZoomKeepsTheAnchorAfterFitView();
+    void wheelZoomStaysAvailableWhilePanning();
 };
 
 void BlueprintSceneTest::canvasPolishPreservesGeometryAndFullText()
@@ -1248,6 +1297,8 @@ void BlueprintSceneTest::mainWindowUsesRubberBandDragAndClampedZoom()
     QVERIFY(view->transform().m11() >= 0.25);
     QVERIFY(view->transform().m11() <= 3.0);
     QVERIFY(view->transform().m11() < initialZoom);
+    // Zooming stops exactly on the limit instead of only refusing to go past it.
+    QVERIFY(qAbs(view->transform().m11() - 0.25) < 1e-9);
 
     for (int i = 0; i < 100; ++i) {
         QWheelEvent event(QPointF(10, 10), QPointF(10, 10), QPoint(), QPoint(0, 120),
@@ -1256,6 +1307,7 @@ void BlueprintSceneTest::mainWindowUsesRubberBandDragAndClampedZoom()
     }
     QVERIFY(view->transform().m11() >= 0.25);
     QVERIFY(view->transform().m11() <= 3.0);
+    QVERIFY(qAbs(view->transform().m11() - 3.0) < 1e-9);
 }
 
 void BlueprintSceneTest::mainWindowRestoresClosedDocksAndDefaultLayout()
@@ -1880,6 +1932,329 @@ void BlueprintSceneTest::resetViewRestoresTheInitialTransform()
     QCOMPARE(view->transform().m11(), 1.0);
     const QPointF centre = view->mapToScene(view->viewport()->rect().center());
     QVERIFY(QLineF(centre, window.scene()->sceneRect().center()).length() < 5.0);
+}
+
+void BlueprintSceneTest::emptyCanvasDragPansTheView()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    BlueprintScene *scene = window.scene();
+    view->centerOn(scene->sceneRect().center());
+    NodeItem *item = scene->nodeItem(window.document().nodes.constFirst().id);
+    // The node sits inside the drag rectangle, so a rubber band would have selected it.
+    placeNodeCentreAtViewportPoint(view, item, QPoint(320, 155));
+    const QPoint start(500, 250);
+    const QPoint end(150, 60);
+    QCOMPARE(scene->itemAt(view->mapToScene(start), QTransform()), nullptr);
+    QCOMPARE(scene->itemAt(view->mapToScene(end), QTransform()), nullptr);
+    const QPointF nodePositionBefore = item->pos();
+    const QPointF viewCentreBefore = viewSceneCentre(view);
+    item->setSelected(true);
+
+    QTest::mousePress(view->viewport(), Qt::LeftButton, Qt::NoModifier, start);
+    QCOMPARE(view->viewport()->cursor().shape(), Qt::ClosedHandCursor);
+    QTest::mouseMove(view->viewport(), end, 20);
+    QTest::mouseRelease(view->viewport(), Qt::LeftButton, Qt::NoModifier, end);
+
+    // The canvas followed the pointer by the whole drag distance.
+    const QPointF drag = end - start;
+    QVERIFY(QLineF(viewSceneCentre(view), viewCentreBefore - drag).length() <= 2.0);
+    // Panning empty canvas keeps the click semantics: the previous selection is gone and the
+    // rubber band did not select the node the drag passed over.
+    QVERIFY(scene->selectedItems().isEmpty());
+    QCOMPARE(item->pos(), nodePositionBefore);
+    QVERIFY(view->viewport()->cursor().shape() != Qt::ClosedHandCursor);
+
+    // Releasing the button ends the gesture for good: a later move that carries no pressed
+    // button cannot scroll the view.
+    const QPointF settled = viewSceneCentre(view);
+    sendButtonlessMouseMove(view, end + QPoint(40, 30));
+    QCOMPARE(viewSceneCentre(view), settled);
+}
+
+void BlueprintSceneTest::emptyCanvasClickAndRightDragDoNotMoveTheView()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    BlueprintScene *scene = window.scene();
+    view->centerOn(scene->sceneRect().center());
+    const QPoint blank = blankViewportPoint(view, *scene);
+    QVERIFY(blank.x() >= 0);
+    const QPointF viewCentreBefore = viewSceneCentre(view);
+
+    // A click with a pixel of hand tremor is not a pan.
+    QTest::mousePress(view->viewport(), Qt::LeftButton, Qt::NoModifier, blank);
+    QTest::mouseMove(view->viewport(), blank + QPoint(1, 1), 20);
+    QTest::mouseRelease(view->viewport(), Qt::LeftButton, Qt::NoModifier, blank + QPoint(1, 1));
+    QCOMPARE(viewSceneCentre(view), viewCentreBefore);
+
+    // The right button belongs to the context menu and never pans.
+    QTest::mousePress(view->viewport(), Qt::RightButton, Qt::NoModifier, blank);
+    QTest::mouseMove(view->viewport(), blank + QPoint(60, 40), 20);
+    QTest::mouseRelease(view->viewport(), Qt::RightButton, Qt::NoModifier, blank + QPoint(60, 40));
+    QCOMPARE(viewSceneCentre(view), viewCentreBefore);
+}
+
+void BlueprintSceneTest::lostButtonReleaseDoesNotLeaveTheViewPanning()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    BlueprintScene *scene = window.scene();
+    view->centerOn(scene->sceneRect().center());
+    placeNodeCentreAtViewportPoint(view, scene->nodeItem(window.document().nodes.constFirst().id),
+                                   QPoint(620, 60));
+    const QPoint start(500, 250);
+    const QPoint panTarget(300, 150);
+    QCOMPARE(scene->itemAt(view->mapToScene(start), QTransform()), nullptr);
+    QCOMPARE(scene->itemAt(view->mapToScene(panTarget), QTransform()), nullptr);
+
+    QTest::mousePress(view->viewport(), Qt::LeftButton, Qt::NoModifier, start);
+    QTest::mouseMove(view->viewport(), panTarget, 20);
+    QCOMPARE(view->viewport()->cursor().shape(), Qt::ClosedHandCursor);
+    const QPointF pannedCentre = viewSceneCentre(view);
+
+    // A move that arrives without any pressed button means the release was lost. It must end the
+    // gesture instead of dragging the canvas on.
+    sendButtonlessMouseMove(view, panTarget + QPoint(-80, -60));
+    QCOMPARE(viewSceneCentre(view), pannedCentre);
+    QVERIFY(view->viewport()->cursor().shape() != Qt::ClosedHandCursor);
+    const QPointF settled = viewSceneCentre(view);
+    sendButtonlessMouseMove(view, panTarget + QPoint(-160, -120));
+    QCOMPARE(viewSceneCentre(view), settled);
+
+    // The canvas still reacts to a fresh press, so the failed gesture did not lock it.
+    const QPoint restart(400, 200);
+    const QPoint restartTarget(200, 100);
+    QCOMPARE(scene->itemAt(view->mapToScene(restart), QTransform()), nullptr);
+    QTest::mousePress(view->viewport(), Qt::LeftButton, Qt::NoModifier, restart);
+    QTest::mouseMove(view->viewport(), restartTarget, 20);
+    QTest::mouseRelease(view->viewport(), Qt::LeftButton, Qt::NoModifier, restartTarget);
+    QVERIFY(QLineF(viewSceneCentre(view), settled - QPointF(restartTarget - restart)).length() <= 2.0);
+}
+
+void BlueprintSceneTest::nodeDragMovesOnlyTheNode()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    BlueprintScene *scene = window.scene();
+    view->centerOn(scene->sceneRect().center());
+    NodeItem *item = scene->nodeItem(window.document().nodes.constFirst().id);
+    placeNodeCentreAtViewportPoint(view, item, QPoint(300, 160));
+    const QPointF positionBefore = item->pos();
+    const QPointF viewCentreBefore = viewSceneCentre(view);
+    const QPoint start = view->mapFromScene(item->sceneBoundingRect().center());
+    const QPoint target = start + QPoint(40, 30);
+
+    QTest::mousePress(view->viewport(), Qt::LeftButton, Qt::NoModifier, start);
+    QTest::mouseMove(view->viewport(), target, 20);
+    QTest::mouseRelease(view->viewport(), Qt::LeftButton, Qt::NoModifier, target);
+
+    QCOMPARE(item->pos(), positionBefore + QPointF(40.0, 30.0));
+    QCOMPARE(viewSceneCentre(view), viewCentreBefore);
+    scene->undoStack()->undo();
+    QCOMPARE(item->pos(), positionBefore);
+    scene->undoStack()->redo();
+    QCOMPARE(item->pos(), positionBefore + QPointF(40.0, 30.0));
+}
+
+void BlueprintSceneTest::portDragStillCreatesAConnectionWithoutPanning()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    QVERIFY(window.addNodeOfType(NodeType::End));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    BlueprintScene *scene = window.scene();
+    view->centerOn(scene->sceneRect().center());
+    const BlueprintDocument before = window.document();
+    NodeItem *source = scene->nodeItem(before.nodes.at(0).id);
+    NodeItem *target = scene->nodeItem(before.nodes.at(1).id);
+    placeNodeCentreAtViewportPoint(view, source, QPoint(200, 120));
+    placeNodeCentreAtViewportPoint(view, target, QPoint(480, 220));
+    const QPointF sourcePositionBefore = source->pos();
+    const QPointF targetPositionBefore = target->pos();
+    const QPointF viewCentreBefore = viewSceneCentre(view);
+
+    dragPort(view, source->outputAnchor(), target->inputAnchor());
+
+    QCOMPARE(window.document().edges.size(), 1);
+    QCOMPARE(window.document().edges.constFirst().source, before.nodes.at(0).id);
+    QCOMPARE(window.document().edges.constFirst().target, before.nodes.at(1).id);
+    QCOMPARE(source->pos(), sourcePositionBefore);
+    QCOMPARE(target->pos(), targetPositionBefore);
+    QCOMPARE(viewSceneCentre(view), viewCentreBefore);
+}
+
+void BlueprintSceneTest::draggingAnEdgeDoesNotPanTheView()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    QVERIFY(window.addNodeOfType(NodeType::End));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    BlueprintScene *scene = window.scene();
+    view->centerOn(scene->sceneRect().center());
+    const BlueprintDocument before = window.document();
+    QVERIFY(scene->connectNodes(before.nodes.at(0).id, before.nodes.at(1).id));
+    placeNodeCentreAtViewportPoint(view, scene->nodeItem(before.nodes.at(0).id), QPoint(200, 150));
+    placeNodeCentreAtViewportPoint(view, scene->nodeItem(before.nodes.at(1).id), QPoint(500, 150));
+    EdgeItem *edge = scene->edgeItem(window.document().edges.constFirst().id);
+    // A few pixels off the curve still lands inside the widened picking shape.
+    const QPointF onEdge = edge->path().pointAtPercent(0.5) + QPointF(0.0, 3.0);
+    QVERIFY(edge->shape().contains(onEdge));
+    const QPoint pressPoint = view->mapFromScene(onEdge);
+    scene->clearSelection();
+    const QPointF viewCentreBefore = viewSceneCentre(view);
+
+    QTest::mousePress(view->viewport(), Qt::LeftButton, Qt::NoModifier, pressPoint);
+    QTest::mouseMove(view->viewport(), pressPoint + QPoint(-60, -40), 20);
+    QTest::mouseRelease(view->viewport(), Qt::LeftButton, Qt::NoModifier,
+                        pressPoint + QPoint(-60, -40));
+
+    QVERIFY(edge->isSelected());
+    QCOMPARE(viewSceneCentre(view), viewCentreBefore);
+}
+
+void BlueprintSceneTest::shiftDragOnEmptyCanvasKeepsRubberBandSelection()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    QVERIFY(window.addNodeOfType(NodeType::End));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    BlueprintScene *scene = window.scene();
+    view->centerOn(scene->sceneRect().center());
+    NodeItem *first = scene->nodeItem(window.document().nodes.at(0).id);
+    NodeItem *second = scene->nodeItem(window.document().nodes.at(1).id);
+    placeNodeCentreAtViewportPoint(view, first, QPoint(220, 150));
+    placeNodeCentreAtViewportPoint(view, second, QPoint(500, 150));
+    // The band covers both nodes, and neither corner starts on an item.
+    const QPoint from(100, 40);
+    const QPoint to(620, 260);
+    QCOMPARE(scene->itemAt(view->mapToScene(from), QTransform()), nullptr);
+    QCOMPARE(scene->itemAt(view->mapToScene(to), QTransform()), nullptr);
+
+    const auto rubberBandSelects = [&](Qt::KeyboardModifier modifier) {
+        scene->clearSelection();
+        const QPointF viewCentreBefore = viewSceneCentre(view);
+        QTest::mousePress(view->viewport(), Qt::LeftButton, modifier, from);
+        QTest::mouseMove(view->viewport(), to, 20);
+        QTest::mouseRelease(view->viewport(), Qt::LeftButton, modifier, to);
+        QCOMPARE(scene->selectedItems().size(), 2);
+        QVERIFY(first->isSelected());
+        QVERIFY(second->isSelected());
+        QCOMPARE(viewSceneCentre(view), viewCentreBefore);
+        QVERIFY(view->viewport()->cursor().shape() != Qt::ClosedHandCursor);
+    };
+    rubberBandSelects(Qt::ShiftModifier);
+    rubberBandSelects(Qt::ControlModifier);
+}
+
+void BlueprintSceneTest::wheelZoomKeepsTheScenePointUnderTheCursor()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    view->centerOn(window.scene()->sceneRect().center());
+    const QPoint cursor(260, 200);
+    const QPointF anchoredScenePoint = view->mapToScene(cursor);
+
+    sendWheel(view, cursor, 120);
+    QVERIFY(view->transform().m11() > 1.0);
+    QVERIFY(viewportDrift(view, cursor, anchoredScenePoint) <= 1.5);
+
+    sendWheel(view, cursor, 120);
+    QVERIFY(view->transform().m11() > 1.3);
+    QVERIFY(viewportDrift(view, cursor, anchoredScenePoint) <= 1.5);
+
+    sendWheel(view, cursor, -120);
+    sendWheel(view, cursor, -120);
+    QVERIFY(qAbs(view->transform().m11() - 1.0) < 1e-9);
+    QVERIFY(viewportDrift(view, cursor, anchoredScenePoint) <= 1.5);
+}
+
+void BlueprintSceneTest::wheelZoomKeepsTheAnchorAfterFitView()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    auto *fitAction = window.findChild<QAction *>(QStringLiteral("fitCanvasViewAction"));
+    QVERIFY(fitAction != nullptr);
+    fitAction->trigger();
+    const qreal fittedZoom = view->transform().m11();
+    QVERIFY(fittedZoom > 1.0);
+    QVERIFY(fittedZoom <= 3.0);
+
+    // The wheel keeps working from the scale Fit View left behind, still around the cursor.
+    const QPoint cursor(240, 180);
+    const QPointF anchoredScenePoint = view->mapToScene(cursor);
+    sendWheel(view, cursor, -120);
+    QVERIFY(view->transform().m11() < fittedZoom);
+    QVERIFY(view->transform().m11() >= 0.25);
+    QVERIFY(viewportDrift(view, cursor, anchoredScenePoint) <= 1.5);
+}
+
+void BlueprintSceneTest::wheelZoomStaysAvailableWhilePanning()
+{
+    MainWindow window;
+    QVERIFY(window.addNodeOfType(NodeType::Start));
+    window.show();
+    QApplication::processEvents();
+    QGraphicsView *view = window.graphicsView();
+    BlueprintScene *scene = window.scene();
+    view->centerOn(scene->sceneRect().center());
+    // Keep the node clear of the gesture below.
+    placeNodeCentreAtViewportPoint(view, scene->nodeItem(window.document().nodes.constFirst().id),
+                                   QPoint(620, 60));
+    const QPoint start(500, 250);
+    const QPoint panTarget(300, 150);
+    QCOMPARE(scene->itemAt(view->mapToScene(start), QTransform()), nullptr);
+
+    QTest::mousePress(view->viewport(), Qt::LeftButton, Qt::NoModifier, start);
+    QTest::mouseMove(view->viewport(), panTarget, 20);
+    QCOMPARE(view->viewport()->cursor().shape(), Qt::ClosedHandCursor);
+
+    const QPoint cursor = panTarget + QPoint(-40, 30);
+    const QPointF anchoredScenePoint = view->mapToScene(cursor);
+    const qreal zoomBefore = view->transform().m11();
+    sendWheel(view, cursor, 120);
+    QVERIFY(view->transform().m11() > zoomBefore);
+    // The wheel neither cancels the pan nor loses the anchor under the cursor.
+    QCOMPARE(view->viewport()->cursor().shape(), Qt::ClosedHandCursor);
+    QVERIFY(viewportDrift(view, cursor, anchoredScenePoint) <= 1.5);
+
+    // The canvas keeps following the pointer from where the wheel left the cursor.
+    const QPoint moveTo = panTarget + QPoint(60, 40);
+    const QPointF viewCentreBefore = viewSceneCentre(view);
+    const QPointF expectedShift = QPointF(moveTo - cursor) / view->transform().m11();
+    QTest::mouseMove(view->viewport(), moveTo, 20);
+    QVERIFY(QLineF(viewSceneCentre(view), viewCentreBefore - expectedShift).length() <= 2.0);
+
+    QTest::mouseRelease(view->viewport(), Qt::LeftButton, Qt::NoModifier, moveTo);
+    QVERIFY(view->viewport()->cursor().shape() != Qt::ClosedHandCursor);
+    // No sticky pan state: later moves leave the view alone.
+    const QPointF settled = viewSceneCentre(view);
+    sendButtonlessMouseMove(view, moveTo + QPoint(60, 40));
+    QCOMPARE(viewSceneCentre(view), settled);
 }
 
 QTEST_MAIN(BlueprintSceneTest)

@@ -143,6 +143,18 @@ add_test(NAME language_switch COMMAND tst_language_switch)
 set_tests_properties(language_switch PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
 
+set(theme_switch_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_theme_switch.moc")
+add_custom_command(OUTPUT "${theme_switch_moc}"
+    COMMAND Qt6::moc -o tst_theme_switch.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_theme_switch.cpp"
+    DEPENDS tst_theme_switch.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_theme_switch tst_theme_switch.cpp "${theme_switch_moc}")
+set_target_properties(tst_theme_switch PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_theme_switch PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_theme_switch PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME theme_switch COMMAND tst_theme_switch)
+set_tests_properties(theme_switch PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 set(end_to_end_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_end_to_end.moc")
 add_custom_command(OUTPUT "${end_to_end_moc}"
     COMMAND Qt6::moc -o tst_end_to_end.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_end_to_end.cpp"

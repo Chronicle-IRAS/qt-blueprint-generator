@@ -40,6 +40,8 @@
 #include <QStatusBar>
 #include <QToolBar>
 #include <QToolButton>
+#include <QMouseEvent>
+#include <QScrollBar>
 #include <QTextCursor>
 #include <QVBoxLayout>
 #include <QWheelEvent>
@@ -108,14 +110,18 @@ const QVector<NodeType> &blueprintNodeTypes()
 constexpr qreal MinZoom = 0.25;
 constexpr qreal MaxZoom = 3.0;
 
+constexpr qreal clampZoom(qreal zoom)
+{
+    return std::clamp(zoom, MinZoom, MaxZoom);
+}
+
 // Fitting a single node would otherwise zoom far closer than the wheel allows.
 void clampViewZoom(QGraphicsView *view)
 {
     const qreal zoom = view->transform().m11();
-    if (zoom > MaxZoom) {
-        view->scale(MaxZoom / zoom, MaxZoom / zoom);
-    } else if (zoom < MinZoom) {
-        view->scale(MinZoom / zoom, MinZoom / zoom);
+    const qreal clamped = clampZoom(zoom);
+    if (!qFuzzyCompare(clamped, zoom)) {
+        view->scale(clamped / zoom, clamped / zoom);
     }
 }
 
@@ -202,15 +208,112 @@ public:
     }
 
 protected:
+    void mousePressEvent(QMouseEvent *event) override
+    {
+        endPan();
+        // Dragging the empty canvas pans the view. Nodes, edges and their ports keep their
+        // own gestures, and holding a selection modifier keeps Qt's rubber band.
+        if (event->button() == Qt::LeftButton && !rubberBandRequested(event)
+            && isEmptyCanvas(event->position().toPoint())) {
+            m_panArmed = true;
+            m_panAnchor = event->position().toPoint();
+            viewport()->setCursor(Qt::ClosedHandCursor);
+            // The press still has to reach the scene, so a click keeps clearing the selection
+            // and focusing the canvas, but Qt must not arm its rubber band for this drag.
+            const DragMode mode = dragMode();
+            setDragMode(NoDrag);
+            QGraphicsView::mousePressEvent(event);
+            setDragMode(mode);
+            return;
+        }
+        QGraphicsView::mousePressEvent(event);
+    }
+
+    void mouseMoveEvent(QMouseEvent *event) override
+    {
+        if (!m_panArmed || !event->buttons().testFlag(Qt::LeftButton)) {
+            // A release that never reached us must not leave the view panning.
+            endPan();
+            QGraphicsView::mouseMoveEvent(event);
+            return;
+        }
+        const QPoint position = event->position().toPoint();
+        if (!m_panStarted
+            && (position - m_panAnchor).manhattanLength() < QApplication::startDragDistance()) {
+            event->accept();
+            return;
+        }
+        m_panStarted = true;
+        const QPoint delta = position - m_panAnchor;
+        horizontalScrollBar()->setValue(horizontalScrollBar()->value() - delta.x());
+        verticalScrollBar()->setValue(verticalScrollBar()->value() - delta.y());
+        m_panAnchor = position;
+        event->accept();
+    }
+
+    void mouseReleaseEvent(QMouseEvent *event) override
+    {
+        endPan();
+        QGraphicsView::mouseReleaseEvent(event);
+    }
+
     void wheelEvent(QWheelEvent *event) override
     {
+        if (event->angleDelta().y() == 0) {
+            QGraphicsView::wheelEvent(event);
+            return;
+        }
         const qreal factor = event->angleDelta().y() > 0 ? 1.15 : 1.0 / 1.15;
-        const qreal nextZoom = transform().m11() * factor;
-        if (nextZoom >= MinZoom && nextZoom <= MaxZoom) {
-            scale(factor, factor);
+        const qreal current = transform().m11();
+        const qreal target = clampZoom(current * factor);
+        const QPoint cursor = event->position().toPoint();
+        const QPointF anchoredScenePoint = mapToScene(cursor);
+        if (!qFuzzyCompare(current, target)) {
+            // The view transform is a plain scale: panning moves the scroll bars, so replacing
+            // the matrix keeps the zoom exactly at the requested value inside the limits.
+            setTransform(QTransform::fromScale(target, target));
+        }
+        // Zooming keeps the scene point under the cursor under the cursor. Qt's AnchorUnderMouse
+        // follows the global cursor instead of this event, and is unreliable while panning.
+        const QPoint drift = mapFromScene(anchoredScenePoint) - cursor;
+        if (!drift.isNull()) {
+            horizontalScrollBar()->setValue(horizontalScrollBar()->value() + drift.x());
+            verticalScrollBar()->setValue(verticalScrollBar()->value() + drift.y());
+        }
+        if (m_panStarted) {
+            // The next pan sample starts where the cursor is now, or the zoom would show up as
+            // a jump on the next mouse move.
+            m_panAnchor = cursor;
         }
         event->accept();
     }
+
+private:
+    static bool rubberBandRequested(QMouseEvent *event)
+    {
+        return (event->modifiers() & (Qt::ShiftModifier | Qt::ControlModifier)) != 0;
+    }
+
+    // Only the empty canvas pans: a press on a node, an edge (including the widened hit shape)
+    // or any other item belongs to that item.
+    bool isEmptyCanvas(const QPoint &viewportPosition) const
+    {
+        return scene() && !scene()->itemAt(mapToScene(viewportPosition), transform());
+    }
+
+    void endPan()
+    {
+        const bool wasPanning = m_panArmed || m_panStarted;
+        m_panArmed = false;
+        m_panStarted = false;
+        if (wasPanning) {
+            viewport()->unsetCursor();
+        }
+    }
+
+    QPoint m_panAnchor;
+    bool m_panArmed = false;
+    bool m_panStarted = false;
 };
 
 } // namespace
@@ -282,6 +385,24 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
 
     m_viewMenu = menuBar()->addMenu(tr("View"));
     m_viewMenu->setObjectName(QStringLiteral("viewMenu"));
+
+    m_themeMenu = m_viewMenu->addMenu(tr("Theme"));
+    m_themeMenu->setObjectName(QStringLiteral("themeMenu"));
+    auto *themeGroup = new QActionGroup(this);
+    themeGroup->setExclusive(true);
+    m_lightThemeAction = m_themeMenu->addAction(tr("Light"));
+    m_lightThemeAction->setObjectName(QStringLiteral("themeLightAction"));
+    m_lightThemeAction->setCheckable(true);
+    themeGroup->addAction(m_lightThemeAction);
+    m_darkThemeAction = m_themeMenu->addAction(tr("Dark"));
+    m_darkThemeAction->setObjectName(QStringLiteral("themeDarkAction"));
+    m_darkThemeAction->setCheckable(true);
+    themeGroup->addAction(m_darkThemeAction);
+    connect(m_lightThemeAction, &QAction::triggered, this,
+            [this] { applyTheme(EditorTheme::Theme::Light, true); });
+    connect(m_darkThemeAction, &QAction::triggered, this,
+            [this] { applyTheme(EditorTheme::Theme::Dark, true); });
+    m_viewMenu->addSeparator();
 
     // Canvas entries live in the canvas context menu only; the issue keeps the menu bar
     // and toolbar structure untouched.
@@ -531,6 +652,13 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     if (!applyLanguage(savedLanguage, false)) {
         applyLanguage(QStringLiteral("en"), false);
     }
+
+    const QString savedTheme = QSettings().value(QStringLiteral("ui/theme"),
+                                                 QStringLiteral("light")).toString();
+    const EditorTheme::Theme restoredTheme = savedTheme == QStringLiteral("dark")
+                                                 ? EditorTheme::Theme::Dark
+                                                 : EditorTheme::Theme::Light;
+    applyTheme(restoredTheme, false);
 }
 
 MainWindow::~MainWindow()
@@ -624,6 +752,28 @@ bool MainWindow::applyLanguage(const QString &languageCode, bool persist)
     return true;
 }
 
+void MainWindow::setTheme(EditorTheme::Theme theme)
+{
+    applyTheme(theme, true);
+}
+
+void MainWindow::applyTheme(EditorTheme::Theme theme, bool persist)
+{
+    m_theme = theme;
+    EditorTheme::setTheme(*qApp, theme);
+
+    // Custom drawn items read the active colours while painting, so the scene has to be
+    // invalidated to repaint them with the new theme.
+    m_scene->update();
+
+    if (persist) {
+        QSettings().setValue(QStringLiteral("ui/theme"),
+                             theme == EditorTheme::Theme::Dark ? QStringLiteral("dark")
+                                                               : QStringLiteral("light"));
+    }
+    updateThemeActions();
+}
+
 void MainWindow::changeEvent(QEvent *event)
 {
     QMainWindow::changeEvent(event);
@@ -636,6 +786,12 @@ void MainWindow::updateLanguageActions()
 {
     m_englishLanguageAction->setChecked(m_currentLanguage == QStringLiteral("en"));
     m_chineseLanguageAction->setChecked(m_currentLanguage == QStringLiteral("zh_CN"));
+}
+
+void MainWindow::updateThemeActions()
+{
+    m_lightThemeAction->setChecked(m_theme == EditorTheme::Theme::Light);
+    m_darkThemeAction->setChecked(m_theme == EditorTheme::Theme::Dark);
 }
 
 void MainWindow::retranslateUi()
@@ -668,6 +824,9 @@ void MainWindow::retranslateUi()
     m_languageMenu->setTitle(tr("Language"));
     m_englishLanguageAction->setText(tr("English"));
     m_chineseLanguageAction->setText(tr("Chinese"));
+    m_themeMenu->setTitle(tr("Theme"));
+    m_lightThemeAction->setText(tr("Light"));
+    m_darkThemeAction->setText(tr("Dark"));
 
     m_propertiesDock->setWindowTitle(tr("Properties"));
     m_propertiesDockAction->setText(tr("Properties"));

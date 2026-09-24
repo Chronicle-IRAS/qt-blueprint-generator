@@ -113,7 +113,7 @@ endif()
 
 set(translation_targets BlueprintEditor)
 if(BUILD_TESTING)
-    list(APPEND translation_targets tst_language_switch tst_ai_settings_dialog tst_generation_workflow tst_candidate_review_dialog tst_editor_theme tst_validation_diagnostics_dialog tst_workspace_browser)
+    list(APPEND translation_targets tst_language_switch tst_theme_switch tst_ai_settings_dialog tst_generation_workflow tst_candidate_review_dialog tst_editor_theme tst_validation_diagnostics_dialog tst_workspace_browser)
 endif()
 
 qt_add_translations(
