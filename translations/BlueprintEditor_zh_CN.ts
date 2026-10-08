@@ -133,6 +133,9 @@
 </context>
 <context>
     <name>MainWindow</name>
+    <message><source>Manage external code...</source><translation>管理外部代码...</translation></message>
+    <message><source>Apply external contract first</source><translation>请先应用外部接口契约</translation></message>
+    <message><source>Apply the inspector changes before managing external code. Imports bind only to the applied contract.</source><translation>请先应用属性面板中的更改，再管理外部代码。导入仅绑定已应用的契约。</translation></message>
     <message><source>File</source><translation>文件</translation></message>
     <message><source>New</source><translation>新建</translation></message>
     <message><source>Open...</source><translation>打开...</translation></message>
@@ -572,5 +575,29 @@
         <source>Output</source>
         <translation>输出</translation>
     </message>
+</context>
+<context>
+    <name>ExternalCodeDialog</name>
+    <message><source>Choose external source root</source><translation>选择外部源码根目录</translation></message>
+    <message><source>Choose external source files</source><translation>选择外部源码文件</translation></message>
+    <message><source>C/C++ sources (*.h *.hpp *.c *.cpp *.cc *.cxx)</source><translation>C/C++ 源码 (*.h *.hpp *.c *.cpp *.cc *.cxx)</translation></message>
+    <message><source>Replace imported sources</source><translation>替换已导入的源码</translation></message>
+    <message><source>Replace the original tracked files with the selected source bytes and bind them to the current applied contract? The tracked file set must stay the same.</source><translation>是否用所选源码替换原清单中的文件，并绑定当前已应用的契约？文件的相对路径清单必须保持一致。</translation></message>
+    <message><source>Replace tracked files</source><translation>替换清单内文件</translation></message>
+    <message><source>Cancel</source><translation>取消</translation></message>
+    <message><source>External code management</source><translation>外部代码管理</translation></message>
+    <message><source>Applied node: %1 (%2)
+Bound workspace: %3</source><translation>已应用的节点：%1（%2）
+绑定的工作目录：%3</translation></message>
+    <message><source>Import files...</source><translation>导入文件...</translation></message>
+    <message><source>Reimport tracked files...</source><translation>重新导入清单内文件...</translation></message>
+    <message><source>Verify import</source><translation>验证导入完整性</translation></message>
+    <message><source>Close</source><translation>关闭</translation></message>
+    <message><source>Select a verified file to view its source (read only).</source><translation>选择已验证的文件以只读方式查看源码。</translation></message>
+    <message><source>No verified import.</source><translation>尚无已验证的导入。</translation></message>
+    <message><source>Verified import. Source bytes are read only and are never sent to AI.</source><translation>导入已验证。源码只读，不会发送给 AI。</translation></message>
+    <message><source>Import verification or operation failed: %1</source><translation>导入验证或操作失败：%1</translation></message>
+    <message><source>Apply inspector changes first. Import writes also require generation, candidate review, and build to be idle.</source><translation>请先应用属性面板的更改；生成、候选审核或构建进行中也不允许写入外部代码。</translation></message>
+    <message><source>The project context changed. Open external code management again.</source><translation>项目上下文已改变，请重新打开外部代码管理窗口。</translation></message>
 </context>
 </TS>

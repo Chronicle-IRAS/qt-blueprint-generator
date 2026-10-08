@@ -48,8 +48,8 @@ bool validSelection(const QStringList &paths, QString *error)
     for (const auto &path : paths) {
         const QString suffix = QFileInfo(path).suffix().toLower();
         if (!WorkspaceIo::safeRelative(path)
-            || (suffix != "h" && suffix != "hpp" && suffix != "cpp" && suffix != "cc"))
-            return WorkspaceIo::fail(error, "External files must use portable relative paths and .h, .hpp, .cpp or .cc extensions");
+            || (suffix != "h" && suffix != "hpp" && suffix != "cpp" && suffix != "cc" && suffix != "c" && suffix != "cxx"))
+            return WorkspaceIo::fail(error, "External files must use portable relative paths and .h, .hpp, .c, .cpp, .cc or .cxx extensions");
         const QString key = path.toCaseFolded();
         for (const auto &other : files)
             if (key == other || key.startsWith(other + '/') || other.startsWith(key + '/'))
@@ -68,7 +68,7 @@ bool validSelection(const QStringList &paths, QString *error)
 }
 
 bool loadImport(const BlueprintNode &node, const QString &workspace,
-                QJsonObject &manifest, QString *error)
+                QJsonObject &manifest, QString *error, bool matchCurrentContract = true)
 {
     std::optional<QByteArray> bytes;
     if (!WorkspaceIo::read(workspace, nodeRoot(node) + '/' + manifestName, bytes, error)) return false;
@@ -78,13 +78,23 @@ bool loadImport(const BlueprintNode &node, const QString &workspace,
     if (parse.error != QJsonParseError::NoError || !document.isObject())
         return WorkspaceIo::fail(error, "Malformed external import manifest");
     manifest = document.object();
-    const auto contract = contractFor(node);
+    const auto contract = manifest.value("contract").toObject();
     if (manifest.size() != 5 || manifest.value("version") != 1
         || manifest.value("generationPolicy") != "readOnly"
-        || !manifest.value("contract").isObject() || manifest.value("contract").toObject() != contract
+        || !manifest.value("contract").isObject()
         || manifest.value("contractSha256") != WorkspaceIo::sha256(WorkspaceIo::json(contract))
         || !manifest.value("files").isObject())
         return WorkspaceIo::fail(error, "External import contract or manifest changed; revalidation is required");
+    // Parse with the existing blueprint schema, then round-trip to reject unknown
+    // fields as well as malformed contracts before trusting stored ownership.
+    BlueprintDocument envelope;
+    auto serialized = QJsonDocument::fromJson(BlueprintSerializer::toJson(envelope)).object();
+    serialized["nodes"] = QJsonArray{contract};
+    const auto stored = BlueprintSerializer::fromJson(WorkspaceIo::json(serialized), error);
+    if (!stored || stored->nodes.size() != 1 || !validContract(stored->nodes.first(), error)) return false;
+    if (stored->nodes.first().id != node.id || contractFor(stored->nodes.first()) != contract
+        || (matchCurrentContract && contract != contractFor(node)))
+        return WorkspaceIo::fail(error, "External import contract ownership changed; revalidation is required");
     const auto files = manifest.value("files").toObject();
     if (!validSelection(files.keys(), error)) return false;
     static const QRegularExpression hash("\\A[a-f0-9]{64}\\z");
@@ -95,7 +105,7 @@ bool loadImport(const BlueprintNode &node, const QString &workspace,
 }
 
 bool verifyFiles(const BlueprintNode &node, const QString &workspace,
-                 const QJsonObject &manifest, QString *error)
+                 const QJsonObject &manifest, QString *error, bool verifyBytes = true)
 {
     const QString root = nodeRoot(node);
     const auto files = manifest.value("files").toObject();
@@ -109,10 +119,13 @@ bool verifyFiles(const BlueprintNode &node, const QString &workspace,
             expectedDirectories.insert(parent);
             parent = parent.section('/', 0, -2);
         }
-        std::optional<QByteArray> bytes;
-        if (!WorkspaceIo::read(workspace, relative, bytes, error)) return false;
-        if (!bytes || WorkspaceIo::sha256(*bytes) != file.value().toString())
-            return WorkspaceIo::fail(error, "External source changed or was deleted; revalidation is required: " + file.key());
+        if (!WorkspaceIo::checkPath(workspace, relative, error)) return false;
+        if (verifyBytes) {
+            std::optional<QByteArray> bytes;
+            if (!WorkspaceIo::read(workspace, relative, bytes, error)) return false;
+            if (!bytes || WorkspaceIo::sha256(*bytes) != file.value().toString())
+                return WorkspaceIo::fail(error, "External source changed or was deleted; revalidation is required: " + file.key());
+        }
     }
     // Inventory every entry, including hidden files and unlisted directory links.
     // Inspect before descending, so links and cycles are never followed.
@@ -133,6 +146,28 @@ bool verifyFiles(const BlueprintNode &node, const QString &workspace,
     }
     return true;
 }
+
+bool selectedWrites(const BlueprintNode &node, const QString &sourceRoot,
+                    const QStringList &paths, QMap<QString, QByteArray> &writes,
+                    QJsonObject &hashes, QString *error)
+{
+    for (const auto &path : paths) {
+        std::optional<QByteArray> bytes;
+        if (!WorkspaceIo::read(sourceRoot, path, bytes, error)) return false;
+        if (!bytes) return WorkspaceIo::fail(error, "Selected external file does not exist: " + path);
+        hashes.insert(path, WorkspaceIo::sha256(*bytes));
+        writes.insert(nodeRoot(node) + '/' + path, *bytes);
+    }
+    return true;
+}
+
+QJsonObject manifestFor(const BlueprintNode &node, const QJsonObject &hashes)
+{
+    const auto contract = contractFor(node);
+    return {{"version", 1}, {"generationPolicy", "readOnly"},
+            {"contract", contract}, {"contractSha256", WorkspaceIo::sha256(WorkspaceIo::json(contract))},
+            {"files", hashes}};
+}
 }
 
 bool ExternalCodeImporter::importFiles(const BlueprintNode &node, const QString &sourceRoot,
@@ -147,13 +182,7 @@ bool ExternalCodeImporter::importFiles(const BlueprintNode &node, const QString 
 
     QMap<QString, QByteArray> writes;
     QJsonObject hashes;
-    for (const auto &path : relativeFiles) {
-        std::optional<QByteArray> bytes;
-        if (!WorkspaceIo::read(sourceRoot, path, bytes, error)) return false;
-        if (!bytes) return WorkspaceIo::fail(error, "Selected external file does not exist: " + path);
-        hashes.insert(path, WorkspaceIo::sha256(*bytes));
-        writes.insert(root + '/' + path, *bytes);
-    }
+    if (!selectedWrites(node, sourceRoot, relativeFiles, writes, hashes, error)) return false;
     if (existing) {
         QJsonObject manifest;
         if (!loadImport(node, workspace, manifest, error) || !verifyFiles(node, workspace, manifest, error)) return false;
@@ -164,18 +193,60 @@ bool ExternalCodeImporter::importFiles(const BlueprintNode &node, const QString 
     const QDir directory(QDir(workspace).filePath(root));
     if (directory.exists() && !directory.entryList(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot).isEmpty())
         return WorkspaceIo::fail(error, "External destination contains untracked entries");
-    const auto contract = contractFor(node);
-    const QJsonObject manifest{{"version", 1}, {"generationPolicy", "readOnly"},
-                               {"contract", contract}, {"contractSha256", WorkspaceIo::sha256(WorkspaceIo::json(contract))},
-                               {"files", hashes}};
-    writes.insert(manifestPath, WorkspaceIo::json(manifest));
+    writes.insert(manifestPath, WorkspaceIo::json(manifestFor(node, hashes)));
     return WorkspaceIo::transaction(workspace, writes, error);
 }
 
 bool ExternalCodeImporter::verifyImport(const BlueprintNode &node, const QString &workspace, QString *error)
 {
+    QJsonObject manifest;
+    return importManifest(node, workspace, manifest, error);
+}
+
+bool ExternalCodeImporter::importManifest(const BlueprintNode &node, const QString &workspace,
+                                        QJsonObject &manifest, QString *error)
+{
+    manifest = {};
     if (error) error->clear();
     if (!validContract(node, error)) return false;
+    QJsonObject verified;
+    if (!loadImport(node, workspace, verified, error) || !verifyFiles(node, workspace, verified, error)) return false;
+    manifest = verified;
+    return true;
+}
+
+bool ExternalCodeImporter::readImportedFile(const BlueprintNode &node, const QString &workspace,
+                                          const QString &relativePath, QByteArray &bytes, QString *error)
+{
+    bytes.clear();
     QJsonObject manifest;
-    return loadImport(node, workspace, manifest, error) && verifyFiles(node, workspace, manifest, error);
+    if (!importManifest(node, workspace, manifest, error)) return false;
+    const auto files = manifest.value("files").toObject();
+    if (!WorkspaceIo::safeRelative(relativePath) || !files.contains(relativePath))
+        return WorkspaceIo::fail(error, "File is not a tracked external source: " + relativePath);
+    std::optional<QByteArray> verified;
+    if (!WorkspaceIo::read(workspace, nodeRoot(node) + '/' + relativePath, verified, error)) return false;
+    if (!verified || WorkspaceIo::sha256(*verified) != files.value(relativePath).toString())
+        return WorkspaceIo::fail(error, "External source changed while reading: " + relativePath);
+    bytes = *verified;
+    return true;
+}
+
+bool ExternalCodeImporter::reimportFiles(const BlueprintNode &node, const QString &sourceRoot,
+                                       const QStringList &relativeFiles, const QString &workspace, QString *error)
+{
+    if (error) error->clear();
+    if (!validContract(node, error) || !validSelection(relativeFiles, error)) return false;
+    QJsonObject manifest;
+    if (!loadImport(node, workspace, manifest, error, false)
+        || !verifyFiles(node, workspace, manifest, error, false)) return false;
+    QStringList selected = relativeFiles;
+    selected.sort();
+    if (selected != manifest.value("files").toObject().keys())
+        return WorkspaceIo::fail(error, "External reimport requires the same tracked file paths");
+    QMap<QString, QByteArray> writes;
+    QJsonObject hashes;
+    if (!selectedWrites(node, sourceRoot, relativeFiles, writes, hashes, error)) return false;
+    writes.insert(nodeRoot(node) + '/' + manifestName, WorkspaceIo::json(manifestFor(node, hashes)));
+    return WorkspaceIo::transaction(workspace, writes, error);
 }

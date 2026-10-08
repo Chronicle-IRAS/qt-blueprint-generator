@@ -171,6 +171,8 @@ void LanguageSwitchTest::refreshesExistingNodeTooltips()
 void LanguageSwitchTest::showsReadOnlyNodeTypeAndFollowsLanguageSwitch()
 {
     MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
     QVERIFY(window.setLanguage(QStringLiteral("en")));
     QVERIFY(window.addNodeOfType(NodeType::LogicModule));
     const QString id = window.document().nodes.constFirst().id;
