@@ -2,6 +2,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QBackingStore>
 #include <QContextMenuEvent>
 #include <QDialog>
 #include <QDockWidget>
@@ -19,7 +20,9 @@
 #include <QToolBar>
 #include <QWheelEvent>
 #include <QPainter>
+#include <QPaintEvent>
 #include <QStyleOptionGraphicsItem>
+#include <QScopeGuard>
 
 #include <functional>
 
@@ -29,6 +32,7 @@
 #include "editor/node_item.h"
 #include "editor/blueprint_scene.h"
 #include "editor/node_properties_editor.h"
+#include "ui/theme.h"
 
 namespace {
 
@@ -185,6 +189,35 @@ qreal viewportDrift(QGraphicsView *view, const QPoint &viewportPoint, const QPoi
     return QLineF(view->mapFromScene(scenePoint), viewportPoint).length();
 }
 
+class RepaintProbeView final : public QGraphicsView
+{
+public:
+    using QGraphicsView::QGraphicsView;
+    QList<QRegion> paintRegions;
+
+    QImage backingFrame() const
+    {
+        // QWidget::grab() triggers a new paint, hiding precisely the stale pixels being tested.
+        // Read the raster backing store after the view's real scheduled paint instead.
+        auto *image = dynamic_cast<QImage *>(backingStore()->paintDevice());
+        if (!image) {
+            return {};
+        }
+        const qreal dpr = image->devicePixelRatio();
+        const QPoint origin = viewport()->mapTo(this, QPoint());
+        return image->copy(QRect(qRound(origin.x() * dpr), qRound(origin.y() * dpr),
+                                 qRound(viewport()->width() * dpr),
+                                 qRound(viewport()->height() * dpr)));
+    }
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        paintRegions.append(event->region());
+        QGraphicsView::paintEvent(event);
+    }
+};
+
 } // namespace
 
 class BlueprintSceneTest : public QObject
@@ -212,6 +245,11 @@ private slots:
     void connectionStateCanBeCancelledAndSelfLoopsAreRejected();
     void connectionModeDoubleClickDoesNotAlsoRequestEditing();
     void graphicsBoundsContainPaintedPortAndArrowExtents();
+    void edgeBoundsContainPaintedGeometry();
+    void canvasGridPartialRepaintIsStable_data();
+    void canvasGridPartialRepaintIsStable();
+    void movingConnectedNodesLeavesNoPartialRepaintResidue_data();
+    void movingConnectedNodesLeavesNoPartialRepaintResidue();
     void editingNodeTextUpdatesDocumentAndSupportsUndo();
     void editingAllNodeFieldsIsOneUndoableCommand();
     void directNodeEditorSaveSynchronizesDocumentCanvasInspectorAndUndo();
@@ -874,6 +912,190 @@ void BlueprintSceneTest::graphicsBoundsContainPaintedPortAndArrowExtents()
     EdgeItem *edge = scene.edgeItem(document.edges.constFirst().id);
     QVERIFY(edge->boundingRect().contains(edge->arrowPolygon().boundingRect()));
     QVERIFY(edge->boundingRect().contains(edge->labelPosition()));
+}
+
+void BlueprintSceneTest::canvasGridPartialRepaintIsStable_data()
+{
+    QTest::addColumn<qreal>("zoom");
+    for (const qreal zoom : {0.25, 1.0, 1.15, 3.0}) {
+        QTest::newRow(QByteArray::number(zoom).constData()) << zoom;
+    }
+}
+
+void BlueprintSceneTest::canvasGridPartialRepaintIsStable()
+{
+    QFETCH(qreal, zoom);
+    BlueprintDocument document;
+    BlueprintScene scene(&document);
+    RepaintProbeView view(&scene);
+    view.setFrameStyle(QFrame::NoFrame);
+    view.setRenderHint(QPainter::Antialiasing);
+    view.setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
+    view.resize(900, 600);
+    view.scale(zoom, zoom);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+    QApplication::processEvents();
+    view.viewport()->repaint();
+    if (view.backingFrame().isNull()) {
+        QSKIP("This platform does not expose a raster image backing store");
+    }
+    view.paintRegions.clear();
+    // Isolate the background: no items or changed geometry can explain a mismatch here.
+    for (int step = 0; step < 12; ++step) {
+        scene.update(QRectF(-100.0 + step * 3.25, -40.0 + step * 1.75, 211.5, 133.25));
+        QTest::qWait(10);
+    }
+    QVERIFY(!view.paintRegions.isEmpty());
+    QVERIFY(view.paintRegions.constLast().intersected(view.viewport()->rect())
+            != QRegion(view.viewport()->rect()));
+    const QImage incremental = view.backingFrame();
+    view.viewport()->repaint();
+    QVERIFY2(incremental == view.backingFrame(),
+             "Partial grid repaint leaves pixels that disappear after a full repaint");
+}
+
+void BlueprintSceneTest::edgeBoundsContainPaintedGeometry()
+{
+    const auto originalTheme = EditorTheme::theme();
+    const auto restoreTheme = qScopeGuard([originalTheme] {
+        EditorTheme::setTheme(*qApp, originalTheme);
+    });
+    BlueprintDocument document;
+    BlueprintScene scene(&document);
+    QVERIFY(scene.addNode(node(QStringLiteral("source"), QStringLiteral("Source")), {}));
+    QVERIFY(scene.addNode(node(QStringLiteral("target"), QStringLiteral("Target")), {300, 0}));
+    QVERIFY(scene.connectNodes(QStringLiteral("source"), QStringLiteral("target"), QStringLiteral("yes")));
+    NodeItem *target = scene.nodeItem(QStringLiteral("target"));
+    EdgeItem *edge = scene.edgeItem(document.edges.constFirst().id);
+    for (const auto theme : {EditorTheme::Theme::Light, EditorTheme::Theme::Dark}) {
+        EditorTheme::setTheme(*qApp, theme);
+        for (const QPointF position : {QPointF(300, 0), QPointF(-200, -100), QPointF(180.25, 240),
+                                       QPointF(180, 0), QPointF(240, -160)}) {
+            target->setPos(position);
+            const QRectF bounds = edge->boundingRect();
+            QVERIFY(bounds.contains(edge->shape().boundingRect()));
+            QVERIFY(bounds.contains(edge->arrowPolygon().boundingRect()));
+            for (const bool selected : {false, true}) {
+                const QRectF area = bounds.adjusted(-8, -8, 8, 8);
+                const qreal scale = 3.0;
+                QImage image(qCeil(area.width() * scale), qCeil(area.height() * scale),
+                             QImage::Format_ARGB32_Premultiplied);
+                image.fill(Qt::transparent);
+                QPainter painter(&image);
+                painter.setRenderHint(QPainter::Antialiasing);
+                painter.scale(scale, scale);
+                painter.translate(-area.topLeft());
+                const QTransform transform = painter.worldTransform();
+                QStyleOptionGraphicsItem option;
+                option.state = selected ? QStyle::State_Selected : QStyle::State_None;
+                edge->paint(&painter, &option, nullptr);
+                painter.end();
+                // Antialiasing can touch one device pixel outside the exact vector boundary.
+                const QRect allowedPixels = transform.mapRect(bounds).adjusted(-1, -1, 1, 1).toAlignedRect();
+                for (int y = 0; y < image.height(); ++y) {
+                    for (int x = 0; x < image.width(); ++x) {
+                        QVERIFY2(qAlpha(image.pixel(x, y)) == 0 || allowedPixels.contains(x, y),
+                                 "Edge paint extends beyond its declared geometry and antialiasing fringe");
+                    }
+                }
+            }
+        }
+    }
+}
+
+void BlueprintSceneTest::movingConnectedNodesLeavesNoPartialRepaintResidue_data()
+{
+    QTest::addColumn<qreal>("zoom");
+    QTest::addColumn<bool>("selected");
+    QTest::addColumn<bool>("dark");
+    QTest::addColumn<int>("direction");
+    for (const qreal zoom : {0.25, 1.0, 1.15, 3.0}) {
+        for (const bool selected : {false, true}) {
+            for (const bool dark : {false, true}) {
+                for (const int direction : {0, 1, 2}) {
+                    const QByteArray name = QByteArray::number(zoom) + (selected ? "-selected" : "-normal")
+                        + (dark ? "-dark" : "-light") + "-direction" + QByteArray::number(direction);
+                    QTest::newRow(name.constData()) << zoom << selected << dark << direction;
+                }
+            }
+        }
+    }
+}
+
+void BlueprintSceneTest::movingConnectedNodesLeavesNoPartialRepaintResidue()
+{
+    QFETCH(qreal, zoom);
+    QFETCH(bool, selected);
+    QFETCH(bool, dark);
+    QFETCH(int, direction);
+    const auto originalTheme = EditorTheme::theme();
+    const auto restoreTheme = qScopeGuard([originalTheme] {
+        EditorTheme::setTheme(*qApp, originalTheme);
+    });
+    EditorTheme::setTheme(*qApp, dark ? EditorTheme::Theme::Dark : EditorTheme::Theme::Light);
+    BlueprintDocument document;
+    BlueprintScene scene(&document);
+    BlueprintNode decision = node(QStringLiteral("source"), QStringLiteral("Decision"));
+    decision.type = NodeType::Decision;
+    QVERIFY(scene.addNode(decision, {-150, -90}));
+    QVERIFY(scene.addNode(node(QStringLiteral("target"), QStringLiteral("Target")), {210, 60}));
+    QVERIFY(scene.connectNodes(QStringLiteral("source"), QStringLiteral("target"), QStringLiteral("yes")));
+    NodeItem *source = scene.nodeItem(QStringLiteral("source"));
+    NodeItem *target = scene.nodeItem(QStringLiteral("target"));
+    EdgeItem *edge = scene.edgeItem(document.edges.constFirst().id);
+    edge->setSelected(selected);
+    RepaintProbeView view(&scene);
+    view.setFrameStyle(QFrame::NoFrame);
+    view.setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    view.setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    view.setRenderHint(QPainter::Antialiasing);
+    view.setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
+    view.resize(900, 600);
+    view.scale(zoom, zoom);
+    view.centerOn(QPointF(120, 0));
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+    QApplication::processEvents();
+    view.viewport()->repaint();
+    if (view.backingFrame().isNull()) {
+        QSKIP("This platform does not expose a raster image backing store");
+    }
+    view.paintRegions.clear();
+    for (int step = 0; step < 12; ++step) {
+        // Several geometry changes can be coalesced into one scheduled viewport paint during drag.
+        for (int burst = 0; burst < 4; ++burst) {
+            source->setPos(-150.0 + step * 2.25 + burst * 0.75, -90.0 + (step % 7) * 9.5);
+            const qreal targetX = direction == 0 ? 210.0 : direction == 1 ? -210.0
+                : source->outputAnchor().x() + 0.25;
+            target->setPos(targetX - step * 1.75, 60.0 - (step % 5) * 11.25 - burst * 0.5);
+        }
+        QVERIFY(edge->boundingRect().contains(edge->shape().boundingRect()));
+        QTest::qWait(10);
+    }
+    const QImage incremental = view.backingFrame();
+    QVERIFY(!view.paintRegions.isEmpty());
+    bool partialPaint = false;
+    for (const QRegion &region : view.paintRegions) {
+        partialPaint |= region.intersected(view.viewport()->rect()) != QRegion(view.viewport()->rect());
+    }
+    QVERIFY2(partialPaint, "The regression must exercise actual partial viewport paints");
+    view.viewport()->repaint();
+    const QImage refreshed = view.backingFrame();
+    int differentPixels = 0;
+    QRect differenceBounds;
+    for (int y = 0; y < incremental.height(); ++y) {
+        for (int x = 0; x < incremental.width(); ++x) {
+            if (incremental.pixel(x, y) != refreshed.pixel(x, y)) {
+                ++differentPixels;
+                differenceBounds |= QRect(x, y, 1, 1);
+            }
+        }
+    }
+    QVERIFY2(differentPixels == 0,
+             qPrintable(QStringLiteral("%1 stale pixels at (%2,%3 %4x%5) after repeated partial paints")
+                 .arg(differentPixels).arg(differenceBounds.x()).arg(differenceBounds.y())
+                 .arg(differenceBounds.width()).arg(differenceBounds.height())));
 }
 
 void BlueprintSceneTest::editingNodeTextUpdatesDocumentAndSupportsUndo()

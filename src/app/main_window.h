@@ -74,6 +74,7 @@ private:
     void applyProperties();
     void updatePropertyEditor();
     void applyWorkspacePathEdit();
+    void browseWorkspace();
     void finishAbortedWorkspaceOperationClick();
     bool prepareWorkspaceOperation();
     void startBuild();
@@ -139,6 +140,8 @@ private:
     WorkspaceBrowserWidget *m_workspaceBrowser = nullptr;
     QFormLayout *m_buildForm = nullptr;
     QLineEdit *m_workspacePathEdit = nullptr;
+    QWidget *m_workspacePathRow = nullptr;
+    QPushButton *m_browseWorkspaceButton = nullptr;
     bool m_workspaceOperationMousePressPending = false;
     bool m_workspaceOperationPreflightActive = false;
     bool m_deferredWorkspaceEdit = false;
