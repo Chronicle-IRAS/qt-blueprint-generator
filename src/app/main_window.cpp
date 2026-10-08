@@ -561,12 +561,25 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     connect(m_workspaceDock, &QDockWidget::visibilityChanged, this, [this](bool visible) {
         m_workspaceDockAction->setChecked(visible);
     });
+    for (QWidget *control : {static_cast<QWidget *>(m_buildProjectButton),
+                             m_blueprintToolbar->widgetForAction(m_toolbarBuildAction),
+                             static_cast<QWidget *>(m_exportProjectButton),
+                             m_blueprintToolbar->widgetForAction(m_toolbarExportAction)}) {
+        if (control) control->installEventFilter(this);
+    }
+    installEventFilter(this);
     connect(m_workspacePathEdit, &QLineEdit::editingFinished, this, [this] {
-        const QString path = m_workspacePathEdit->text().trimmed();
-        if (!m_workspaceBrowser->setWorkspacePath(path)) {
-            const QSignalBlocker blocked(m_workspacePathEdit);
-            m_workspacePathEdit->setText(m_workspaceBrowser->workspacePath());
+        QWidget *focused = QApplication::focusWidget();
+        const bool focusedOperation = focused == m_buildProjectButton
+            || focused == m_blueprintToolbar->widgetForAction(m_toolbarBuildAction)
+            || focused == m_exportProjectButton
+            || focused == m_blueprintToolbar->widgetForAction(m_toolbarExportAction);
+        if (m_workspaceOperationMousePressPending || m_workspaceOperationPreflightActive
+            || (focusedOperation && (QApplication::mouseButtons() & Qt::LeftButton))) {
+            m_deferredWorkspaceEdit = true;
+            return;
         }
+        applyWorkspacePathEdit();
     });
     m_viewMenu->addSeparator();
     m_resetLayoutAction = m_viewMenu->addAction(tr("Reset Layout"));
@@ -958,8 +971,43 @@ void MainWindow::showValidationDiagnostics()
     dialog.exec();
 }
 
+void MainWindow::applyWorkspacePathEdit()
+{
+    const QString path = m_workspacePathEdit->text().trimmed();
+    if (!m_workspaceBrowser->setWorkspacePath(path)) {
+        const QSignalBlocker blocked(m_workspacePathEdit);
+        m_workspacePathEdit->setText(m_workspaceBrowser->workspacePath());
+    }
+}
+
+void MainWindow::finishAbortedWorkspaceOperationClick()
+{
+    if (!m_workspaceOperationMousePressPending || m_workspaceOperationPreflightActive) return;
+    m_workspaceOperationMousePressPending = false;
+    if (!m_deferredWorkspaceEdit) return;
+    m_deferredWorkspaceEdit = false;
+    applyWorkspacePathEdit();
+}
+
+bool MainWindow::prepareWorkspaceOperation()
+{
+    m_workspaceOperationPreflightActive = true;
+    const QString target = m_workspacePathEdit->text().trimmed();
+    const bool switched = m_workspaceBrowser->setWorkspacePath(target);
+    if (!switched) {
+        const QSignalBlocker blocked(m_workspacePathEdit);
+        m_workspacePathEdit->setText(m_workspaceBrowser->workspacePath());
+    }
+    const bool ready = switched && m_workspaceBrowser->requestCanDiscardChanges();
+    m_workspaceOperationPreflightActive = false;
+    m_workspaceOperationMousePressPending = false;
+    m_deferredWorkspaceEdit = false;
+    return ready;
+}
+
 void MainWindow::startBuild()
 {
+    if (!prepareWorkspaceOperation()) return;
     BuildRequest request;
     const QString workspace = m_workspacePathEdit->text().trimmed();
     request.buildDirectory = m_buildDirectoryEdit->text().trimmed();
@@ -986,6 +1034,7 @@ void MainWindow::startBuild()
 
 void MainWindow::exportProject()
 {
+    if (!prepareWorkspaceOperation()) return;
     QString error;
     if (ProjectExporter::exportProject(m_workspacePathEdit->text().trimmed(),
                                        m_exportTargetEdit->text().trimmed(), &error)) {
@@ -1017,6 +1066,26 @@ void MainWindow::resetWindowLayout()
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
+    if (watched == this && event->type() == QEvent::WindowDeactivate) {
+        QMetaObject::invokeMethod(this, [this] { finishAbortedWorkspaceOperationClick(); },
+                                  Qt::QueuedConnection);
+    }
+    if (watched == m_buildProjectButton
+        || watched == m_blueprintToolbar->widgetForAction(m_toolbarBuildAction)
+        || watched == m_exportProjectButton
+        || watched == m_blueprintToolbar->widgetForAction(m_toolbarExportAction)) {
+        if (event->type() == QEvent::MouseButtonPress
+            && static_cast<QMouseEvent *>(event)->button() == Qt::LeftButton) {
+            m_workspaceOperationMousePressPending = true;
+        } else if (event->type() == QEvent::MouseButtonRelease
+                   && static_cast<QMouseEvent *>(event)->button() == Qt::LeftButton) {
+            QMetaObject::invokeMethod(this, [this] { finishAbortedWorkspaceOperationClick(); },
+                                      Qt::QueuedConnection);
+        } else if (event->type() == QEvent::UngrabMouse) {
+            QMetaObject::invokeMethod(this, [this] { finishAbortedWorkspaceOperationClick(); },
+                                      Qt::QueuedConnection);
+        }
+    }
     if (watched == m_workspaceDock && event->type() == QEvent::Close
         && !m_workspaceBrowser->requestCanDiscardChanges()) {
         static_cast<QCloseEvent *>(event)->ignore();

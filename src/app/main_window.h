@@ -73,6 +73,9 @@ private:
     void editNodeFromCanvas(const QString &nodeId);
     void applyProperties();
     void updatePropertyEditor();
+    void applyWorkspacePathEdit();
+    void finishAbortedWorkspaceOperationClick();
+    bool prepareWorkspaceOperation();
     void startBuild();
     void exportProject();
     void resetWindowLayout();
@@ -136,6 +139,9 @@ private:
     WorkspaceBrowserWidget *m_workspaceBrowser = nullptr;
     QFormLayout *m_buildForm = nullptr;
     QLineEdit *m_workspacePathEdit = nullptr;
+    bool m_workspaceOperationMousePressPending = false;
+    bool m_workspaceOperationPreflightActive = false;
+    bool m_deferredWorkspaceEdit = false;
     QLineEdit *m_buildDirectoryEdit = nullptr;
     QLineEdit *m_exportTargetEdit = nullptr;
     QLineEdit *m_cmakeExecutableEdit = nullptr;
