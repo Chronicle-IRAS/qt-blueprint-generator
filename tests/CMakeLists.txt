@@ -416,6 +416,14 @@ set_tests_properties(blueprint_scene PROPERTIES
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
 )
 
+add_test(NAME blueprint_scene_fractional_dpi COMMAND tst_blueprint_scene
+    canvasGridPartialRepaintIsStable movingConnectedNodesLeavesNoPartialRepaintResidue
+    edgeBoundsContainPaintedGeometry)
+set_tests_properties(blueprint_scene_fractional_dpi PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=1.5"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+)
+
 set(ir_compiler_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_ir_compiler.moc")
 
 add_custom_command(

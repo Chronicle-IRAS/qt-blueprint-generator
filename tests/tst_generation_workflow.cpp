@@ -1,10 +1,16 @@
 #include "app/main_window.h"
 #include "app/candidate_review_dialog.h"
+#include "app/workspace_browser_widget.h"
 #include "ai/fake_ai_client.h"
+#include "generation/project_scaffolder.h"
 #include "editor/blueprint_scene.h"
 #include "editor/node_item.h"
 #include <QAction>
+#include <QCryptographicHash>
+#include <QDirIterator>
 #include <QFile>
+#include <QFileDialog>
+#include <QFormLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -51,6 +57,22 @@ QByteArray readFile(const QString &path)
 {
     QFile f(path); if (!f.open(QIODevice::ReadOnly)) return {}; return f.readAll();
 }
+bool writeFile(const QString &path, const QByteArray &bytes)
+{
+    if (!QDir().mkpath(QFileInfo(path).absolutePath())) return false;
+    QFile file(path);
+    return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size();
+}
+QMap<QString, QByteArray> fileHashes(const QString &root)
+{
+    QMap<QString, QByteArray> hashes;
+    QDirIterator files(root, QDir::Files | QDir::Hidden, QDirIterator::Subdirectories);
+    while (files.hasNext()) {
+        const QString path = files.next();
+        hashes.insert(QDir(root).relativeFilePath(path), QCryptographicHash::hash(readFile(path), QCryptographicHash::Sha256));
+    }
+    return hashes;
+}
 void confirmNextDialog()
 {
     QTimer::singleShot(0, [] {
@@ -70,8 +92,204 @@ private slots:
         QCoreApplication::setApplicationName("OfflineWorkflow");
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_settings.path());
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
     }
     void init() { QSettings().clear(); }
+    void browseCanceledOnFirstLaunchPreservesDefaultInput()
+    {
+        MainWindow window;
+        window.show();
+        auto *path = window.findChild<QLineEdit *>("workspacePathEdit");
+        auto *browse = window.findChild<QPushButton *>("browseWorkspaceButton");
+        auto *browser = window.findChild<WorkspaceBrowserWidget *>();
+        QVERIFY(path && browse && browser);
+        const QString inputBeforeDialog = path->text();
+        QVERIFY(!inputBeforeDialog.isEmpty());
+        QCOMPARE(inputBeforeDialog, QDir::currentPath());
+        QVERIFY(browser->workspacePath().isEmpty());
+        path->setFocus(); QApplication::processEvents();
+        bool picked = false;
+        QTimer::singleShot(0, &window, [&] {
+            if (auto *picker = qobject_cast<QFileDialog *>(QApplication::activeModalWidget())) {
+                picked = true;
+                picker->reject();
+            }
+        });
+        QTest::mouseClick(browse, Qt::LeftButton);
+        QApplication::processEvents();
+        QVERIFY(picked);
+        QCOMPARE(path->text(), inputBeforeDialog);
+        QVERIFY(browser->workspacePath().isEmpty());
+    }
+    void browseCanceledBeforeWorkspaceCommitPreservesPendingInput()
+    {
+        QTemporaryDir dir;
+        MainWindow window;
+        window.show();
+        auto *path = window.findChild<QLineEdit *>("workspacePathEdit");
+        auto *browse = window.findChild<QPushButton *>("browseWorkspaceButton");
+        auto *browser = window.findChild<WorkspaceBrowserWidget *>();
+        QVERIFY(path && browse && browser);
+        QVERIFY(browser->workspacePath().isEmpty());
+        path->setFocus(); QApplication::processEvents();
+        path->setText(dir.path());
+        bool picked = false;
+        QString initialDirectory;
+        QTimer::singleShot(0, &window, [&] {
+            if (auto *picker = qobject_cast<QFileDialog *>(QApplication::activeModalWidget())) {
+                picked = true;
+                initialDirectory = picker->directory().absolutePath();
+                picker->reject();
+            }
+        });
+        QTest::mouseClick(browse, Qt::LeftButton);
+        QApplication::processEvents();
+        QVERIFY(picked);
+        QCOMPARE(initialDirectory, dir.path());
+        QCOMPARE(path->text(), dir.path());
+        QVERIFY(browser->workspacePath().isEmpty());
+        QVERIFY(QDir(dir.path()).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).isEmpty());
+    }
+    void browseWorkspaceUsesDirectoryDialogAndDirtyPreflight_data()
+    {
+        QTest::addColumn<bool>("dirty");
+        QTest::addColumn<bool>("pendingPath");
+        QTest::addColumn<bool>("acceptPicker");
+        QTest::addColumn<int>("decision");
+        QTest::addColumn<bool>("saveFailure");
+        QTest::newRow("empty-chinese-directory") << false << false << true << int(QMessageBox::NoRole) << false;
+        QTest::newRow("picker-cancel") << false << false << false << int(QMessageBox::NoRole) << false;
+        QTest::newRow("dirty-picker-cancel") << true << false << false << int(QMessageBox::NoRole) << false;
+        QTest::newRow("pending-dirty-picker-cancel") << true << true << false << int(QMessageBox::NoRole) << false;
+        QTest::newRow("save") << true << false << true << int(QMessageBox::AcceptRole) << false;
+        QTest::newRow("discard") << true << false << true << int(QMessageBox::DestructiveRole) << false;
+        QTest::newRow("dirty-cancel") << true << false << true << int(QMessageBox::RejectRole) << false;
+        QTest::newRow("pending-dirty-cancel") << true << true << true << int(QMessageBox::RejectRole) << false;
+        QTest::newRow("save-failure") << true << false << true << int(QMessageBox::AcceptRole) << true;
+    }
+    void browseWorkspaceUsesDirectoryDialogAndDirtyPreflight()
+    {
+        QFETCH(bool, dirty);
+        QFETCH(bool, pendingPath);
+        QFETCH(bool, acceptPicker);
+        QFETCH(int, decision);
+        QFETCH(bool, saveFailure);
+        QTemporaryDir dir;
+        const QString first = dir.path() + "/first";
+        const QString second = dir.path() + QString::fromUtf8("/中文空工作目录");
+        const QString pending = dir.path() + "/pending";
+        QVERIFY(QDir().mkpath(first)); QVERIFY(QDir().mkpath(second)); QVERIFY(QDir().mkpath(pending));
+        MainWindow window;
+        QVERIFY(window.setLanguage("en"));
+        prepare(window, first);
+        auto *pathEdit = window.findChild<QLineEdit *>("workspacePathEdit");
+        auto *browse = window.findChild<QPushButton *>("browseWorkspaceButton");
+        QVERIFY2(browse, "Workspace root needs a Browse directory button");
+        QVERIFY(ProjectScaffolder::create(window.document(), first));
+        const QString original = first + "/generated-project/src/custom.cpp";
+        QVERIFY(writeFile(original, "original"));
+        window.findChild<QAction *>("workspaceEditorAction")->trigger();
+        auto *browser = window.findChild<WorkspaceBrowserWidget *>();
+        QVERIFY(browser); QCOMPARE(browser->workspacePath(), first);
+        browser->openFile("src/custom.cpp");
+        auto *preview = browser->findChild<QPlainTextEdit *>("workspacePreview");
+        QVERIFY(preview); QVERIFY(!preview->isReadOnly());
+        if (dirty) { preview->moveCursor(QTextCursor::End); QTest::keyClicks(preview, " changed"); }
+        if (saveFailure) { QVERIFY(QFile::remove(original)); QVERIFY(QDir().mkpath(original)); }
+        pathEdit->setFocus();
+        QApplication::processEvents();
+        if (pendingPath) pathEdit->setText(pending);
+        const QString inputBeforeDialog = pathEdit->text();
+        int pickerCount = 0;
+        int promptCount = 0;
+        QString pickerTitle;
+        QFileDialog::FileMode pickerMode = QFileDialog::AnyFile;
+        QString workspaceWhilePicking;
+        QTimer dialogs;
+        dialogs.setInterval(5);
+        connect(&dialogs, &QTimer::timeout, &window, [&] {
+            if (auto *picker = qobject_cast<QFileDialog *>(QApplication::activeModalWidget())) {
+                ++pickerCount;
+                pickerTitle = picker->windowTitle(); pickerMode = picker->fileMode();
+                workspaceWhilePicking = browser->workspacePath();
+                if (acceptPicker) {
+                    picker->setDirectory(second); picker->selectFile(second);
+                    QMetaObject::invokeMethod(picker, "accept", Qt::DirectConnection);
+                } else picker->reject();
+            } else if (auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget())) {
+                ++promptCount;
+                for (auto *button : box->buttons()) {
+                    if (box->buttonRole(button) == decision) { button->click(); return; }
+                }
+                box->reject();
+            }
+        });
+        dialogs.start();
+        QTest::mouseClick(browse, Qt::LeftButton);
+        dialogs.stop();
+        QApplication::processEvents();
+        QCOMPARE(pickerCount, 1);
+        QCOMPARE(pickerTitle, QString("Select workspace directory"));
+        QCOMPARE(pickerMode, QFileDialog::Directory);
+        QCOMPARE(workspaceWhilePicking, first);
+        QCOMPARE(promptCount, dirty && acceptPicker ? 1 : 0);
+        const bool switched = acceptPicker && (!dirty || (decision != QMessageBox::RejectRole && !saveFailure));
+        QCOMPARE(pathEdit->text(), !acceptPicker ? inputBeforeDialog : switched ? second : first);
+        QCOMPARE(browser->workspacePath(), switched ? second : first);
+        QCOMPARE(preview->toPlainText(), switched ? QString() : dirty ? QString("original changed") : QString("original"));
+        QCOMPARE(browser->hasUnsavedChanges(), dirty && !switched);
+        if (saveFailure) QVERIFY(QFileInfo(original).isDir());
+        else QCOMPARE(readFile(original), dirty && switched && decision == QMessageBox::AcceptRole
+                          ? QByteArray("original changed") : QByteArray("original"));
+        QVERIFY(QDir(second).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).isEmpty());
+    }
+    void scaffoldFailureReachesGuiWithoutChangingOldProject_data()
+    {
+        QTest::addColumn<QString>("failure");
+        QTest::addColumn<QString>("reason");
+        QTest::newRow("blueprint-mismatch") << "mismatch" << "Blueprint or scaffold version changed; use a new workspace";
+        QTest::newRow("protected-changed") << "changed" << "Scaffold file was manually changed or removed: src/main.cpp";
+        QTest::newRow("untracked-project") << "untracked" << "Refusing to overwrite an untracked project file: src/main.cpp";
+    }
+    void scaffoldFailureReachesGuiWithoutChangingOldProject()
+    {
+        QFETCH(QString, failure);
+        QFETCH(QString, reason);
+        QTemporaryDir dir;
+        int calls = 0;
+        MainWindow window([&](const AiProviderSettings &, QObject *parent) {
+            ++calls; return new DeferredClient(parent);
+        });
+        QVERIFY(window.setLanguage("en"));
+        prepare(window, dir.path());
+        auto old = window.document();
+        if (failure == "mismatch") old.nodes[1].description += " old contract";
+        if (failure != "untracked") QVERIFY(ProjectScaffolder::create(old, dir.path()));
+        if (failure != "mismatch") QVERIFY(writeFile(dir.path() + "/generated-project/src/main.cpp", "// manual source"));
+        const auto before = fileHashes(dir.path());
+        auto *generate = window.findChild<QAction *>("generateSelectedNodeAction");
+        generate->trigger();
+        auto *status = window.findChild<QLabel *>("generationStatus");
+        QCOMPARE(calls, 0);
+        QVERIFY(!window.findChild<CandidateReviewDialog *>());
+        QCOMPARE(fileHashes(dir.path()), before);
+        QVERIFY2(status->text().contains(reason), qPrintable(status->text()));
+        QVERIFY(status->text().contains("Could not initialize workspace scaffold:"));
+        const QString english = status->text();
+        QVERIFY(window.setLanguage("zh_CN"));
+        QVERIFY(status->text().contains(QString::fromUtf8("无法初始化工作区工程骨架：")));
+        QVERIFY(status->text().contains(reason));
+        QVERIFY(window.setLanguage("en"));
+        QCOMPARE(status->text(), english);
+        QTemporaryDir empty;
+        window.findChild<QLineEdit *>("workspacePathEdit")->setText(empty.path());
+        generate->trigger();
+        QCOMPARE(calls, 1);
+        QVERIFY(status->text().contains("Generating"));
+        QVERIFY(!status->text().contains(reason));
+        window.findChild<QAction *>("cancelGenerationAction")->trigger();
+        QCOMPARE(fileHashes(dir.path()), before);
+    }
     void synchronousCompletionUsesCapturedBlueprint()
     {
         QTemporaryDir dir;

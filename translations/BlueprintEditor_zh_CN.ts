@@ -45,7 +45,7 @@
     <message><source>AI provider settings are invalid.</source><translation>AI 服务设置无效。</translation></message>
     <message><source>Select an existing absolute workspace directory.</source><translation>请选择已存在的工作目录，并使用绝对路径。</translation></message>
     <message><source>Fix blueprint validation errors before generating.</source><translation>请先修正蓝图校验错误，再生成代码。</translation></message>
-    <message><source>The workspace scaffold could not be initialized or does not match the blueprint.</source><translation>无法初始化工程骨架，或工作目录与当前蓝图不匹配。</translation></message>
+    <message><source>Could not initialize workspace scaffold: %1</source><translation>无法初始化工作区工程骨架：%1</translation></message>
     <message><source>Could not read the workspace contracts.</source><translation>无法读取工作目录中的接口契约。</translation></message>
     <message><source>The workspace blueprint contract is invalid.</source><translation>工作目录中的蓝图契约无效。</translation></message>
     <message><source>Could not prepare the node generation prompt.</source><translation>无法准备节点生成提示词。</translation></message>
@@ -133,6 +133,9 @@
 </context>
 <context>
     <name>MainWindow</name>
+    <message><source>Browse...</source><translation>浏览...</translation></message>
+    <message><source>Choose an existing workspace directory</source><translation>选择已有的工作区目录</translation></message>
+    <message><source>Select workspace directory</source><translation>选择工作区目录</translation></message>
     <message><source>Workspace Editor</source><translation>工作区编辑器</translation></message>
     <message><source>Generate selected node</source><translation>生成选中节点</translation></message>
     <message><source>Cancel generation</source><translation>取消生成</translation></message>

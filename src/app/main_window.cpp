@@ -24,6 +24,7 @@
 #include <QDockWidget>
 #include <QDir>
 #include <QEvent>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QGraphicsView>
 #include <QHBoxLayout>
@@ -473,6 +474,15 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_workspacePathEdit = new QLineEdit(QDir::currentPath(), buildWidget);
     m_workspacePathEdit->setObjectName(QStringLiteral("workspacePathEdit"));
     m_workspacePathEdit->setToolTip(tr("Workspace root containing generated-project"));
+    m_workspacePathRow = new QWidget(buildWidget);
+    auto *workspacePathLayout = new QHBoxLayout(m_workspacePathRow);
+    workspacePathLayout->setContentsMargins(0, 0, 0, 0);
+    workspacePathLayout->addWidget(m_workspacePathEdit);
+    m_browseWorkspaceButton = new QPushButton(tr("Browse..."), m_workspacePathRow);
+    m_browseWorkspaceButton->setObjectName(QStringLiteral("browseWorkspaceButton"));
+    m_browseWorkspaceButton->setToolTip(tr("Choose an existing workspace directory"));
+    workspacePathLayout->addWidget(m_browseWorkspaceButton);
+    connect(m_browseWorkspaceButton, &QPushButton::clicked, this, &MainWindow::browseWorkspace);
     m_buildDirectoryEdit = new QLineEdit(QDir(QDir::currentPath()).filePath(QStringLiteral("build/generated-project")), buildWidget);
     m_buildDirectoryEdit->setObjectName(QStringLiteral("buildDirectoryEdit"));
     m_exportTargetEdit = new QLineEdit(buildWidget);
@@ -482,7 +492,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_configureArgumentsEdit = new QLineEdit(buildWidget);
     m_configureArgumentsEdit->setObjectName(QStringLiteral("cmakeConfigureArgumentsEdit"));
     m_configureArgumentsEdit->setPlaceholderText(tr("For example: -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.x/mingw_64"));
-    m_buildForm->addRow(tr("Workspace root"), m_workspacePathEdit);
+    m_buildForm->addRow(tr("Workspace root"), m_workspacePathRow);
     m_buildForm->addRow(tr("Build directory"), m_buildDirectoryEdit);
     m_buildForm->addRow(tr("Empty export directory"), m_exportTargetEdit);
     m_buildForm->addRow(tr("CMake executable"), m_cmakeExecutableEdit);
@@ -562,6 +572,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
         m_workspaceDockAction->setChecked(visible);
     });
     for (QWidget *control : {static_cast<QWidget *>(m_buildProjectButton),
+                             static_cast<QWidget *>(m_browseWorkspaceButton),
                              m_blueprintToolbar->widgetForAction(m_toolbarBuildAction),
                              static_cast<QWidget *>(m_exportProjectButton),
                              m_blueprintToolbar->widgetForAction(m_toolbarExportAction)}) {
@@ -571,6 +582,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     connect(m_workspacePathEdit, &QLineEdit::editingFinished, this, [this] {
         QWidget *focused = QApplication::focusWidget();
         const bool focusedOperation = focused == m_buildProjectButton
+            || focused == m_browseWorkspaceButton
             || focused == m_blueprintToolbar->widgetForAction(m_toolbarBuildAction)
             || focused == m_exportProjectButton
             || focused == m_blueprintToolbar->widgetForAction(m_toolbarExportAction);
@@ -876,9 +888,11 @@ void MainWindow::retranslateUi()
     m_buildDockAction->setText(tr("Build and export"));
     m_resetLayoutAction->setText(tr("Reset Layout"));
     m_workspacePathEdit->setToolTip(tr("Workspace root containing generated-project"));
+    m_browseWorkspaceButton->setText(tr("Browse..."));
+    m_browseWorkspaceButton->setToolTip(tr("Choose an existing workspace directory"));
     m_configureArgumentsEdit->setPlaceholderText(
         tr("For example: -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.x/mingw_64"));
-    setFormLabel(m_buildForm, m_workspacePathEdit, tr("Workspace root"));
+    setFormLabel(m_buildForm, m_workspacePathRow, tr("Workspace root"));
     setFormLabel(m_buildForm, m_buildDirectoryEdit, tr("Build directory"));
     setFormLabel(m_buildForm, m_exportTargetEdit, tr("Empty export directory"));
     setFormLabel(m_buildForm, m_cmakeExecutableEdit, tr("CMake executable"));
@@ -980,6 +994,27 @@ void MainWindow::applyWorkspacePathEdit()
     }
 }
 
+void MainWindow::browseWorkspace()
+{
+    // Opening the picker must not commit a pending path through editingFinished.
+    const QString inputBeforeDialog = m_workspacePathEdit->text();
+    m_workspaceOperationPreflightActive = true;
+    const QString activePath = m_workspaceBrowser->workspacePath();
+    const QString initialDirectory = activePath.isEmpty()
+        ? inputBeforeDialog.trimmed() : activePath;
+    const QString selected = QFileDialog::getExistingDirectory(
+        this, tr("Select workspace directory"), initialDirectory);
+    if (!selected.isEmpty() && m_workspaceBrowser->setWorkspacePath(selected)) {
+        m_workspacePathEdit->setText(selected);
+    } else {
+        const QSignalBlocker blocked(m_workspacePathEdit);
+        m_workspacePathEdit->setText(selected.isEmpty() ? inputBeforeDialog : activePath);
+    }
+    m_workspaceOperationPreflightActive = false;
+    m_workspaceOperationMousePressPending = false;
+    m_deferredWorkspaceEdit = false;
+}
+
 void MainWindow::finishAbortedWorkspaceOperationClick()
 {
     if (!m_workspaceOperationMousePressPending || m_workspaceOperationPreflightActive) return;
@@ -1071,6 +1106,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
                                   Qt::QueuedConnection);
     }
     if (watched == m_buildProjectButton
+        || watched == m_browseWorkspaceButton
         || watched == m_blueprintToolbar->widgetForAction(m_toolbarBuildAction)
         || watched == m_exportProjectButton
         || watched == m_blueprintToolbar->widgetForAction(m_toolbarExportAction)) {
