@@ -997,17 +997,18 @@ void MainWindow::applyWorkspacePathEdit()
 void MainWindow::browseWorkspace()
 {
     // Opening the picker must not commit a pending path through editingFinished.
+    const QString inputBeforeDialog = m_workspacePathEdit->text();
     m_workspaceOperationPreflightActive = true;
     const QString activePath = m_workspaceBrowser->workspacePath();
     const QString initialDirectory = activePath.isEmpty()
-        ? m_workspacePathEdit->text().trimmed() : activePath;
+        ? inputBeforeDialog.trimmed() : activePath;
     const QString selected = QFileDialog::getExistingDirectory(
         this, tr("Select workspace directory"), initialDirectory);
     if (!selected.isEmpty() && m_workspaceBrowser->setWorkspacePath(selected)) {
         m_workspacePathEdit->setText(selected);
     } else {
         const QSignalBlocker blocked(m_workspacePathEdit);
-        m_workspacePathEdit->setText(activePath);
+        m_workspacePathEdit->setText(selected.isEmpty() ? inputBeforeDialog : activePath);
     }
     m_workspaceOperationPreflightActive = false;
     m_workspaceOperationMousePressPending = false;

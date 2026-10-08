@@ -95,7 +95,33 @@ private slots:
         QApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
     }
     void init() { QSettings().clear(); }
-    void browseCanceledBeforeWorkspaceCommitRestoresActualActivePath()
+    void browseCanceledOnFirstLaunchPreservesDefaultInput()
+    {
+        MainWindow window;
+        window.show();
+        auto *path = window.findChild<QLineEdit *>("workspacePathEdit");
+        auto *browse = window.findChild<QPushButton *>("browseWorkspaceButton");
+        auto *browser = window.findChild<WorkspaceBrowserWidget *>();
+        QVERIFY(path && browse && browser);
+        const QString inputBeforeDialog = path->text();
+        QVERIFY(!inputBeforeDialog.isEmpty());
+        QCOMPARE(inputBeforeDialog, QDir::currentPath());
+        QVERIFY(browser->workspacePath().isEmpty());
+        path->setFocus(); QApplication::processEvents();
+        bool picked = false;
+        QTimer::singleShot(0, &window, [&] {
+            if (auto *picker = qobject_cast<QFileDialog *>(QApplication::activeModalWidget())) {
+                picked = true;
+                picker->reject();
+            }
+        });
+        QTest::mouseClick(browse, Qt::LeftButton);
+        QApplication::processEvents();
+        QVERIFY(picked);
+        QCOMPARE(path->text(), inputBeforeDialog);
+        QVERIFY(browser->workspacePath().isEmpty());
+    }
+    void browseCanceledBeforeWorkspaceCommitPreservesPendingInput()
     {
         QTemporaryDir dir;
         MainWindow window;
@@ -117,9 +143,10 @@ private slots:
             }
         });
         QTest::mouseClick(browse, Qt::LeftButton);
+        QApplication::processEvents();
         QVERIFY(picked);
         QCOMPARE(initialDirectory, dir.path());
-        QCOMPARE(path->text(), browser->workspacePath());
+        QCOMPARE(path->text(), dir.path());
         QVERIFY(browser->workspacePath().isEmpty());
         QVERIFY(QDir(dir.path()).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).isEmpty());
     }
@@ -172,6 +199,7 @@ private slots:
         pathEdit->setFocus();
         QApplication::processEvents();
         if (pendingPath) pathEdit->setText(pending);
+        const QString inputBeforeDialog = pathEdit->text();
         int pickerCount = 0;
         int promptCount = 0;
         QString pickerTitle;
@@ -206,7 +234,7 @@ private slots:
         QCOMPARE(workspaceWhilePicking, first);
         QCOMPARE(promptCount, dirty && acceptPicker ? 1 : 0);
         const bool switched = acceptPicker && (!dirty || (decision != QMessageBox::RejectRole && !saveFailure));
-        QCOMPARE(pathEdit->text(), switched ? second : first);
+        QCOMPARE(pathEdit->text(), !acceptPicker ? inputBeforeDialog : switched ? second : first);
         QCOMPARE(browser->workspacePath(), switched ? second : first);
         QCOMPARE(preview->toPlainText(), switched ? QString() : dirty ? QString("original changed") : QString("original"));
         QCOMPARE(browser->hasUnsavedChanges(), dirty && !switched);
