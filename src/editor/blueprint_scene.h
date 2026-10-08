@@ -45,10 +45,15 @@ public:
     NodeItem *nodeItem(const QString &nodeId) const;
     EdgeItem *edgeItem(const QString &edgeId) const;
     QPointF nodePosition(const QString &nodeId) const;
+    QHash<QString, QPointF> layoutSnapshot() const;
+    bool resetDocument(const BlueprintDocument &document,
+                       const QHash<QString, QPointF> &layout = {},
+                       QString *errorMessage = nullptr);
     QUndoStack *undoStack();
     void setSemanticChangeHandler(std::function<void()> handler);
 
 signals:
+    void layoutChanged();
     void nodeEditRequested(const QString &nodeId);
     // Emitted for a right click on the canvas. target is the NodeItem, EdgeItem or nullptr
     // for empty canvas; the host owns the menu itself.

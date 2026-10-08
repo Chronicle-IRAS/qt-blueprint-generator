@@ -201,6 +201,46 @@ private slots:
         QCOMPARE(c.state(), GenerationController::State::Cancelled);
         QVERIFY(!read(dir.path()+"/generation-manifest.json").contains("pending"));
     }
+    void unconditionalResetCancelsAndClearsAllSessionState()
+    {
+        ManualClient *client = nullptr;
+        GenerationController controller([&](const AiProviderSettings &, QObject *parent) {
+            return client = new ManualClient(parent);
+        });
+        QTemporaryDir directory;
+        QVERIFY(controller.start(document(), "logic", directory.path(), {}));
+        controller.invalidateContext(document(), directory.path());
+        QCOMPARE(controller.state(), GenerationController::State::Generating);
+        auto *old = client;
+        controller.resetContext();
+        QCOMPARE(controller.state(), GenerationController::State::Idle);
+        old->reply();
+        QCOMPARE(controller.state(), GenerationController::State::Idle);
+        QVERIFY(!controller.candidateBatch());
+        QVERIFY(controller.errorMessage().isEmpty());
+        QVERIFY(controller.diagnostics().isEmpty());
+
+        QVERIFY(controller.start(document(), "logic", directory.path(), {}));
+        client->reply();
+        QCOMPARE(controller.state(), GenerationController::State::Success);
+        QVERIFY(controller.candidateBatch());
+        const auto manifest = read(directory.path() + "/generation-manifest.json");
+        controller.resetContext();
+        QCOMPARE(controller.state(), GenerationController::State::Idle);
+        QVERIFY(!controller.candidateBatch());
+        QCOMPARE(read(directory.path() + "/generation-manifest.json"), manifest);
+
+        auto invalid = document();
+        invalid.edges.clear();
+        QVERIFY(!controller.start(invalid, "logic", directory.path(), {}));
+        QVERIFY(!controller.diagnostics().isEmpty());
+        QVERIFY(!controller.errorMessage().isEmpty());
+        controller.resetContext();
+        QCOMPARE(controller.state(), GenerationController::State::Idle);
+        QVERIFY(controller.errorMessage().isEmpty());
+        QVERIFY(controller.diagnostics().isEmpty());
+        QVERIFY(!controller.candidateBatch());
+    }
     void synchronousSuccess()
     {
         GenerationController c([](const AiProviderSettings &, QObject *p) {

@@ -30,6 +30,8 @@ public:
     bool start(BlueprintDocument document, QString nodeId,
                QString absoluteWorkspace, AiProviderSettings provider);
     void cancel();
+    // A project identity switch ends the session even if its semantic content is equal.
+    void resetContext();
     void invalidateContext(const BlueprintDocument &document, const QString &workspace);
     State state() const { return m_state; }
     QString errorMessage() const { return m_error ? tr(m_error) : QString(); }

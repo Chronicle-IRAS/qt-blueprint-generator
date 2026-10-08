@@ -5,6 +5,7 @@
 #include "app/ai_settings_dialog.h"
 #include "app/candidate_review_dialog.h"
 #include "app/validation_diagnostics_dialog.h"
+#include "blueprint/blueprint_project_store.h"
 #include <QUuid>
 
 #include "editor/blueprint_scene.h"
@@ -17,12 +18,15 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QCloseEvent>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDockWidget>
 #include <QDir>
 #include <QEvent>
 #include <QFormLayout>
+#include <QFileInfo>
+#include <QFileDialog>
 #include <QGraphicsView>
 #include <QHBoxLayout>
 #include <QKeySequence>
@@ -30,12 +34,14 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QPainter>
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSettings>
+#include <QScopedValueRollback>
 #include <QStatusBar>
 #include <QToolBar>
 #include <QToolButton>
@@ -48,6 +54,29 @@
 #include <algorithm>
 
 namespace {
+
+BlueprintDocument blankBlueprint()
+{
+    BlueprintDocument document;
+    document.projectId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    document.projectName = QStringLiteral("BlueprintProject");
+    document.target = QStringLiteral("qt6-widgets-cpp17-cmake");
+    return document;
+}
+
+QString normalizedProjectDirectory(const QString &directory)
+{
+    return QDir::cleanPath(QDir::fromNativeSeparators(directory));
+}
+
+bool sameProjectDirectory(const QString &first, const QString &second)
+{
+#ifdef Q_OS_WIN
+    return first.compare(second, Qt::CaseInsensitive) == 0;
+#else
+    return first == second;
+#endif
+}
 
 QString nodeTypeActionObjectName(NodeType type)
 {
@@ -325,9 +354,7 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *parent)
     : QMainWindow(parent)
 {
-    m_document.projectId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    m_document.projectName = QStringLiteral("BlueprintProject");
-    m_document.target = QStringLiteral("qt6-widgets-cpp17-cmake");
+    m_document = blankBlueprint();
     setWindowTitle(tr("Blueprint Editor"));
     resize(1100, 700);
 
@@ -337,6 +364,25 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_view->setRenderHint(QPainter::Antialiasing);
     m_view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
     setCentralWidget(m_view);
+
+    m_fileMenu = menuBar()->addMenu(tr("File"));
+    m_fileMenu->setObjectName(QStringLiteral("fileMenu"));
+    const auto addFileAction = [this](const QString &text, const QString &name,
+                                      QKeySequence::StandardKey shortcut) {
+        QAction *action = m_fileMenu->addAction(text);
+        action->setObjectName(name);
+        action->setShortcut(shortcut);
+        return action;
+    };
+    m_newProjectAction = addFileAction(tr("New"), QStringLiteral("newProjectAction"), QKeySequence::New);
+    m_openProjectAction = addFileAction(tr("Open..."), QStringLiteral("openProjectAction"), QKeySequence::Open);
+    m_fileMenu->addSeparator();
+    m_saveProjectAction = addFileAction(tr("Save"), QStringLiteral("saveProjectAction"), QKeySequence::Save);
+    m_saveProjectAsAction = addFileAction(tr("Save As..."), QStringLiteral("saveProjectAsAction"), QKeySequence::SaveAs);
+    connect(m_newProjectAction, &QAction::triggered, this, [this] { newProject(); });
+    connect(m_openProjectAction, &QAction::triggered, this, &MainWindow::chooseOpenProjectDirectory);
+    connect(m_saveProjectAction, &QAction::triggered, this, [this] { saveProject(); });
+    connect(m_saveProjectAsAction, &QAction::triggered, this, [this] { chooseSaveProjectDirectory(); });
 
     m_blueprintToolbar = addToolBar(tr("Blueprint"));
     m_blueprintToolbar->setObjectName(QStringLiteral("blueprintToolbar"));
@@ -548,8 +594,8 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
         m_reviewDialog = dialog;
         dialog->setAttribute(Qt::WA_DeleteOnClose);
         dialog->setWindowModality(Qt::ApplicationModal);
-        connect(dialog, &QObject::destroyed, this, [this] {
-            m_reviewDialog = nullptr;
+        connect(dialog, &QObject::destroyed, this, [this, dialog] {
+            if (m_reviewDialog == dialog) m_reviewDialog = nullptr;
             updateGenerationUi();
         });
         dialog->show();
@@ -582,6 +628,12 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     connect(m_scene->undoStack(), &QUndoStack::canRedoChanged, this, [this](bool enabled) {
         m_toolbarRedoAction->setEnabled(enabled);
         m_menuRedoAction->setEnabled(enabled);
+    });
+    connect(m_scene->undoStack(), &QUndoStack::indexChanged, this, [this] {
+        if (!m_replacingProject) updateProjectTitle();
+    });
+    connect(m_scene, &BlueprintScene::layoutChanged, this, [this] {
+        if (!m_replacingProject) updateProjectTitle();
     });
     connect(m_englishLanguageAction, &QAction::triggered, this,
             [this] { setLanguage(QStringLiteral("en")); });
@@ -624,7 +676,9 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
         updateGenerationUi();
     });
     m_scene->setSemanticChangeHandler([this] {
+        if (m_replacingProject) return;
         updatePropertyEditor();
+        updateProjectTitle();
         invalidateGenerationContext();
     });
     updatePropertyEditor();
@@ -641,6 +695,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
                                                  ? EditorTheme::Theme::Dark
                                                  : EditorTheme::Theme::Light;
     applyTheme(restoredTheme, false);
+    markProjectSaved();
 }
 
 MainWindow::~MainWindow()
@@ -650,9 +705,181 @@ MainWindow::~MainWindow()
     QObject::disconnect(m_generationController, nullptr, this, nullptr);
     qApp->removeTranslator(&m_translator);
     if (m_scene) {
+        QObject::disconnect(m_scene->undoStack(), nullptr, this, nullptr);
         QObject::disconnect(m_scene, nullptr, this, nullptr);
         m_scene->setSemanticChangeHandler({});
     }
+}
+
+bool MainWindow::newProject()
+{
+    if (!confirmProjectTransition()) return false;
+    const QScopedValueRollback<bool> replacing(m_replacingProject, true);
+    QString error;
+    if (!m_scene->resetDocument(blankBlueprint(), {}, &error)) return false;
+    resetProjectGenerationContext();
+    m_projectDirectory.clear();
+    m_scene->setDragConnectionLabel(m_connectionLabelEdit->text());
+    markProjectSaved();
+    updatePropertyEditor();
+    resetCanvasView(m_view);
+    return true;
+}
+
+bool MainWindow::openProject(const QString &directory)
+{
+    QString error;
+    auto project = BlueprintProjectStore::load(directory, &error);
+    if (!project) {
+        QMessageBox::critical(this, tr("Cannot open blueprint project"), error);
+        return false;
+    }
+    if (!confirmProjectTransition()) return false;
+    // Saving in the prompt may have replaced the very project being opened.
+    if (sameProjectDirectory(normalizedProjectDirectory(directory), m_projectDirectory)) {
+        project = BlueprintProjectStore::load(directory, &error);
+        if (!project) {
+            QMessageBox::critical(this, tr("Cannot open blueprint project"), error);
+            return false;
+        }
+    }
+    const QScopedValueRollback<bool> replacing(m_replacingProject, true);
+    if (!m_scene->resetDocument(project->document, project->layout, &error)) {
+        QMessageBox::critical(this, tr("Cannot open blueprint project"), error);
+        return false;
+    }
+    resetProjectGenerationContext();
+    m_projectDirectory = normalizedProjectDirectory(directory);
+    m_scene->setDragConnectionLabel(m_connectionLabelEdit->text());
+    markProjectSaved();
+    updatePropertyEditor();
+    resetCanvasView(m_view);
+    fitViewToNodeItems(m_view);
+    return true;
+}
+
+bool MainWindow::saveProject()
+{
+    return m_projectDirectory.isEmpty() ? chooseSaveProjectDirectory()
+                                       : saveProjectAs(m_projectDirectory);
+}
+
+bool MainWindow::saveProjectAs(const QString &directory)
+{
+    if (directory.isEmpty()) return false;
+    const QString normalized = normalizedProjectDirectory(directory);
+    if (!sameProjectDirectory(normalized, m_projectDirectory)
+        && (QFileInfo::exists(QDir(directory).filePath(QStringLiteral("blueprint.json")))
+            || QFileInfo::exists(QDir(directory).filePath(QStringLiteral("layout.json"))))) {
+        QMessageBox prompt(QMessageBox::Warning, tr("Replace blueprint project"),
+                           tr("This directory already contains blueprint project files. Replace them with the current project?"),
+                           QMessageBox::NoButton, this);
+        prompt.setObjectName(QStringLiteral("replaceBlueprintProjectDialog"));
+        auto *replace = prompt.addButton(tr("Replace"), QMessageBox::AcceptRole);
+        replace->setObjectName(QStringLiteral("replaceBlueprintProjectButton"));
+        auto *cancel = prompt.addButton(tr("Cancel"), QMessageBox::RejectRole);
+        cancel->setObjectName(QStringLiteral("cancelBlueprintChangesButton"));
+        prompt.setDefaultButton(cancel);
+        prompt.setEscapeButton(cancel);
+        prompt.exec();
+        if (prompt.clickedButton() != replace) return false;
+    }
+    QString error;
+    if (!BlueprintProjectStore::save(directory, m_document, m_scene->layoutSnapshot(), &error)) {
+        QMessageBox::critical(this, tr("Cannot save blueprint project"), error);
+        return false;
+    }
+    if (!sameProjectDirectory(normalized, m_projectDirectory)) resetProjectGenerationContext();
+    m_projectDirectory = normalized;
+    markProjectSaved();
+    return true;
+}
+
+QString MainWindow::projectDirectory() const { return m_projectDirectory; }
+
+bool MainWindow::isModified() const
+{
+    return m_document != m_savedDocument || m_scene->layoutSnapshot() != m_savedLayout;
+}
+
+void MainWindow::markProjectSaved()
+{
+    m_savedDocument = m_document;
+    m_savedLayout = m_scene->layoutSnapshot();
+    m_scene->undoStack()->setClean();
+    updateProjectTitle();
+}
+
+void MainWindow::updateProjectTitle()
+{
+    QString title = tr("Blueprint Editor");
+    if (!m_projectDirectory.isEmpty())
+        title += QStringLiteral(" — ") + QFileInfo(m_projectDirectory).fileName();
+    if (isModified()) title += QStringLiteral(" *");
+    setWindowTitle(title);
+}
+
+bool MainWindow::confirmProjectTransition()
+{
+    if (!isModified()) return true;
+    QMessageBox prompt(QMessageBox::Warning, tr("Unsaved blueprint changes"),
+                       tr("Save changes to the current blueprint project?"),
+                       QMessageBox::NoButton, this);
+    prompt.setObjectName(QStringLiteral("unsavedBlueprintChangesDialog"));
+    // Custom button texts keep the editor language even when qtbase translations are absent.
+    auto *save = prompt.addButton(tr("Save"), QMessageBox::AcceptRole);
+    save->setObjectName(QStringLiteral("saveBlueprintChangesButton"));
+    auto *discard = prompt.addButton(tr("Discard"), QMessageBox::DestructiveRole);
+    discard->setObjectName(QStringLiteral("discardBlueprintChangesButton"));
+    auto *cancel = prompt.addButton(tr("Cancel"), QMessageBox::RejectRole);
+    cancel->setObjectName(QStringLiteral("cancelBlueprintChangesButton"));
+    prompt.setDefaultButton(save);
+    prompt.setEscapeButton(cancel);
+    prompt.exec();
+    if (prompt.clickedButton() == save) return saveProject();
+    return prompt.clickedButton() == discard;
+}
+
+bool MainWindow::chooseSaveProjectDirectory()
+{
+    const QString directory = QFileDialog::getExistingDirectory(
+        this, tr("Save blueprint project as"),
+        m_projectDirectory.isEmpty() ? QDir::currentPath() : m_projectDirectory);
+    return !directory.isEmpty() && saveProjectAs(directory);
+}
+
+void MainWindow::chooseOpenProjectDirectory()
+{
+    const QString directory = QFileDialog::getExistingDirectory(
+        this, tr("Open blueprint project"),
+        m_projectDirectory.isEmpty() ? QDir::currentPath() : m_projectDirectory);
+    if (!directory.isEmpty()) openProject(directory);
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (!confirmProjectTransition()) {
+        event->ignore();
+        return;
+    }
+    resetProjectGenerationContext();
+    event->accept();
+}
+
+void MainWindow::resetProjectGenerationContext()
+{
+    m_generationSnapshot = {};
+    m_generationNodeId.clear();
+    if (m_reviewDialog) {
+        const auto dialog = m_reviewDialog;
+        QObject::disconnect(dialog, nullptr, this, nullptr);
+        m_reviewDialog = nullptr;
+        dialog->invalidateContext();
+        // Project switching dismisses the review without rejecting persisted candidates.
+        dialog->done(QDialog::Rejected);
+    }
+    m_generationController->resetContext();
+    updateGenerationUi();
 }
 
 bool MainWindow::addNodeOfType(NodeType type)
@@ -778,7 +1005,12 @@ void MainWindow::updateThemeActions()
 
 void MainWindow::retranslateUi()
 {
-    setWindowTitle(tr("Blueprint Editor"));
+    updateProjectTitle();
+    m_fileMenu->setTitle(tr("File"));
+    m_newProjectAction->setText(tr("New"));
+    m_openProjectAction->setText(tr("Open..."));
+    m_saveProjectAction->setText(tr("Save"));
+    m_saveProjectAsAction->setText(tr("Save As..."));
     m_blueprintToolbar->setWindowTitle(tr("Blueprint"));
     m_addNodeButton->setText(tr("Add node"));
     for (const auto &[type, action] : m_addNodeActions) {
