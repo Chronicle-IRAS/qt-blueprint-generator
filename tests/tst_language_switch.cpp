@@ -383,7 +383,7 @@ void LanguageSwitchTest::switchesBetweenEnglishAndChineseAndPersistsChoice()
         inputsTable->item(0, 0)->setText(QStringLiteral("draft-input"));
         englishAction->trigger();
         QCOMPARE(window.currentLanguage(), QStringLiteral("en"));
-        QCOMPARE(window.windowTitle(), QStringLiteral("Blueprint Editor"));
+        QCOMPARE(window.windowTitle(), QStringLiteral("Blueprint Editor *"));
         QCOMPARE(languageMenu->title(), QStringLiteral("Language"));
         QCOMPARE(propertiesDock->windowTitle(), QStringLiteral("Properties"));
         QCOMPARE(buildButton->text(), QStringLiteral("Build"));

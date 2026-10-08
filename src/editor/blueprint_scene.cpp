@@ -1,4 +1,5 @@
 #include "editor/blueprint_scene.h"
+#include "blueprint/blueprint_project_store.h"
 
 #include "editor/edge_item.h"
 #include "editor/node_item.h"
@@ -17,6 +18,7 @@
 
 #include <QSet>
 #include <QStringList>
+#include <QSignalBlocker>
 
 #include <algorithm>
 #include <cmath>
@@ -349,6 +351,38 @@ QPointF BlueprintScene::nodePosition(const QString &nodeId) const
     return m_layout.value(nodeId);
 }
 
+QHash<QString, QPointF> BlueprintScene::layoutSnapshot() const
+{
+    return m_layout;
+}
+
+bool BlueprintScene::resetDocument(const BlueprintDocument &document, const QHash<QString, QPointF> &layout,
+                                   QString *errorMessage)
+{
+    if (!BlueprintProjectStore::validate(document, layout, errorMessage)) return false;
+    const BlueprintDocument replacement = document;
+    {
+        const QSignalBlocker blocker(this);
+        cancelConnection();
+        m_dragConnectionLabel.clear();
+        m_undoStack.clear();
+        clear();
+        m_nodes.clear();
+        m_edges.clear();
+        m_layout.clear();
+        *m_document = replacement;
+        m_representable = true;
+        for (qsizetype index = 0; index < m_document->nodes.size(); ++index) {
+            const BlueprintNode &node = m_document->nodes.at(index);
+            createNodeItem(node, layout.value(node.id, QPointF(index * 240.0, 0.0)));
+        }
+        for (const BlueprintEdge &edge : m_document->edges) createEdgeItem(edge);
+        m_undoStack.setClean();
+    }
+    notifySemanticChanged();
+    return true;
+}
+
 QUndoStack *BlueprintScene::undoStack()
 {
     return &m_undoStack;
@@ -608,6 +642,7 @@ void BlueprintScene::handleItemPositionChanged(const QString &nodeId)
     if (NodeItem *item = nodeItem(nodeId)) {
         m_layout.insert(nodeId, item->pos());
         updateEdgesForNode(nodeId);
+        emit layoutChanged();
     }
 }
 

@@ -174,6 +174,15 @@ void GenerationController::cancel()
     if (m_state == State::Generating) finish(State::Cancelled);
 }
 
+void GenerationController::resetContext()
+{
+    m_batch.reset();
+    m_diagnostics.clear();
+    m_document = {};
+    m_workspace.clear();
+    finish(State::Idle);
+}
+
 void GenerationController::invalidateContext(const BlueprintDocument &document, const QString &workspace)
 {
     if (document == m_document && normalized(workspace) == m_workspace) return;

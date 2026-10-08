@@ -133,6 +133,20 @@
 </context>
 <context>
     <name>MainWindow</name>
+    <message><source>File</source><translation>文件</translation></message>
+    <message><source>New</source><translation>新建</translation></message>
+    <message><source>Open...</source><translation>打开...</translation></message>
+    <message><source>Save As...</source><translation>另存为...</translation></message>
+    <message><source>Open blueprint project</source><translation>打开蓝图工程</translation></message>
+    <message><source>Save blueprint project as</source><translation>蓝图工程另存为</translation></message>
+    <message><source>Cannot open blueprint project</source><translation>无法打开蓝图工程</translation></message>
+    <message><source>Cannot save blueprint project</source><translation>无法保存蓝图工程</translation></message>
+    <message><source>Unsaved blueprint changes</source><translation>蓝图有未保存的更改</translation></message>
+    <message><source>Save changes to the current blueprint project?</source><translation>保存当前蓝图工程的更改吗？</translation></message>
+    <message><source>Discard</source><translation>放弃</translation></message>
+    <message><source>Replace blueprint project</source><translation>替换蓝图工程</translation></message>
+    <message><source>This directory already contains blueprint project files. Replace them with the current project?</source><translation>此目录已包含蓝图工程文件。是否用当前工程替换？</translation></message>
+    <message><source>Replace</source><translation>替换</translation></message>
     <message><source>Generate selected node</source><translation>生成选中节点</translation></message>
     <message><source>Cancel generation</source><translation>取消生成</translation></message>
     <message><source>Ready to generate</source><translation>可以开始生成</translation></message>

@@ -1,5 +1,29 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
 
+set(blueprint_project_store_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_blueprint_project_store.moc")
+add_custom_command(OUTPUT "${blueprint_project_store_moc}"
+    COMMAND Qt6::moc -o tst_blueprint_project_store.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_blueprint_project_store.cpp"
+    DEPENDS tst_blueprint_project_store.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_blueprint_project_store tst_blueprint_project_store.cpp "${blueprint_project_store_moc}")
+set_target_properties(tst_blueprint_project_store PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_blueprint_project_store PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_blueprint_project_store PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME blueprint_project_store COMMAND tst_blueprint_project_store)
+set_tests_properties(blueprint_project_store PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
+set(blueprint_persistence_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_blueprint_persistence.moc")
+add_custom_command(OUTPUT "${blueprint_persistence_moc}"
+    COMMAND Qt6::moc -o tst_blueprint_persistence.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_blueprint_persistence.cpp"
+    DEPENDS tst_blueprint_persistence.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_blueprint_persistence tst_blueprint_persistence.cpp "${blueprint_persistence_moc}")
+set_target_properties(tst_blueprint_persistence PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_blueprint_persistence PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_blueprint_persistence PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME blueprint_persistence COMMAND tst_blueprint_persistence)
+set_tests_properties(blueprint_persistence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 set(editor_theme_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_editor_theme.moc")
 add_custom_command(OUTPUT "${editor_theme_moc}"
     COMMAND Qt6::moc -o tst_editor_theme.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_editor_theme.cpp"

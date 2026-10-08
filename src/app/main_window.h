@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QHash>
 #include <QPair>
 #include <QPointF>
 #include <QString>
@@ -21,6 +22,7 @@ class NodePropertiesEditor;
 class QAction;
 class QDockWidget;
 class QEvent;
+class QCloseEvent;
 class QFormLayout;
 class QGraphicsItem;
 class QGraphicsView;
@@ -47,6 +49,12 @@ public:
     const BlueprintDocument &document() const;
     BlueprintScene *scene() const;
     QGraphicsView *graphicsView() const;
+    bool newProject();
+    bool openProject(const QString &projectDirectory);
+    bool saveProject();
+    bool saveProjectAs(const QString &projectDirectory);
+    QString projectDirectory() const;
+    bool isModified() const;
     QString currentLanguage() const;
     bool setLanguage(const QString &languageCode);
     void setTheme(EditorTheme::Theme theme);
@@ -56,6 +64,7 @@ public:
 
 protected:
     void changeEvent(QEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     bool applyLanguage(const QString &languageCode, bool persist);
@@ -78,8 +87,23 @@ private:
     void updateGenerationUi();
     void showValidationDiagnostics();
     void invalidateGenerationContext();
+    void markProjectSaved();
+    void updateProjectTitle();
+    bool confirmProjectTransition();
+    bool chooseSaveProjectDirectory();
+    void chooseOpenProjectDirectory();
+    void resetProjectGenerationContext();
 
     BlueprintDocument m_document;
+    BlueprintDocument m_savedDocument;
+    QHash<QString, QPointF> m_savedLayout;
+    QString m_projectDirectory;
+    bool m_replacingProject = false;
+    QMenu *m_fileMenu = nullptr;
+    QAction *m_newProjectAction = nullptr;
+    QAction *m_openProjectAction = nullptr;
+    QAction *m_saveProjectAction = nullptr;
+    QAction *m_saveProjectAsAction = nullptr;
     BlueprintDocument m_generationSnapshot;
     GenerationController *m_generationController = nullptr;
     QPointer<CandidateReviewDialog> m_reviewDialog;
