@@ -1,4 +1,27 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
+set(workspace_main_integration_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_workspace_main_integration.moc")
+add_custom_command(OUTPUT "${workspace_main_integration_moc}"
+    COMMAND Qt6::moc -o tst_workspace_main_integration.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_workspace_main_integration.cpp"
+    DEPENDS tst_workspace_main_integration.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_workspace_main_integration tst_workspace_main_integration.cpp "${workspace_main_integration_moc}")
+set_target_properties(tst_workspace_main_integration PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_workspace_main_integration PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_workspace_main_integration PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME workspace_main_integration COMMAND tst_workspace_main_integration)
+set_tests_properties(workspace_main_integration PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
+set(workspace_browser_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_workspace_browser.moc")
+add_custom_command(OUTPUT "${workspace_browser_moc}"
+    COMMAND Qt6::moc -o tst_workspace_browser.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_workspace_browser.cpp"
+    DEPENDS tst_workspace_browser.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_workspace_browser tst_workspace_browser.cpp "${workspace_browser_moc}")
+set_target_properties(tst_workspace_browser PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_workspace_browser PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_workspace_browser PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME workspace_browser COMMAND tst_workspace_browser)
+set_tests_properties(workspace_browser PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
 
 set(external_code_gui_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_external_code_gui.moc")
 add_custom_command(OUTPUT "${external_code_gui_moc}"
@@ -438,6 +461,14 @@ add_test(NAME blueprint_scene COMMAND tst_blueprint_scene)
 
 set_tests_properties(blueprint_scene PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+)
+
+add_test(NAME blueprint_scene_fractional_dpi COMMAND tst_blueprint_scene
+    canvasGridPartialRepaintIsStable movingConnectedNodesLeavesNoPartialRepaintResidue
+    edgeBoundsContainPaintedGeometry)
+set_tests_properties(blueprint_scene_fractional_dpi PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=1.5"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
 )
 

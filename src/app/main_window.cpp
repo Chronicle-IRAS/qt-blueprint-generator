@@ -1,4 +1,5 @@
 #include "app/main_window.h"
+#include "app/workspace_browser_widget.h"
 #include "ui/node_type_display.h"
 #include "ui/theme.h"
 
@@ -25,9 +26,9 @@
 #include <QDockWidget>
 #include <QDir>
 #include <QEvent>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QFileInfo>
-#include <QFileDialog>
 #include <QGraphicsView>
 #include <QHBoxLayout>
 #include <QKeySequence>
@@ -41,6 +42,7 @@
 #include <QProcess>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QSettings>
 #include <QScopedValueRollback>
 #include <QStatusBar>
@@ -521,6 +523,15 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_workspacePathEdit = new QLineEdit(QDir::currentPath(), buildWidget);
     m_workspacePathEdit->setObjectName(QStringLiteral("workspacePathEdit"));
     m_workspacePathEdit->setToolTip(tr("Workspace root containing generated-project"));
+    m_workspacePathRow = new QWidget(buildWidget);
+    auto *workspacePathLayout = new QHBoxLayout(m_workspacePathRow);
+    workspacePathLayout->setContentsMargins(0, 0, 0, 0);
+    workspacePathLayout->addWidget(m_workspacePathEdit);
+    m_browseWorkspaceButton = new QPushButton(tr("Browse..."), m_workspacePathRow);
+    m_browseWorkspaceButton->setObjectName(QStringLiteral("browseWorkspaceButton"));
+    m_browseWorkspaceButton->setToolTip(tr("Choose an existing workspace directory"));
+    workspacePathLayout->addWidget(m_browseWorkspaceButton);
+    connect(m_browseWorkspaceButton, &QPushButton::clicked, this, &MainWindow::browseWorkspace);
     m_buildDirectoryEdit = new QLineEdit(QDir(QDir::currentPath()).filePath(QStringLiteral("build/generated-project")), buildWidget);
     m_buildDirectoryEdit->setObjectName(QStringLiteral("buildDirectoryEdit"));
     m_exportTargetEdit = new QLineEdit(buildWidget);
@@ -530,7 +541,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_configureArgumentsEdit = new QLineEdit(buildWidget);
     m_configureArgumentsEdit->setObjectName(QStringLiteral("cmakeConfigureArgumentsEdit"));
     m_configureArgumentsEdit->setPlaceholderText(tr("For example: -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.x/mingw_64"));
-    m_buildForm->addRow(tr("Workspace root"), m_workspacePathEdit);
+    m_buildForm->addRow(tr("Workspace root"), m_workspacePathRow);
     m_buildForm->addRow(tr("Build directory"), m_buildDirectoryEdit);
     m_buildForm->addRow(tr("Empty export directory"), m_exportTargetEdit);
     m_buildForm->addRow(tr("CMake executable"), m_cmakeExecutableEdit);
@@ -577,6 +588,60 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_buildDockAction->setObjectName(QStringLiteral("buildExportDockAction"));
     m_viewMenu->addAction(m_propertiesDockAction);
     m_viewMenu->addAction(m_buildDockAction);
+    m_workspaceDock = new QDockWidget(tr("Workspace Editor"), this);
+    m_workspaceDock->setObjectName(QStringLiteral("workspaceEditorDock"));
+    m_workspaceBrowser = new WorkspaceBrowserWidget(m_workspaceDock);
+    m_workspaceDock->setWidget(m_workspaceBrowser);
+    m_workspaceDock->installEventFilter(this);
+    addDockWidget(Qt::BottomDockWidgetArea, m_workspaceDock, Qt::Vertical);
+    m_workspaceDock->hide();
+    m_workspaceDockAction = m_viewMenu->addAction(tr("Workspace Editor"));
+    m_workspaceDockAction->setObjectName(QStringLiteral("workspaceEditorAction"));
+    m_workspaceDockAction->setCheckable(true);
+    connect(m_workspaceDockAction, &QAction::triggered, this, [this](bool visible) {
+        if (visible) {
+            if (!m_workspaceBrowser->setWorkspacePath(m_workspacePathEdit->text().trimmed())) {
+                m_workspaceDockAction->setChecked(false);
+                return;
+            }
+            if (!m_workspaceBrowser->refresh()) {
+                m_workspaceDockAction->setChecked(false);
+                return;
+            }
+            m_workspaceDock->show();
+        } else {
+            if (!m_workspaceBrowser->requestCanDiscardChanges()) {
+                m_workspaceDockAction->setChecked(true);
+                return;
+            }
+            m_workspaceDock->hide();
+        }
+    });
+    connect(m_workspaceDock, &QDockWidget::visibilityChanged, this, [this](bool visible) {
+        m_workspaceDockAction->setChecked(visible);
+    });
+    for (QWidget *control : {static_cast<QWidget *>(m_buildProjectButton),
+                             static_cast<QWidget *>(m_browseWorkspaceButton),
+                             m_blueprintToolbar->widgetForAction(m_toolbarBuildAction),
+                             static_cast<QWidget *>(m_exportProjectButton),
+                             m_blueprintToolbar->widgetForAction(m_toolbarExportAction)}) {
+        if (control) control->installEventFilter(this);
+    }
+    installEventFilter(this);
+    connect(m_workspacePathEdit, &QLineEdit::editingFinished, this, [this] {
+        QWidget *focused = QApplication::focusWidget();
+        const bool focusedOperation = focused == m_buildProjectButton
+            || focused == m_browseWorkspaceButton
+            || focused == m_blueprintToolbar->widgetForAction(m_toolbarBuildAction)
+            || focused == m_exportProjectButton
+            || focused == m_blueprintToolbar->widgetForAction(m_toolbarExportAction);
+        if (m_workspaceOperationMousePressPending || m_workspaceOperationPreflightActive
+            || (focusedOperation && (QApplication::mouseButtons() & Qt::LeftButton))) {
+            m_deferredWorkspaceEdit = true;
+            return;
+        }
+        applyWorkspacePathEdit();
+    });
     m_viewMenu->addSeparator();
     m_resetLayoutAction = m_viewMenu->addAction(tr("Reset Layout"));
     m_resetLayoutAction->setObjectName(QStringLiteral("resetLayoutAction"));
@@ -873,6 +938,12 @@ void MainWindow::closeEvent(QCloseEvent *event)
         event->ignore();
         return;
     }
+    // Blueprint Discard only approves closing; source Discard changes the buffer.
+    // Ask the blueprint owner first so cancelling it cannot discard source edits.
+    if (!m_workspaceBrowser->requestCanDiscardChanges()) {
+        event->ignore();
+        return;
+    }
     resetProjectGenerationContext();
     event->accept();
 }
@@ -1062,12 +1133,16 @@ void MainWindow::retranslateUi()
     m_manageExternalCodeButton->setText(tr("Manage external code..."));
 
     m_buildDock->setWindowTitle(tr("Build and export"));
+    m_workspaceDock->setWindowTitle(tr("Workspace Editor"));
+    m_workspaceDockAction->setText(tr("Workspace Editor"));
     m_buildDockAction->setText(tr("Build and export"));
     m_resetLayoutAction->setText(tr("Reset Layout"));
     m_workspacePathEdit->setToolTip(tr("Workspace root containing generated-project"));
+    m_browseWorkspaceButton->setText(tr("Browse..."));
+    m_browseWorkspaceButton->setToolTip(tr("Choose an existing workspace directory"));
     m_configureArgumentsEdit->setPlaceholderText(
         tr("For example: -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.x/mingw_64"));
-    setFormLabel(m_buildForm, m_workspacePathEdit, tr("Workspace root"));
+    setFormLabel(m_buildForm, m_workspacePathRow, tr("Workspace root"));
     setFormLabel(m_buildForm, m_buildDirectoryEdit, tr("Build directory"));
     setFormLabel(m_buildForm, m_exportTargetEdit, tr("Empty export directory"));
     setFormLabel(m_buildForm, m_cmakeExecutableEdit, tr("CMake executable"));
@@ -1160,8 +1235,64 @@ void MainWindow::showValidationDiagnostics()
     dialog.exec();
 }
 
+void MainWindow::applyWorkspacePathEdit()
+{
+    const QString path = m_workspacePathEdit->text().trimmed();
+    if (!m_workspaceBrowser->setWorkspacePath(path)) {
+        const QSignalBlocker blocked(m_workspacePathEdit);
+        m_workspacePathEdit->setText(m_workspaceBrowser->workspacePath());
+    }
+}
+
+void MainWindow::browseWorkspace()
+{
+    // Opening the picker must not commit a pending path through editingFinished.
+    const QString inputBeforeDialog = m_workspacePathEdit->text();
+    m_workspaceOperationPreflightActive = true;
+    const QString activePath = m_workspaceBrowser->workspacePath();
+    const QString initialDirectory = activePath.isEmpty()
+        ? inputBeforeDialog.trimmed() : activePath;
+    const QString selected = QFileDialog::getExistingDirectory(
+        this, tr("Select workspace directory"), initialDirectory);
+    if (!selected.isEmpty() && m_workspaceBrowser->setWorkspacePath(selected)) {
+        m_workspacePathEdit->setText(selected);
+    } else {
+        const QSignalBlocker blocked(m_workspacePathEdit);
+        m_workspacePathEdit->setText(selected.isEmpty() ? inputBeforeDialog : activePath);
+    }
+    m_workspaceOperationPreflightActive = false;
+    m_workspaceOperationMousePressPending = false;
+    m_deferredWorkspaceEdit = false;
+}
+
+void MainWindow::finishAbortedWorkspaceOperationClick()
+{
+    if (!m_workspaceOperationMousePressPending || m_workspaceOperationPreflightActive) return;
+    m_workspaceOperationMousePressPending = false;
+    if (!m_deferredWorkspaceEdit) return;
+    m_deferredWorkspaceEdit = false;
+    applyWorkspacePathEdit();
+}
+
+bool MainWindow::prepareWorkspaceOperation()
+{
+    m_workspaceOperationPreflightActive = true;
+    const QString target = m_workspacePathEdit->text().trimmed();
+    const bool switched = m_workspaceBrowser->setWorkspacePath(target);
+    if (!switched) {
+        const QSignalBlocker blocked(m_workspacePathEdit);
+        m_workspacePathEdit->setText(m_workspaceBrowser->workspacePath());
+    }
+    const bool ready = switched && m_workspaceBrowser->requestCanDiscardChanges();
+    m_workspaceOperationPreflightActive = false;
+    m_workspaceOperationMousePressPending = false;
+    m_deferredWorkspaceEdit = false;
+    return ready;
+}
+
 void MainWindow::startBuild()
 {
+    if (!prepareWorkspaceOperation()) return;
     BuildRequest request;
     const QString workspace = m_workspacePathEdit->text().trimmed();
     request.buildDirectory = m_buildDirectoryEdit->text().trimmed();
@@ -1188,6 +1319,7 @@ void MainWindow::startBuild()
 
 void MainWindow::exportProject()
 {
+    if (!prepareWorkspaceOperation()) return;
     QString error;
     if (ProjectExporter::exportProject(m_workspacePathEdit->text().trimmed(),
                                        m_exportTargetEdit->text().trimmed(), &error)) {
@@ -1199,6 +1331,12 @@ void MainWindow::exportProject()
 
 void MainWindow::resetWindowLayout()
 {
+    if (!m_workspaceBrowser->requestCanDiscardChanges()) return;
+    m_workspaceDock->hide();
+    m_workspaceDock->setFloating(false);
+    removeDockWidget(m_workspaceDock);
+    addDockWidget(Qt::BottomDockWidgetArea, m_workspaceDock, Qt::Vertical);
+    m_workspaceDock->hide();
     for (QDockWidget *dock : {m_propertiesDock, m_buildDock}) {
         dock->setFloating(false);
         removeDockWidget(dock);
@@ -1209,6 +1347,37 @@ void MainWindow::resetWindowLayout()
     m_buildDock->show();
     resizeDocks({m_propertiesDock}, {340}, Qt::Horizontal);
     resizeDocks({m_buildDock}, {260}, Qt::Vertical);
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == this && event->type() == QEvent::WindowDeactivate) {
+        QMetaObject::invokeMethod(this, [this] { finishAbortedWorkspaceOperationClick(); },
+                                  Qt::QueuedConnection);
+    }
+    if (watched == m_buildProjectButton
+        || watched == m_browseWorkspaceButton
+        || watched == m_blueprintToolbar->widgetForAction(m_toolbarBuildAction)
+        || watched == m_exportProjectButton
+        || watched == m_blueprintToolbar->widgetForAction(m_toolbarExportAction)) {
+        if (event->type() == QEvent::MouseButtonPress
+            && static_cast<QMouseEvent *>(event)->button() == Qt::LeftButton) {
+            m_workspaceOperationMousePressPending = true;
+        } else if (event->type() == QEvent::MouseButtonRelease
+                   && static_cast<QMouseEvent *>(event)->button() == Qt::LeftButton) {
+            QMetaObject::invokeMethod(this, [this] { finishAbortedWorkspaceOperationClick(); },
+                                      Qt::QueuedConnection);
+        } else if (event->type() == QEvent::UngrabMouse) {
+            QMetaObject::invokeMethod(this, [this] { finishAbortedWorkspaceOperationClick(); },
+                                      Qt::QueuedConnection);
+        }
+    }
+    if (watched == m_workspaceDock && event->type() == QEvent::Close
+        && !m_workspaceBrowser->requestCanDiscardChanges()) {
+        static_cast<QCloseEvent *>(event)->ignore();
+        return true;
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::appendBuildLog(const QString &text)

@@ -1,5 +1,8 @@
 #include "app/generation_controller.h"
 #include "ai/fake_ai_client.h"
+#include "generation/project_scaffolder.h"
+#include <QCryptographicHash>
+#include <QDirIterator>
 #include <QFile>
 #include <QJsonDocument>
 #include <QTemporaryDir>
@@ -24,6 +27,16 @@ QByteArray response()
     return R"({"nodeId":"logic","summary":"done","files":[{"path":"src/modules/logic/implementation/worker.cpp","content":"// candidate"}]})";
 }
 QByteArray read(const QString &path) { QFile f(path); if (!f.open(QIODevice::ReadOnly)) return {}; return f.readAll(); }
+QMap<QString, QByteArray> fileHashes(const QString &root)
+{
+    QMap<QString, QByteArray> hashes;
+    QDirIterator files(root, QDir::Files | QDir::Hidden, QDirIterator::Subdirectories);
+    while (files.hasNext()) {
+        const QString path = files.next();
+        hashes.insert(QDir(root).relativeFilePath(path), QCryptographicHash::hash(read(path), QCryptographicHash::Sha256));
+    }
+    return hashes;
+}
 class ManualClient : public IAiClient {
 public:
     using IAiClient::IAiClient;
@@ -59,6 +72,50 @@ private slots:
         QVERIFY(!c.start(invalid, "logic", dir.path(), {}));
         QCOMPARE(calls, 0);
         QCOMPARE(c.state(), GenerationController::State::Failed);
+    }
+    void scaffoldInitializationKeepsSpecificReasonAndFiles_data()
+    {
+        QTest::addColumn<QString>("failure");
+        QTest::addColumn<QString>("reason");
+        QTest::newRow("blueprint-mismatch") << "mismatch" << "Blueprint or scaffold version changed; use a new workspace";
+        QTest::newRow("protected-changed") << "changed" << "Scaffold file was manually changed or removed: src/main.cpp";
+        QTest::newRow("protected-removed") << "removed" << "Scaffold file was manually changed or removed: src/main.cpp";
+        QTest::newRow("untracked-project") << "untracked" << "Refusing to overwrite an untracked project file: src/main.cpp";
+    }
+    void scaffoldInitializationKeepsSpecificReasonAndFiles()
+    {
+        QFETCH(QString, failure);
+        QFETCH(QString, reason);
+        QTemporaryDir dir;
+        auto requested = document();
+        const QString main = dir.path() + "/generated-project/src/main.cpp";
+        if (failure != "untracked") QVERIFY(ProjectScaffolder::create(requested, dir.path()));
+        if (failure == "mismatch") requested.nodes[1].description += " revised";
+        if (failure == "changed" || failure == "untracked") {
+            QVERIFY(QDir().mkpath(QFileInfo(main).absolutePath()));
+            QFile file(main); QVERIFY(file.open(QIODevice::WriteOnly));
+            QCOMPARE(file.write("// keep manual code"), qint64(19)); file.close();
+        }
+        if (failure == "removed") QVERIFY(QFile::remove(main));
+        const auto before = fileHashes(dir.path());
+        int calls = 0;
+        GenerationController controller([&](const AiProviderSettings &, QObject *parent) {
+            ++calls; return new ManualClient(parent);
+        });
+        QVERIFY(!controller.start(requested, "logic", dir.path(), {}));
+        QCOMPARE(controller.state(), GenerationController::State::Failed);
+        QCOMPARE(calls, 0);
+        QVERIFY(!controller.candidateBatch());
+        QVERIFY(controller.diagnostics().isEmpty());
+        QCOMPARE(fileHashes(dir.path()), before);
+        QVERIFY2(controller.errorMessage().contains(reason), qPrintable(controller.errorMessage()));
+        QTemporaryDir empty;
+        QVERIFY(controller.start(requested, "logic", empty.path(), {}));
+        QCOMPARE(calls, 1);
+        QVERIFY(controller.errorMessage().isEmpty());
+        controller.cancel();
+        QVERIFY(controller.errorMessage().isEmpty());
+        QCOMPARE(fileHashes(dir.path()), before);
     }
     void validationFailureExposesDiagnostics()
     {

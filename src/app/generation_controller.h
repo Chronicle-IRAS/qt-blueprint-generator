@@ -34,7 +34,10 @@ public:
     void resetContext();
     void invalidateContext(const BlueprintDocument &document, const QString &workspace);
     State state() const { return m_state; }
-    QString errorMessage() const { return m_error ? tr(m_error) : QString(); }
+    QString errorMessage() const {
+        if (!m_error) return {};
+        return m_errorDetail.isEmpty() ? tr(m_error) : tr(m_error).arg(m_errorDetail);
+    }
     // Blueprint validation diagnostics of the last failed start(); empty for every
     // other failure (provider, workspace, selection) and for a successful session.
     QVector<BlueprintDiagnostic> diagnostics() const { return m_diagnostics; }
@@ -43,10 +46,11 @@ signals:
     void stateChanged(GenerationController::State state);
     void candidateReady(const CandidateBatch &batch);
 private:
-    void finish(State state, const char *safeError = nullptr);
+    void finish(State state, const char *safeError = nullptr, const QString &localDetail = {});
     ClientFactory m_factory;
     State m_state = State::Idle;
     const char *m_error = nullptr;
+    QString m_errorDetail;
     QPointer<QObject> m_session;
     QUuid m_token;
     BlueprintDocument m_document;

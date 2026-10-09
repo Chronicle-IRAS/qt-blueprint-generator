@@ -16,6 +16,7 @@
 
 class BlueprintScene;
 class BuildService;
+class WorkspaceBrowserWidget;
 class CandidateReviewDialog;
 class ExternalCodeDialog;
 class QLabel;
@@ -66,6 +67,7 @@ public:
 protected:
     void changeEvent(QEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     bool applyLanguage(const QString &languageCode, bool persist);
@@ -79,6 +81,10 @@ private:
     void editNodeFromCanvas(const QString &nodeId);
     void applyProperties();
     void updatePropertyEditor();
+    void applyWorkspacePathEdit();
+    void browseWorkspace();
+    void finishAbortedWorkspaceOperationClick();
+    bool prepareWorkspaceOperation();
     void startBuild();
     void exportProject();
     void resetWindowLayout();
@@ -143,6 +149,7 @@ private:
     QAction *m_aiSettingsAction = nullptr;
     QAction *m_propertiesDockAction = nullptr;
     QAction *m_buildDockAction = nullptr;
+    QAction *m_workspaceDockAction = nullptr;
     QAction *m_resetLayoutAction = nullptr;
     QMenu *m_languageMenu = nullptr;
     QAction *m_englishLanguageAction = nullptr;
@@ -157,8 +164,15 @@ private:
     QPushButton *m_manageExternalCodeButton = nullptr;
     BuildService *m_buildService = nullptr;
     QDockWidget *m_buildDock = nullptr;
+    QDockWidget *m_workspaceDock = nullptr;
+    WorkspaceBrowserWidget *m_workspaceBrowser = nullptr;
     QFormLayout *m_buildForm = nullptr;
     QLineEdit *m_workspacePathEdit = nullptr;
+    QWidget *m_workspacePathRow = nullptr;
+    QPushButton *m_browseWorkspaceButton = nullptr;
+    bool m_workspaceOperationMousePressPending = false;
+    bool m_workspaceOperationPreflightActive = false;
+    bool m_deferredWorkspaceEdit = false;
     QLineEdit *m_buildDirectoryEdit = nullptr;
     QLineEdit *m_exportTargetEdit = nullptr;
     QLineEdit *m_cmakeExecutableEdit = nullptr;

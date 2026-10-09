@@ -45,7 +45,7 @@
     <message><source>AI provider settings are invalid.</source><translation>AI 服务设置无效。</translation></message>
     <message><source>Select an existing absolute workspace directory.</source><translation>请选择已存在的工作目录，并使用绝对路径。</translation></message>
     <message><source>Fix blueprint validation errors before generating.</source><translation>请先修正蓝图校验错误，再生成代码。</translation></message>
-    <message><source>The workspace scaffold could not be initialized or does not match the blueprint.</source><translation>无法初始化工程骨架，或工作目录与当前蓝图不匹配。</translation></message>
+    <message><source>Could not initialize workspace scaffold: %1</source><translation>无法初始化工作区工程骨架：%1</translation></message>
     <message><source>Could not read the workspace contracts.</source><translation>无法读取工作目录中的接口契约。</translation></message>
     <message><source>The workspace blueprint contract is invalid.</source><translation>工作目录中的蓝图契约无效。</translation></message>
     <message><source>Could not prepare the node generation prompt.</source><translation>无法准备节点生成提示词。</translation></message>
@@ -150,6 +150,10 @@
     <message><source>Replace blueprint project</source><translation>替换蓝图工程</translation></message>
     <message><source>This directory already contains blueprint project files. Replace them with the current project?</source><translation>此目录已包含蓝图工程文件。是否用当前工程替换？</translation></message>
     <message><source>Replace</source><translation>替换</translation></message>
+    <message><source>Browse...</source><translation>浏览...</translation></message>
+    <message><source>Choose an existing workspace directory</source><translation>选择已有的工作区目录</translation></message>
+    <message><source>Select workspace directory</source><translation>选择工作区目录</translation></message>
+    <message><source>Workspace Editor</source><translation>工作区编辑器</translation></message>
     <message><source>Generate selected node</source><translation>生成选中节点</translation></message>
     <message><source>Cancel generation</source><translation>取消生成</translation></message>
     <message><source>Ready to generate</source><translation>可以开始生成</translation></message>
@@ -605,5 +609,38 @@ Bound workspace: %3</source><translation>已应用的节点：%1（%2）
     <message><source>Import verification or operation failed: %1</source><translation>导入验证或操作失败：%1</translation></message>
     <message><source>Apply inspector changes first. Import writes also require generation, candidate review, and build to be idle.</source><translation>请先应用属性面板的更改；生成、候选审核或构建进行中也不允许写入外部代码。</translation></message>
     <message><source>The project context changed. Open external code management again.</source><translation>项目上下文已改变，请重新打开外部代码管理窗口。</translation></message>
+</context>
+<context>
+    <name>WorkspaceBrowserWidget</name>
+    <message><source>Refresh</source><translation>刷新</translation></message>
+    <message><source>Save</source><translation>保存</translation></message>
+    <message><source>Unsaved changes</source><translation>未保存修改</translation></message>
+    <message><source>Save changes to %1?</source><translation>是否保存对 %1 的修改？</translation></message>
+    <message><source>Discard</source><translation>放弃</translation></message>
+    <message><source>Cancel</source><translation>取消</translation></message>
+    <message><source>File changed on disk</source><translation>文件已在磁盘上发生变化</translation></message>
+    <message><source>File changed on disk. Reload and discard your changes?</source><translation>磁盘文件已改变。是否重新加载并放弃当前修改？</translation></message>
+    <message><source>Reload</source><translation>重新加载</translation></message>
+    <message><source>The file or its protection status changed.</source><translation>文件或其保护状态已改变。</translation></message>
+    <message><source>Cannot verify the current disk file.</source><translation>无法验证当前磁盘文件。</translation></message>
+    <message><source>Save failed: %1</source><translation>保存失败：%1</translation></message>
+    <message><source>Reload failed; local edits were kept.</source><translation>重新加载失败；本地修改已保留。</translation></message>
+    <message><source>File changed on disk.</source><translation>磁盘文件已改变。</translation></message>
+    <message><source>Double-click a file to open it.</source><translation>双击文件打开。</translation></message>
+    <message><source>Empty file. Editable.</source><translation>空文件。可编辑。</translation></message>
+    <message><source>Editable project file.</source><translation>可编辑的工程文件。</translation></message>
+    <message><source> Modified.</source><translation> 已修改。</translation></message>
+    <message><source>No file selected</source><translation>未选择文件</translation></message>
+    <message><source>No generated-project directory. Set an existing workspace root in Build and export.</source><translation>尚无 generated-project 目录。请在“构建与导出”中设置已有的工作区根目录。</translation></message>
+    <message><source>The generated-project directory is empty.</source><translation>generated-project 目录为空。</translation></message>
+    <message><source>The file tree limit was reached (2,000 entries / 32 levels).</source><translation>已达到文件树上限（2,000 个条目 / 32 层）。</translation></message>
+    <message><source>Cannot open file: missing file or unsafe workspace path. Refresh the file tree.</source><translation>无法打开文件：文件不存在或工作区路径不安全。请刷新文件树。</translation></message>
+    <message><source>Cannot read this file.</source><translation>无法读取此文件。</translation></message>
+    <message><source>Preview is not supported for this file type or encoding. UTF-8 text is required.</source><translation>不支持预览此文件类型或编码。仅支持 UTF-8 文本。</translation></message>
+    <message><source>File is too large to preview (limit: 1 MiB).</source><translation>文件过大，无法预览（上限：1 MiB）。</translation></message>
+    <message><source>Empty file. Read-only.</source><translation>空文件。只读。</translation></message>
+    <message><source>Read-only preview — protected scaffold / contract.</source><translation>只读预览 — 受保护的骨架 / 契约文件。</translation></message>
+    <message><source>Read-only preview — protected external code.</source><translation>只读预览 — 受保护的外部代码。</translation></message>
+    <message><source>Read-only preview — protection metadata is unavailable.</source><translation>只读预览 — 保护元数据不可用。</translation></message>
 </context>
 </TS>
