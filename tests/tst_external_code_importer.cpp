@@ -1,5 +1,6 @@
 #include "workspace/external_code_importer.h"
 #include "blueprint/blueprint_validator.h"
+#include "blueprint/blueprint_serializer.h"
 #include "generation/generation_service.h"
 #include "generation/ir_compiler.h"
 #include "generation/project_scaffolder.h"
@@ -70,6 +71,11 @@ class ExternalCodeImporterTest final : public QObject
 {
     Q_OBJECT
 private slots:
+    void distinguishesFreshAndAssociatedImportState_data();
+    void distinguishesFreshAndAssociatedImportState();
+    void missingImportUsesSurvivingScaffoldContext_data();
+    void missingImportUsesSurvivingScaffoldContext();
+    void missingImportRejectsLinkedScaffoldSource();
     void preservesSelectedBytesAndRecordsContract();
     void acceptsCAndCxxSelections();
     void exposesOnlyVerifiedMetadataAndBytes();
@@ -94,6 +100,119 @@ private slots:
     void deletedManifestCannotBypassValidation_data();
     void deletedManifestCannotBypassValidation();
 };
+
+void ExternalCodeImporterTest::distinguishesFreshAndAssociatedImportState_data()
+{
+    QTest::addColumn<QString>("kind");
+    for (const char *kind : {"fresh", "incomplete-contract", "verified", "missing-manifest", "empty-root", "corrupt-manifest", "unsafe-node", "wrong-type", "relative-workspace", "absent-workspace", "case-alias"})
+        QTest::newRow(kind) << QString::fromLatin1(kind);
+}
+
+void ExternalCodeImporterTest::distinguishesFreshAndAssociatedImportState()
+{
+    QFETCH(QString, kind);
+    QTemporaryDir source, workspace;
+    auto node = externalNode();
+    QString selectedWorkspace = workspace.path();
+    QVERIFY(write(source.path(), "api.h", "source"));
+    if (kind == "verified" || kind == "missing-manifest" || kind == "corrupt-manifest") {
+        QVERIFY(ExternalCodeImporter::importFiles(node, source.path(), {"api.h"}, workspace.path()));
+        if (kind == "missing-manifest") QVERIFY(QFile::remove(workspace.filePath(manifestPath)));
+        if (kind == "corrupt-manifest") QVERIFY(write(workspace.path(), manifestPath, "bad json"));
+    }
+    if (kind == "empty-root") QVERIFY(QDir().mkpath(workspace.filePath("external/vendor")));
+    if (kind == "incomplete-contract") node.description.clear();
+    if (kind == "unsafe-node") node.id = "../vendor";
+    if (kind == "wrong-type") node.type = NodeType::LogicModule;
+    if (kind == "relative-workspace") selectedWorkspace = "relative-workspace";
+    if (kind == "absent-workspace") selectedWorkspace = workspace.filePath("absent");
+    if (kind == "case-alias") QVERIFY(QDir().mkpath(workspace.filePath("external/VENDOR")));
+    QJsonObject manifest{{"stale", true}};
+    QString error = "stale";
+    const auto state = ExternalCodeImporter::inspectImport(node, selectedWorkspace, manifest, &error);
+    using State = ExternalCodeImporter::ImportState;
+    if (kind == "fresh" || kind == "incomplete-contract") {
+        QCOMPARE(state, State::NotImported);
+        QVERIFY(manifest.isEmpty());
+        QVERIFY(error.isEmpty());
+        QVERIFY(!ExternalCodeImporter::verifyImport(node, selectedWorkspace));
+    } else if (kind == "verified") {
+        QCOMPARE(state, State::Verified);
+        QVERIFY(!manifest.isEmpty());
+        QVERIFY(error.isEmpty());
+    } else {
+        QCOMPARE(state, State::Invalid);
+        QVERIFY(manifest.isEmpty());
+        QVERIFY(!error.isEmpty());
+        QVERIFY(!ExternalCodeImporter::verifyImport(node, selectedWorkspace));
+    }
+}
+
+void ExternalCodeImporterTest::missingImportUsesSurvivingScaffoldContext_data()
+{
+    QTest::addColumn<QString>("kind");
+    for (const char *kind : {"associated", "changed-contract", "other-node", "missing-source", "tampered-source", "malformed-source", "bad-generation-manifest", "source-without-generation"})
+        QTest::newRow(kind) << QString::fromLatin1(kind);
+}
+
+void ExternalCodeImporterTest::missingImportUsesSurvivingScaffoldContext()
+{
+    QFETCH(QString, kind);
+    QTemporaryDir source, workspace;
+    auto node = externalNode();
+    QVERIFY(write(source.path(), "api.h", "source"));
+    QVERIFY(ExternalCodeImporter::importFiles(node, source.path(), {"api.h"}, workspace.path()));
+    QVERIFY(ProjectScaffolder::create(graph(node), workspace.path()));
+    // Exact fixture-owned import directory; preserve surviving scaffold evidence.
+    QVERIFY(QDir(workspace.filePath("external/vendor")).removeRecursively());
+    const QString sourcePath = "generated-project/src/contracts/source-blueprint.json";
+    if (kind == "changed-contract") node.description += " changed";
+    if (kind == "other-node") node.id = "other";
+    if (kind == "missing-source") QVERIFY(QFile::remove(workspace.filePath(sourcePath)));
+    if (kind == "tampered-source") {
+        auto changed = node; changed.id = "other";
+        QVERIFY(write(workspace.path(), sourcePath, BlueprintSerializer::toJson(graph(changed))));
+    }
+    if (kind == "malformed-source") {
+        QVERIFY(write(workspace.path(), sourcePath, "bad json"));
+        auto generation = QJsonDocument::fromJson(read(workspace.path(), "generation-manifest.json")).object();
+        auto protectedFiles = generation.value("protectedFiles").toObject();
+        protectedFiles["src/contracts/source-blueprint.json"] = WorkspaceIo::sha256("bad json");
+        generation["protectedFiles"] = protectedFiles;
+        QVERIFY(write(workspace.path(), "generation-manifest.json", WorkspaceIo::json(generation)));
+    }
+    if (kind == "bad-generation-manifest") QVERIFY(write(workspace.path(), "generation-manifest.json", "bad json"));
+    if (kind == "source-without-generation") QVERIFY(QFile::remove(workspace.filePath("generation-manifest.json")));
+    QJsonObject manifest{{"stale", true}};
+    QString error;
+    const auto state = ExternalCodeImporter::inspectImport(node, workspace.path(), manifest, &error);
+    QCOMPARE(state, kind == "other-node" ? ExternalCodeImporter::ImportState::NotImported : ExternalCodeImporter::ImportState::Invalid);
+    QVERIFY(manifest.isEmpty());
+    QCOMPARE(error.isEmpty(), kind == "other-node");
+}
+
+void ExternalCodeImporterTest::missingImportRejectsLinkedScaffoldSource()
+{
+    QTemporaryDir workspace, outside;
+    const auto node = externalNode();
+    QVERIFY(write(outside.path(), "source-blueprint.json", BlueprintSerializer::toJson(graph(node))));
+    QVERIFY(QDir().mkpath(workspace.filePath("generated-project/src")));
+    const QString link = workspace.filePath("generated-project/src/contracts");
+#ifdef Q_OS_WIN
+    if (QProcess::execute("cmd.exe", {"/c", "mklink", "/J", QDir::toNativeSeparators(link), QDir::toNativeSeparators(outside.path())}) != 0)
+        QSKIP("Directory junction creation unavailable");
+    const auto cleanup = qScopeGuard([&] { QDir().rmdir(link); });
+#else
+    if (!QFile::link(outside.path(), link)) QSKIP("Directory symlink creation unavailable");
+    const auto cleanup = qScopeGuard([&] { QFile::remove(link); });
+#endif
+    QJsonObject manifest{{"stale", true}};
+    QString error;
+    QCOMPARE(ExternalCodeImporter::inspectImport(node, workspace.path(), manifest, &error), ExternalCodeImporter::ImportState::Invalid);
+    QVERIFY(manifest.isEmpty());
+    QVERIFY(!error.isEmpty());
+    QCOMPARE(read(outside.path(), "source-blueprint.json"), BlueprintSerializer::toJson(graph(node)));
+}
 
 void ExternalCodeImporterTest::acceptsCAndCxxSelections()
 {
@@ -574,6 +693,13 @@ void ExternalCodeImporterTest::rejectsDirectoryLinks()
         QVERIFY(!BlueprintValidator::validate(graph(node), {workspace.path()}).isEmpty());
         QCOMPARE(read(workspace.path(), "external/vendor/api.h"), "original");
     } else QVERIFY(!QFileInfo::exists(workspace.filePath(manifestPath)));
+    if (location == "workspace-root" || location.startsWith("destination-") || location == "unlisted-cycle") {
+        QJsonObject manifest{{"stale", true}};
+        QCOMPARE(ExternalCodeImporter::inspectImport(node, selectedWorkspace, manifest, &error),
+                 ExternalCodeImporter::ImportState::Invalid);
+        QVERIFY(manifest.isEmpty());
+        QVERIFY(!error.isEmpty());
+    }
 }
 
 QTEST_GUILESS_MAIN(ExternalCodeImporterTest)

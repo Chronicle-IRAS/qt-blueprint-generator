@@ -589,12 +589,18 @@
     <message><source>Applied node: %1 (%2)
 Bound workspace: %3</source><translation>已应用的节点：%1（%2）
 绑定的工作目录：%3</translation></message>
-    <message><source>Import files...</source><translation>导入文件...</translation></message>
-    <message><source>Reimport tracked files...</source><translation>重新导入清单内文件...</translation></message>
+    <message><source>Pending selection: choose a source root first.</source><translation>待选文件：请先选择源码根目录。</translation></message>
+    <message><source>Pending selection source root: %1</source><translation>待选文件的源码根目录：%1</translation></message>
+    <message><source>Choose source root...</source><translation>选择源码根目录...</translation></message>
+    <message><source>Add files...</source><translation>添加文件...</translation></message>
+    <message><source>Remove selected</source><translation>移除选中条目</translation></message>
+    <message><source>Clear selection</source><translation>清空待选列表</translation></message>
+    <message><source>Import selected files</source><translation>导入待选文件</translation></message>
+    <message><source>Reimport tracked files</source><translation>重新导入清单内文件</translation></message>
     <message><source>Verify import</source><translation>验证导入完整性</translation></message>
     <message><source>Close</source><translation>关闭</translation></message>
     <message><source>Select a verified file to view its source (read only).</source><translation>选择已验证的文件以只读方式查看源码。</translation></message>
-    <message><source>No verified import.</source><translation>尚无已验证的导入。</translation></message>
+    <message><source>Not imported.</source><translation>未导入。</translation></message>
     <message><source>Verified import. Source bytes are read only and are never sent to AI.</source><translation>导入已验证。源码只读，不会发送给 AI。</translation></message>
     <message><source>Import verification or operation failed: %1</source><translation>导入验证或操作失败：%1</translation></message>
     <message><source>Apply inspector changes first. Import writes also require generation, candidate review, and build to be idle.</source><translation>请先应用属性面板的更改；生成、候选审核或构建进行中也不允许写入外部代码。</translation></message>

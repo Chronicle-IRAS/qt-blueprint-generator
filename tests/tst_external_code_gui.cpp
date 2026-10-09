@@ -3,10 +3,12 @@
 #include "editor/node_item.h"
 #include "workspace/external_code_importer.h"
 #include "workspace/build_service.h"
+#include "generation/project_scaffolder.h"
 #include "ai/ai_client.h"
 #include "app/candidate_review_dialog.h"
 #include "ui/theme.h"
 #include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
@@ -81,8 +83,9 @@ void modalActions(const QVector<std::function<void(QDialog *)>> &actions)
     QObject::connect(timer, &QTimer::timeout, timer, [timer, actions, next] {
         auto *modal = qobject_cast<QDialog *>(QApplication::activeModalWidget());
         if (!modal) return;
-        actions.at((*next)++)(modal);
+        const auto action = actions.at((*next)++);
         if (*next == actions.size()) { timer->stop(); timer->deleteLater(); }
+        action(modal);
     });
     timer->start();
 }
@@ -93,7 +96,12 @@ std::function<void(QDialog *)> chooseRoot(const QString &root)
         QVERIFY(picker);
         QCOMPARE(picker->fileMode(), QFileDialog::Directory);
         picker->setDirectory(root);
-        QMetaObject::invokeMethod(picker, "accept");
+        auto *buttons = picker->findChild<QDialogButtonBox *>();
+        QVERIFY(buttons);
+        auto *choose = buttons->button(QDialogButtonBox::Open);
+        QVERIFY(choose);
+        QVERIFY(choose->isEnabled());
+        QTest::mouseClick(choose, Qt::LeftButton);
     };
 }
 std::function<void(QDialog *)> chooseFiles(const QStringList &paths)
@@ -102,27 +110,46 @@ std::function<void(QDialog *)> chooseFiles(const QStringList &paths)
         auto *picker = qobject_cast<QFileDialog *>(modal);
         QVERIFY(picker);
         QCOMPARE(picker->fileMode(), QFileDialog::ExistingFiles);
-        QStringList quoted;
-        for (const auto &path : paths) quoted << QStringLiteral("\"%1\"").arg(path);
-        picker->findChild<QLineEdit *>("fileNameEdit")->setText(quoted.join(' '));
-        QMetaObject::invokeMethod(picker, "accept");
+        QCOMPARE(paths.size(), 1);
+        picker->setDirectory(QFileInfo(paths.first()).absolutePath());
+        auto *edit = picker->findChild<QLineEdit *>("fileNameEdit");
+        QVERIFY(edit);
+        edit->setFocus();
+        QTest::keyClicks(edit, QFileInfo(paths.first()).fileName());
+        QTest::keyClick(edit, Qt::Key_Return);
     };
 }
-void importSelection(QDialog *dialog, const QString &root, const QStringList &paths,
-                     bool reimport = false, bool confirm = true)
+void selectRoot(QDialog *dialog, const QString &root)
 {
-    QVector<std::function<void(QDialog *)>> actions{chooseRoot(root), chooseFiles(paths)};
-    if (reimport) actions << [confirm](QDialog *modal) {
+    modalActions({chooseRoot(root)});
+    QTest::mouseClick(dialog->findChild<QPushButton *>("chooseExternalSourceRootButton"), Qt::LeftButton);
+}
+void addFile(QDialog *dialog, const QString &path)
+{
+    modalActions({chooseFiles({path})});
+    QTest::mouseClick(dialog->findChild<QPushButton *>("addExternalSourceFilesButton"), Qt::LeftButton);
+}
+void commitSelection(QDialog *dialog, bool reimport = false, bool confirm = true)
+{
+    if (reimport) modalActions({[confirm](QDialog *modal) {
         auto *box = qobject_cast<QMessageBox *>(modal);
         QVERIFY(box);
         auto *button = box->findChild<QPushButton *>(confirm ? "confirmExternalReimportButton"
                                                             : "cancelExternalReimportButton");
         QVERIFY(button);
-        button->click();
-    };
-    modalActions(actions);
-    dialog->findChild<QPushButton *>(reimport ? "reimportExternalCodeButton"
-                                             : "importExternalCodeButton")->click();
+        if (!confirm) QCOMPARE(box->defaultButton(), button);
+        QTest::mouseClick(button, Qt::LeftButton);
+    }});
+    QTest::mouseClick(dialog->findChild<QPushButton *>(reimport ? "reimportExternalCodeButton"
+                                             : "importExternalCodeButton"), Qt::LeftButton);
+}
+void importSelection(QDialog *dialog, const QString &root, const QStringList &paths,
+                     bool reimport = false, bool confirm = true)
+{
+    selectRoot(dialog, root);
+    dialog->findChild<QPushButton *>("clearExternalSelectionButton")->click();
+    for (const auto &path : paths) addFile(dialog, path);
+    commitSelection(dialog, reimport, confirm);
 }
 }
 
@@ -130,6 +157,226 @@ class ExternalCodeGuiTest final : public QObject
 {
     Q_OBJECT
 private slots:
+    void freshNodeIsNeutralAndHasPendingSelection()
+    {
+        QTemporaryDir workspace;
+        MainWindow window;
+        prepare(window, workspace.path());
+        QVERIFY(window.setLanguage("en"));
+        auto *dialog = manage(window);
+        QVERIFY(dialog);
+        QCOMPARE(dialog->findChild<QLabel *>("externalImportStatus")->text(), QString("Not imported."));
+        auto *pending = dialog->findChild<QListWidget *>("externalPendingFiles");
+        QVERIFY(pending);
+        QCOMPARE(pending->count(), 0);
+        QVERIFY(!dialog->findChild<QPushButton *>("importExternalCodeButton")->isEnabled());
+    }
+    void pendingSelectionEntryExists()
+    {
+        QTemporaryDir workspace;
+        MainWindow window;
+        prepare(window, workspace.path());
+        auto *dialog = manage(window);
+        QVERIFY(dialog);
+        QVERIFY(dialog->findChild<QPushButton *>("chooseExternalSourceRootButton"));
+        QVERIFY(dialog->findChild<QPushButton *>("addExternalSourceFilesButton"));
+        QVERIFY(dialog->findChild<QListWidget *>("externalPendingFiles"));
+    }
+    void freshIncompleteNodeIsNeutral()
+    {
+        QTemporaryDir workspace;
+        MainWindow window;
+        window.show();
+        window.findChild<QLineEdit *>("workspacePathEdit")->setText(workspace.path());
+        auto node = externalNode();
+        node.description.clear();
+        QVERIFY(window.scene()->addNode(node, {}));
+        window.scene()->nodeItem(node.id)->setSelected(true);
+        QVERIFY(window.setLanguage("en"));
+        auto *dialog = manage(window);
+        QVERIFY(dialog);
+        QCOMPARE(dialog->findChild<QLabel *>("externalImportStatus")->text(), QString("Not imported."));
+        QVERIFY(!ExternalCodeImporter::verifyImport(node, workspace.path()));
+    }
+    void associatedImportDeletionRemainsFailure_data()
+    {
+        QTest::addColumn<QString>("kind");
+        for (const char *kind : {"missing-manifest", "corrupt-manifest", "whole-root"})
+            QTest::newRow(kind) << QString::fromLatin1(kind);
+    }
+    void associatedImportDeletionRemainsFailure()
+    {
+        QFETCH(QString, kind);
+        QTemporaryDir workspace, source;
+        writeBytes(source.filePath("a.cpp"), "original");
+        MainWindow window;
+        prepare(window, workspace.path());
+        QVERIFY(window.setLanguage("en"));
+        auto *dialog = manage(window);
+        QVERIFY(dialog);
+        importSelection(dialog, source.path(), {source.filePath("a.cpp")});
+        auto *files = dialog->findChild<QListWidget *>("externalImportedFiles");
+        QCOMPARE(files->count(), 1);
+        files->setCurrentRow(0);
+        if (kind == "missing-manifest") QVERIFY(QFile::remove(workspace.filePath("external/external/import-manifest.json")));
+        if (kind == "corrupt-manifest") writeBytes(workspace.filePath("external/external/import-manifest.json"), "bad json");
+        // Remove exactly this fixture-owned import; retain the current dialog's observation.
+        if (kind == "whole-root") QVERIFY(QDir(workspace.filePath("external/external")).removeRecursively());
+        dialog->findChild<QPushButton *>("verifyExternalCodeButton")->click();
+        QVERIFY(dialog->findChild<QLabel *>("externalImportStatus")->text().startsWith("Import verification or operation failed:"));
+        QCOMPARE(files->count(), 0);
+        QVERIFY(dialog->findChild<QPlainTextEdit *>("externalSourcePreview")->toPlainText().isEmpty());
+    }
+    void multiplePickerOperationsCommitTogether()
+    {
+        QTemporaryDir workspace, source;
+        writeBytes(source.filePath("include/api.h"), "old header");
+        writeBytes(source.filePath("src/api.cpp"), "old source");
+        MainWindow window;
+        prepare(window, workspace.path());
+        auto *dialog = manage(window);
+        QVERIFY(dialog);
+        auto *root = dialog->findChild<QPushButton *>("chooseExternalSourceRootButton");
+        QVERIFY(root);
+        selectRoot(dialog, source.path());
+        addFile(dialog, source.filePath("include/api.h"));
+        addFile(dialog, source.filePath("src/api.cpp"));
+        auto *pending = dialog->findChild<QListWidget *>("externalPendingFiles");
+        QCOMPARE(pending->count(), 2);
+        QCOMPARE(pending->item(0)->text(), QString("include/api.h"));
+        QCOMPARE(pending->item(1)->text(), QString("src/api.cpp"));
+        QVERIFY(!QFileInfo::exists(workspace.filePath("external")));
+        commitSelection(dialog);
+        QJsonObject manifest;
+        QVERIFY(ExternalCodeImporter::importManifest(externalNode(), workspace.path(), manifest));
+        QCOMPARE(manifest.value("files").toObject().keys(), QStringList({"include/api.h", "src/api.cpp"}));
+        QCOMPARE(readBytes(workspace.filePath("external/external/include/api.h")), QByteArray("old header"));
+        QCOMPARE(readBytes(workspace.filePath("external/external/src/api.cpp")), QByteArray("old source"));
+        writeBytes(source.filePath("include/api.h"), "new header");
+        writeBytes(source.filePath("src/api.cpp"), "new source");
+        commitSelection(dialog, true, false);
+        QCOMPARE(readBytes(workspace.filePath("external/external/include/api.h")), QByteArray("old header"));
+        QCOMPARE(readBytes(workspace.filePath("external/external/src/api.cpp")), QByteArray("old source"));
+        QCOMPARE(pending->count(), 2);
+        commitSelection(dialog, true);
+        QVERIFY(ExternalCodeImporter::importManifest(externalNode(), workspace.path(), manifest));
+        QCOMPARE(readBytes(workspace.filePath("external/external/include/api.h")), QByteArray("new header"));
+        QCOMPARE(readBytes(workspace.filePath("external/external/src/api.cpp")), QByteArray("new source"));
+    }
+    void survivingScaffoldKeepsMissingImportErrorAfterReopen()
+    {
+        QTemporaryDir workspace, source;
+        writeBytes(source.filePath("a.cpp"), "source");
+        MainWindow window;
+        prepare(window, workspace.path());
+        QVERIFY(window.setLanguage("en"));
+        QPointer<QDialog> dialog = manage(window);
+        QVERIFY(dialog);
+        importSelection(dialog, source.path(), {source.filePath("a.cpp")});
+        QVERIFY(ProjectScaffolder::create(window.document(), workspace.path()));
+        dialog->close();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        QVERIFY(!dialog);
+        // Delete exactly the fixture-owned import; the scaffold remains associated.
+        QVERIFY(QDir(workspace.filePath("external/external")).removeRecursively());
+        dialog = manage(window);
+        QVERIFY(dialog);
+        QVERIFY(dialog->findChild<QLabel *>("externalImportStatus")->text().startsWith("Import verification or operation failed:"));
+        QCOMPARE(dialog->findChild<QListWidget *>("externalImportedFiles")->count(), 0);
+    }
+    void pendingQueueEditsAndPickerCancellation()
+    {
+        QTemporaryDir workspace, source, other;
+        writeBytes(source.filePath("a.cpp"), "source");
+        writeBytes(source.filePath("b.h"), "header");
+        MainWindow window;
+        prepare(window, workspace.path());
+        auto *dialog = manage(window);
+        QVERIFY(dialog);
+        selectRoot(dialog, source.path());
+        addFile(dialog, source.filePath("a.cpp"));
+        addFile(dialog, source.filePath("a.cpp"));
+        auto *pending = dialog->findChild<QListWidget *>("externalPendingFiles");
+        QCOMPARE(pending->count(), 1);
+        modalActions({[](QDialog *picker) { picker->reject(); }});
+        dialog->findChild<QPushButton *>("chooseExternalSourceRootButton")->click();
+        QCOMPARE(pending->count(), 1);
+        modalActions({[](QDialog *picker) { picker->reject(); }});
+        dialog->findChild<QPushButton *>("addExternalSourceFilesButton")->click();
+        QCOMPARE(pending->count(), 1);
+        addFile(dialog, source.filePath("b.h"));
+        pending->setCurrentRow(0);
+        dialog->findChild<QPushButton *>("removeExternalSelectionButton")->click();
+        QCOMPARE(pending->count(), 1);
+        QCOMPARE(pending->item(0)->text(), QString("b.h"));
+        QCOMPARE(readBytes(source.filePath("a.cpp")), QByteArray("source"));
+        selectRoot(dialog, source.path());
+        QCOMPARE(pending->count(), 1);
+        selectRoot(dialog, other.path());
+        QCOMPARE(pending->count(), 0);
+        QVERIFY(!dialog->findChild<QPushButton *>("importExternalCodeButton")->isEnabled());
+        selectRoot(dialog, source.path());
+        addFile(dialog, source.filePath("a.cpp"));
+        dialog->findChild<QPushButton *>("clearExternalSelectionButton")->click();
+        QCOMPARE(pending->count(), 0);
+        QVERIFY(!QFileInfo::exists(workspace.filePath("external")));
+        QCOMPARE(readBytes(source.filePath("b.h")), QByteArray("header"));
+    }
+    void changedSourceSelectionDuringNestedDialog_data()
+    {
+        QTest::addColumn<QString>("stage");
+        QTest::newRow("file-picker") << QString("files");
+        QTest::newRow("confirmation-root") << QString("root");
+        QTest::newRow("confirmation-queue") << QString("queue");
+    }
+    void changedSourceSelectionDuringNestedDialog()
+    {
+        QFETCH(QString, stage);
+        QTemporaryDir workspace, source, other;
+        writeBytes(source.filePath("a.cpp"), "old");
+        writeBytes(other.filePath("a.cpp"), "other");
+        QVERIFY(ExternalCodeImporter::importFiles(externalNode(), source.path(), {"a.cpp"}, workspace.path()));
+        writeBytes(source.filePath("a.cpp"), "new");
+        MainWindow window;
+        prepare(window, workspace.path());
+        auto *dialog = manage(window);
+        QVERIFY(dialog);
+        selectRoot(dialog, source.path());
+        addFile(dialog, source.filePath("a.cpp"));
+        modalActions({[&](QDialog *modal) {
+            if (stage == "queue") dialog->findChild<QPushButton *>("clearExternalSelectionButton")->click();
+            else selectRoot(dialog, other.path());
+            if (stage == "files") chooseFiles({source.filePath("a.cpp")})(modal);
+            else modal->findChild<QPushButton *>("confirmExternalReimportButton")->click();
+        }});
+        dialog->findChild<QPushButton *>(stage == "files" ? "addExternalSourceFilesButton" : "reimportExternalCodeButton")->click();
+        QCOMPARE(dialog->findChild<QListWidget *>("externalPendingFiles")->count(), 0);
+        QCOMPARE(readBytes(workspace.filePath("external/external/a.cpp")), QByteArray("old"));
+        QVERIFY(ExternalCodeImporter::verifyImport(externalNode(), workspace.path()));
+    }
+    void pendingCaseAliasesReachImporterValidation()
+    {
+        QTemporaryDir workspace, source;
+        writeBytes(source.filePath("a.cpp"), "source");
+        writeBytes(source.filePath("A.cpp"), "alias");
+        if (QDir(source.path()).entryList(QDir::Files).size() != 2)
+            QSKIP("The filesystem cannot expose distinct case-alias entries through the real picker");
+        MainWindow window;
+        prepare(window, workspace.path());
+        auto *dialog = manage(window);
+        QVERIFY(dialog);
+        selectRoot(dialog, source.path());
+        addFile(dialog, source.filePath("a.cpp"));
+        addFile(dialog, source.filePath("A.cpp"));
+        auto *pending = dialog->findChild<QListWidget *>("externalPendingFiles");
+        QCOMPARE(pending->count(), 2);
+        QCOMPARE(pending->item(0)->text(), QString("a.cpp"));
+        QCOMPARE(pending->item(1)->text(), QString("A.cpp"));
+        commitSelection(dialog);
+        QCOMPARE(pending->count(), 2);
+        QVERIFY(!QFileInfo::exists(workspace.filePath("external")));
+        QCOMPARE(dialog->findChild<QListWidget *>("externalImportedFiles")->count(), 0);
+    }
     void inspectorEntryIsExternalOnly()
     {
         MainWindow window;
@@ -193,11 +440,12 @@ private slots:
         auto *dialog = manage(window);
         QVERIFY(dialog);
         modalActions({[](QDialog *picker) { picker->reject(); }});
-        dialog->findChild<QPushButton *>("importExternalCodeButton")->click();
+        dialog->findChild<QPushButton *>("chooseExternalSourceRootButton")->click();
         QVERIFY(!QFileInfo::exists(workspace.filePath("external/external/import-manifest.json")));
         QVERIFY(!QFileInfo::exists(workspace.filePath("external")));
-        modalActions({chooseRoot(source.path()), [](QDialog *picker) { picker->reject(); }});
-        dialog->findChild<QPushButton *>("importExternalCodeButton")->click();
+        selectRoot(dialog, source.path());
+        modalActions({[](QDialog *picker) { picker->reject(); }});
+        dialog->findChild<QPushButton *>("addExternalSourceFilesButton")->click();
         QVERIFY(!QFileInfo::exists(workspace.filePath("external/external/import-manifest.json")));
         QVERIFY(!QFileInfo::exists(workspace.filePath("external")));
         importSelection(dialog, source.path(), {source.filePath("a.cpp")});
@@ -252,7 +500,8 @@ private slots:
     void contextChangesDismissDialog()
     {
         QFETCH(QString, change);
-        QTemporaryDir workspace;
+        QTemporaryDir workspace, source;
+        writeBytes(source.filePath("a.cpp"), "pending");
         MainWindow window;
         prepare(window, workspace.path());
         QVERIFY(QDir().mkpath(workspace.filePath("project")));
@@ -260,6 +509,10 @@ private slots:
         QVERIFY(window.saveProjectAs(workspace.filePath("project")));
         QPointer<QDialog> dialog = manage(window);
         QVERIFY(dialog);
+        selectRoot(dialog, source.path());
+        addFile(dialog, source.filePath("a.cpp"));
+        auto *pending = dialog->findChild<QListWidget *>("externalPendingFiles");
+        QCOMPARE(pending->count(), 1);
         if (change == "selection") window.scene()->clearSelection();
         if (change == "workspace") window.findChild<QLineEdit *>("workspacePathEdit")->setText(workspace.filePath("other"));
         if (change == "contract") { auto node = externalNode(); node.description = "Changed"; QVERIFY(window.scene()->editNode(node.id, node)); }
@@ -268,6 +521,8 @@ private slots:
         if (change == "open") QVERIFY(window.openProject(workspace.filePath("project")));
         if (change == "saveAs") QVERIFY(window.saveProjectAs(workspace.filePath("equal-project")));
         QVERIFY(!dialog || !dialog->isVisible());
+        if (dialog) QCOMPARE(pending->count(), 0);
+        QVERIFY(!QFileInfo::exists(workspace.filePath("external")));
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
         QVERIFY(!dialog);
     }
@@ -334,18 +589,25 @@ private slots:
         list->setCurrentRow(0);
         auto *preview = dialog->findChild<QPlainTextEdit *>("externalSourcePreview");
         const auto sourceText = preview->toPlainText();
+        auto *pending = dialog->findChild<QListWidget *>("externalPendingFiles");
+        QCOMPARE(pending->count(), 1);
         QVERIFY(window.setLanguage("en"));
+        const auto rootBinding = dialog->findChild<QLabel *>("externalPendingSelectionBinding")->text();
         const auto english = dialog->windowTitle();
         QVERIFY(window.setLanguage("zh_CN"));
         QTRY_VERIFY(dialog->windowTitle() != english);
         window.setTheme(EditorTheme::Theme::Dark);
         QCOMPARE(list->currentRow(), 0);
         QCOMPARE(preview->toPlainText(), sourceText);
+        QCOMPARE(pending->count(), 1);
+        QCOMPARE(pending->item(0)->text(), QString("a.cpp"));
         QVERIFY(preview->isReadOnly());
         QVERIFY(window.setLanguage("en"));
         window.setTheme(EditorTheme::Theme::Light);
         QCOMPARE(list->currentRow(), 0);
         QCOMPARE(preview->toPlainText(), sourceText);
+        QCOMPARE(pending->count(), 1);
+        QTRY_COMPARE(dialog->findChild<QLabel *>("externalPendingSelectionBinding")->text(), rootBinding);
     }
     void staleDuringNestedDialogs_data()
     {
@@ -372,9 +634,11 @@ private slots:
         QPointer<MainWindow> owner = window;
         QPointer<QDialog> dialog = manage(*window);
         QVERIFY(dialog);
+        selectRoot(dialog, source.path());
+        addFile(dialog, source.filePath("a.cpp"));
+        auto *pending = dialog->findChild<QListWidget *>("externalPendingFiles");
+        QCOMPARE(pending->count(), 1);
         QVector<std::function<void(QDialog *)>> actions;
-        if (stage != "root") actions << chooseRoot(source.path());
-        if (stage == "confirmation") actions << chooseFiles({source.filePath("a.cpp")});
         bool changed = false;
         actions << [&](QDialog *) {
             changed = true;
@@ -389,9 +653,10 @@ private slots:
         };
         modalActions(actions);
         dialog->findChild<QPushButton *>(stage == "confirmation" ? "reimportExternalCodeButton"
-                                                                 : "importExternalCodeButton")->click();
+                 : stage == "root" ? "chooseExternalSourceRootButton" : "addExternalSourceFilesButton")->click();
         QVERIFY(changed);
         QVERIFY(!dialog || !dialog->isVisible());
+        if (dialog) QCOMPARE(pending->count(), 0);
         if (stage == "confirmation") {
             QCOMPARE(readBytes(workspace.filePath("external/external/a.cpp")), QByteArray("old"));
         } else QVERIFY(!QFileInfo::exists(workspace.filePath("external/external/import-manifest.json")));
@@ -419,11 +684,13 @@ private slots:
         prepare(window, workspace.path());
         auto *dialog = manage(window);
         QVERIFY(dialog);
-        modalActions({chooseRoot(source.path()), [&](QDialog *picker) {
+        selectRoot(dialog, source.path());
+        modalActions({[&](QDialog *picker) {
             window.findChild<QLineEdit *>("nodeNameEdit")->setText("draft");
             chooseFiles({source.filePath("a.cpp")})(picker);
         }});
-        dialog->findChild<QPushButton *>("importExternalCodeButton")->click();
+        dialog->findChild<QPushButton *>("addExternalSourceFilesButton")->click();
+        commitSelection(dialog);
         QVERIFY(!QFileInfo::exists(workspace.filePath("external/external/import-manifest.json")));
         QCOMPARE(window.document().nodes.first(), externalNode());
     }
@@ -435,7 +702,8 @@ private slots:
         prepare(window, workspace.path());
         auto *dialog = manage(window);
         QVERIFY(dialog);
-        modalActions({chooseRoot(source.path()), [&](QDialog *picker) {
+        selectRoot(dialog, source.path());
+        modalActions({[&](QDialog *picker) {
             BuildRequest request;
             request.sourceDirectory = source.path();
             request.buildDirectory = workspace.path();
@@ -445,7 +713,8 @@ private slots:
             QVERIFY(window.findChild<BuildService *>()->isRunning());
             chooseFiles({source.filePath("a.cpp")})(picker);
         }});
-        dialog->findChild<QPushButton *>("importExternalCodeButton")->click();
+        dialog->findChild<QPushButton *>("addExternalSourceFilesButton")->click();
+        commitSelection(dialog);
         QVERIFY(!QFileInfo::exists(workspace.filePath("external/external/import-manifest.json")));
     }
     void relativeWorkspaceRejected()
@@ -494,7 +763,8 @@ private slots:
         auto *dialog = manage(window);
         QVERIFY(dialog);
         auto *controller = window.findChild<GenerationController *>();
-        modalActions({chooseRoot(source.path()), [&](QDialog *picker) {
+        selectRoot(dialog, source.path());
+        modalActions({[&](QDialog *picker) {
             QVERIFY(controller->start(window.document(), "logic", workspace.path(), AiProviderSettings{}));
             QCOMPARE(controller->state(), GenerationController::State::Generating);
             if (review) {
@@ -506,7 +776,8 @@ private slots:
             chooseFiles({source.filePath("a.cpp")})(picker);
         }});
         // First import uses the same paths; its write must also be blocked after the picker.
-        dialog->findChild<QPushButton *>("importExternalCodeButton")->click();
+        dialog->findChild<QPushButton *>("addExternalSourceFilesButton")->click();
+        commitSelection(dialog);
         writeBytes(source.filePath("a.cpp"), "new");
         const auto generationState = readBytes(workspace.filePath("generation-manifest.json"));
         dialog->findChild<QPushButton *>("reimportExternalCodeButton")->click();

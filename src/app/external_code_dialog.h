@@ -25,7 +25,10 @@ protected:
 private:
     bool checkContext();
     bool checkWriteAccess();
-    void selectAndImport(bool replace);
+    void chooseSourceRoot();
+    void addSourceFiles();
+    void importSelection(bool replace);
+    void updateSelectionControls();
     void verify();
     void previewFile();
     void clearVerifiedContent();
@@ -36,13 +39,22 @@ private:
     std::function<bool()> m_contextCurrent;
     std::function<bool()> m_writesAllowed;
     bool m_invalid = false;
+    bool m_knownImport = false;
+    QString m_sourceRoot;
+    quint64 m_selectionRevision = 0;
     Status m_status = Status::NotImported;
     QString m_error;
     QLabel *m_binding = nullptr;
     QLabel *m_statusLabel = nullptr;
+    QLabel *m_selectionLabel = nullptr;
+    QListWidget *m_pendingFiles = nullptr;
     QListWidget *m_files = nullptr;
     QPlainTextEdit *m_preview = nullptr;
     QPushButton *m_importButton = nullptr;
+    QPushButton *m_chooseRootButton = nullptr;
+    QPushButton *m_addFilesButton = nullptr;
+    QPushButton *m_removeSelectionButton = nullptr;
+    QPushButton *m_clearSelectionButton = nullptr;
     QPushButton *m_reimportButton = nullptr;
     QPushButton *m_verifyButton = nullptr;
     QPushButton *m_closeButton = nullptr;

@@ -6,6 +6,11 @@
 class ExternalCodeImporter final
 {
 public:
+    enum class ImportState { NotImported, Verified, Invalid };
+    // Neutral only for a safe, absent destination without surviving association
+    // evidence. Existing destinations and associated metadata require verification.
+    static ImportState inspectImport(const BlueprintNode &node, const QString &workspace,
+                                     QJsonObject &verifiedManifest, QString *error = nullptr);
     // Explicit selection only. The workspace and source root must already exist.
     // Nested portable relative paths are preserved; no overwrite/delete operation.
     // The node's manually supplied contract is bound to the imported byte hashes.

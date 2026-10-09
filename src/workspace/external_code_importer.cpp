@@ -203,6 +203,48 @@ bool ExternalCodeImporter::verifyImport(const BlueprintNode &node, const QString
     return importManifest(node, workspace, manifest, error);
 }
 
+ExternalCodeImporter::ImportState ExternalCodeImporter::inspectImport(
+    const BlueprintNode &node, const QString &workspace, QJsonObject &verifiedManifest, QString *error)
+{
+    verifiedManifest = {};
+    if (error) error->clear();
+    if (node.type != NodeType::ExternalCode || !WorkspaceIo::safeId(node.id)) {
+        WorkspaceIo::fail(error, "Import inspection requires an ExternalCode node with a safe id");
+        return ImportState::Invalid;
+    }
+    const QString root = nodeRoot(node);
+    if (!WorkspaceIo::checkPath(workspace, root, error)) return ImportState::Invalid;
+    if (QFileInfo::exists(QDir(workspace).filePath(root)))
+        return importManifest(node, workspace, verifiedManifest, error) ? ImportState::Verified : ImportState::Invalid;
+
+    // A surviving scaffold can prove association, never a valid import. Only
+    // consult it when the entire destination is absent; normal verification stays strict.
+    std::optional<QByteArray> generationBytes, sourceBytes;
+    const QString sourcePath = QStringLiteral("src/contracts/source-blueprint.json");
+    if (!WorkspaceIo::read(workspace, "generation-manifest.json", generationBytes, error)
+        || !WorkspaceIo::read(workspace, "generated-project/" + sourcePath, sourceBytes, error))
+        return ImportState::Invalid;
+    if (generationBytes) {
+        QJsonObject generation;
+        if (!WorkspaceIo::loadManifest(workspace, generation, error)) return ImportState::Invalid;
+        const auto expected = generation.value("protectedFiles").toObject().value(sourcePath).toString();
+        if (!sourceBytes || expected.isEmpty() || WorkspaceIo::sha256(*sourceBytes) != expected) {
+            WorkspaceIo::fail(error, "Scaffold source blueprint changed or is missing; import association cannot be verified");
+            return ImportState::Invalid;
+        }
+    }
+    if (sourceBytes) {
+        const auto source = BlueprintSerializer::fromJson(*sourceBytes, error);
+        if (!source) return ImportState::Invalid;
+        for (const auto &sourceNode : source->nodes)
+            if (sourceNode.type == NodeType::ExternalCode && sourceNode.id == node.id) {
+                WorkspaceIo::fail(error, "External import is missing from an associated scaffold; revalidation is required");
+                return ImportState::Invalid;
+            }
+    }
+    return ImportState::NotImported;
+}
+
 bool ExternalCodeImporter::importManifest(const BlueprintNode &node, const QString &workspace,
                                         QJsonObject &manifest, QString *error)
 {
