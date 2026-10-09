@@ -2,6 +2,8 @@
 
 Qt Blueprint Generator 是一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统负责校验蓝图、编译中间表示和 AI 提示词，并管理生成工程、候选代码、构建与导出。
 
+项目的最终目标是生成可以构建、运行的 Qt 应用原型，并通过行级代码评审驱动 AI 返工；工作区以生成和评审为核心。蓝图持久化已实现，应用入口装配、行级评论与返工闭环的后续安排见[项目路线](doc/project-roadmap.md)。
+
 蓝图是项目结构和模块契约的主数据源。AI 返回的代码不会直接覆盖工程文件，而是先进入候选区，经过预览和人工确认后再写入。
 
 ## 核心能力
@@ -18,9 +20,10 @@ Qt Blueprint Generator 是一个面向 Qt 6 Widgets 项目的可视化蓝图编�
 - Qt/CMake 工程骨架、公共契约、生成记录及文件 SHA-256 校验。
 - GUI 中外部 C/C++ 代码的黑盒导入，支持分多次跨目录添加待选文件，再统一导入或确认后重新导入；提供接口契约绑定、SHA-256 完整性复验与只读查看。
 - 独立 CMake 构建、日志采集和空目录导出。
+- 通过 Workspace Root 旁的 Browse 选择工作区，支持中文路径和首次生成所需的空目录；通过 Workspace Editor 浏览 `generated-project` 文件树，普通文本源码可安全编辑，受保护文件保持只读，切换、关闭及构建/导出前会处理未保存修改。
 - 英文与简体中文界面运行时切换。
 - 亮色 / 暗色界面主题，覆盖菜单、工具栏、停靠面板、对话框、画布网格、节点、端口和连线；可从 `View > Theme` 运行时切换并记住选择。
-- 可恢复的 Properties、Build and Export 面板，以及复用现有构建与导出操作的工具栏入口。
+- 可恢复的 Properties、Build and Export、Workspace Editor 面板，以及复用现有构建与导出操作的工具栏入口。
 
 ## 使用边界
 
@@ -64,7 +67,7 @@ project/
 
 从窗口的 `AI > AI Settings...` 可设置 OpenAI-compatible HTTPS 端点与模型，并用 `Test Connection` 做一次受限连接测试。默认端点是 `https://api.deepseek.com/chat/completions`，默认模型是 `deepseek-flash`。API 密钥只从启动进程的 `BLUEPRINT_AI_API_KEY` 环境变量读取；不要把密钥放入 `.env`、脚本、蓝图、项目文件或 CMake 参数。
 
-在构建面板填写已存在的绝对工作目录，完成有效蓝图并选中一个 UI Page、Logic Module 或 Decision 节点后，可通过工具栏或 AI 菜单发起生成。修改蓝图结构、节点属性或工作目录会使旧请求和审核上下文失效；已有工程与新蓝图不匹配时，请使用新的工作目录。详细操作见[使用指南](doc/project-usage-guide.md#8-ai-设置与人工真实集成)。
+在构建面板填写或浏览选择已存在的绝对工作目录，完成有效蓝图并选中一个 UI Page、Logic Module 或 Decision 节点后，可通过工具栏或 AI 菜单发起生成。修改蓝图结构、节点属性或工作目录会使旧请求和审核上下文失效；初始化失败会显示具体原因，已有工程与新蓝图不匹配时，请使用新的工作目录。详细操作见[使用指南](doc/project-usage-guide.md#8-ai-设置与人工真实集成)。
 
 也可使用显式启用的命令行验收工具，默认构建不会产生该程序：
 
@@ -89,6 +92,7 @@ try {
 ## 文档
 
 - [项目说明与使用指南](doc/project-usage-guide.md)
+- [项目方向与后续路线](doc/project-roadmap.md)
 - [界面样式与缩放验收指南](doc/visual-style-verification.md)
 - [MVP 实施计划](doc/mvp-implementation-plan.md)
 - [实现进度](doc/implementation-progress.md)

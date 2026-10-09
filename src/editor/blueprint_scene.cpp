@@ -70,10 +70,16 @@ void BlueprintScene::drawBackground(QPainter *painter, const QRectF &rect)
 {
     const auto &colors = EditorTheme::colors();
     painter->save();
-    painter->setClipRect(rect, Qt::IntersectClip);
-    painter->fillRect(rect, colors.canvas);
     const QTransform transform = painter->worldTransform();
     const qreal scale = std::hypot(transform.m11(), transform.m12());
+    QRectF paintRect = rect;
+    if (scale > 0.0 && std::isfinite(scale)) {
+        // At fractional display scales the device dirty region rounds outwards. Cover its
+        // boundary pixels too; the painter's existing device clip still limits this partial paint.
+        const qreal margin = 1.0 / scale;
+        paintRect.adjust(-margin, -margin, margin, margin);
+    }
+    painter->fillRect(paintRect, colors.canvas);
     if (scale > 0.0 && std::isfinite(scale)) {
         qreal spacing = 24.0;
         while (spacing * scale < 16.0 || rect.width() / spacing > 512.0
@@ -83,14 +89,14 @@ void BlueprintScene::drawBackground(QPainter *painter, const QRectF &rect)
         const auto drawLines = [&](qreal step, const QColor &color) {
             QPen pen(color, 0.0);
             painter->setPen(pen);
-            const qreal startX = std::ceil(rect.left() / step) * step;
-            const qreal startY = std::ceil(rect.top() / step) * step;
-            for (int i = 0; i <= 512 && startX + i * step <= rect.right(); ++i)
-                painter->drawLine(QPointF(startX + i * step, rect.top()),
-                                  QPointF(startX + i * step, rect.bottom()));
-            for (int i = 0; i <= 512 && startY + i * step <= rect.bottom(); ++i)
-                painter->drawLine(QPointF(rect.left(), startY + i * step),
-                                  QPointF(rect.right(), startY + i * step));
+            const qreal startX = std::ceil(paintRect.left() / step) * step;
+            const qreal startY = std::ceil(paintRect.top() / step) * step;
+            for (int i = 0; i <= 512 && startX + i * step <= paintRect.right(); ++i)
+                painter->drawLine(QPointF(startX + i * step, paintRect.top()),
+                                  QPointF(startX + i * step, paintRect.bottom()));
+            for (int i = 0; i <= 512 && startY + i * step <= paintRect.bottom(); ++i)
+                painter->drawLine(QPointF(paintRect.left(), startY + i * step),
+                                  QPointF(paintRect.right(), startY + i * step));
         };
         drawLines(spacing, colors.gridMinor);
         drawLines(spacing * 5.0, colors.gridMajor);

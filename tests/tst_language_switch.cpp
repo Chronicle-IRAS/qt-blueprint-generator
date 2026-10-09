@@ -119,6 +119,7 @@ private slots:
     void nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName_data();
     void nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName();
     void contextMenusFollowTheLanguageSwitch();
+    void workspaceBrowseFollowsTheLanguageSwitch();
 
 private:
     QTemporaryDir m_settingsDirectory;
@@ -138,6 +139,29 @@ void LanguageSwitchTest::initTestCase()
 void LanguageSwitchTest::cleanupTestCase()
 {
     QSettings().clear();
+}
+
+void LanguageSwitchTest::workspaceBrowseFollowsTheLanguageSwitch()
+{
+    MainWindow window;
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    auto *browse = window.findChild<QPushButton *>(QStringLiteral("browseWorkspaceButton"));
+    QVERIFY(browse);
+    auto *path = window.findChild<QLineEdit *>(QStringLiteral("workspacePathEdit"));
+    auto *form = qobject_cast<QFormLayout *>(path->parentWidget()->parentWidget()->layout());
+    QVERIFY(form);
+    auto *label = qobject_cast<QLabel *>(form->labelForField(path->parentWidget()));
+    QVERIFY(label);
+    QCOMPARE(browse->text(), QStringLiteral("Browse..."));
+    QCOMPARE(browse->toolTip(), QStringLiteral("Choose an existing workspace directory"));
+    QCOMPARE(label->text(), QStringLiteral("Workspace root"));
+    QVERIFY(window.setLanguage(QStringLiteral("zh_CN")));
+    QCOMPARE(browse->text(), QStringLiteral("浏览..."));
+    QCOMPARE(browse->toolTip(), QStringLiteral("选择已有的工作区目录"));
+    QCOMPARE(label->text(), QStringLiteral("工作区根目录"));
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    QCOMPARE(browse->text(), QStringLiteral("Browse..."));
+    QCOMPARE(label->text(), QStringLiteral("Workspace root"));
 }
 
 void LanguageSwitchTest::refreshesExistingNodeTooltips()

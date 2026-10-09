@@ -47,6 +47,7 @@ bool GenerationController::start(BlueprintDocument document, QString nodeId,
     if (m_state == State::Generating) return false;
     m_batch.reset();
     m_diagnostics.clear();
+    m_errorDetail.clear();
     const auto fail = [this](const char *message) { finish(State::Failed, message); return false; };
     bool generatable = false;
     for (const auto &node : document.nodes) {
@@ -64,8 +65,12 @@ bool GenerationController::start(BlueprintDocument document, QString nodeId,
         m_diagnostics = validationDiagnostics;
         return fail(QT_TR_NOOP("Fix blueprint validation errors before generating."));
     }
-    if (!ProjectScaffolder::create(document, workspace))
-        return fail(QT_TR_NOOP("The workspace scaffold could not be initialized or does not match the blueprint."));
+    QString scaffoldError;
+    if (!ProjectScaffolder::create(document, workspace, &scaffoldError)) {
+        // This detail comes from local workspace checks, never from the AI provider.
+        finish(State::Failed, QT_TR_NOOP("Could not initialize workspace scaffold: %1"), scaffoldError);
+        return false;
+    }
 
     QByteArray ir, types, contract;
     if (!readScaffold(workspace, "src/contracts/blueprint.json", ir)
@@ -159,13 +164,14 @@ bool GenerationController::start(BlueprintDocument document, QString nodeId,
     return true;
 }
 
-void GenerationController::finish(State state, const char *safeError)
+void GenerationController::finish(State state, const char *safeError, const QString &localDetail)
 {
     m_token = QUuid();
     if (m_session) m_session->deleteLater();
     m_session.clear();
     m_state = state;
     m_error = safeError;
+    m_errorDetail = localDetail;
     emit stateChanged(state);
 }
 
