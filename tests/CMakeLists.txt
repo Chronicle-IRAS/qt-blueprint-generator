@@ -1,5 +1,17 @@
 set(smoke_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_smoke.moc")
 
+set(external_code_gui_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_external_code_gui.moc")
+add_custom_command(OUTPUT "${external_code_gui_moc}"
+    COMMAND Qt6::moc -o tst_external_code_gui.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_external_code_gui.cpp"
+    DEPENDS tst_external_code_gui.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_external_code_gui tst_external_code_gui.cpp "${external_code_gui_moc}")
+set_target_properties(tst_external_code_gui PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_external_code_gui PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_external_code_gui PRIVATE BlueprintEditorCore Qt6::Test)
+add_test(NAME external_code_gui COMMAND tst_external_code_gui)
+set_tests_properties(external_code_gui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
 set(blueprint_project_store_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_blueprint_project_store.moc")
 add_custom_command(OUTPUT "${blueprint_project_store_moc}"
     COMMAND Qt6::moc -o tst_blueprint_project_store.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_blueprint_project_store.cpp"

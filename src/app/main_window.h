@@ -17,6 +17,7 @@
 class BlueprintScene;
 class BuildService;
 class CandidateReviewDialog;
+class ExternalCodeDialog;
 class QLabel;
 class NodePropertiesEditor;
 class QAction;
@@ -93,6 +94,8 @@ private:
     bool chooseSaveProjectDirectory();
     void chooseOpenProjectDirectory();
     void resetProjectGenerationContext();
+    void showExternalCodeManagement();
+    void invalidateExternalCodeContext();
 
     BlueprintDocument m_document;
     BlueprintDocument m_savedDocument;
@@ -107,6 +110,8 @@ private:
     BlueprintDocument m_generationSnapshot;
     GenerationController *m_generationController = nullptr;
     QPointer<CandidateReviewDialog> m_reviewDialog;
+    QPointer<ExternalCodeDialog> m_externalCodeDialog;
+    quint64 m_projectEpoch = 0;
     QAction *m_generateAction = nullptr;
     QAction *m_cancelGenerationAction = nullptr;
     QLabel *m_generationStatus = nullptr;
@@ -149,6 +154,7 @@ private:
     QDockWidget *m_propertiesDock = nullptr;
     NodePropertiesEditor *m_nodePropertiesEditor = nullptr;
     QPushButton *m_applyPropertiesButton = nullptr;
+    QPushButton *m_manageExternalCodeButton = nullptr;
     BuildService *m_buildService = nullptr;
     QDockWidget *m_buildDock = nullptr;
     QFormLayout *m_buildForm = nullptr;

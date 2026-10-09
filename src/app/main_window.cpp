@@ -13,6 +13,7 @@
 #include "editor/node_item.h"
 #include "editor/node_properties_editor.h"
 #include "workspace/build_service.h"
+#include "app/external_code_dialog.h"
 #include "workspace/project_exporter.h"
 
 #include <QAction>
@@ -505,6 +506,10 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_applyPropertiesButton->setObjectName(QStringLiteral("applyNodePropertiesButton"));
     m_applyPropertiesButton->setProperty("role", "primary");
     propertyLayout->addWidget(m_applyPropertiesButton);
+    m_manageExternalCodeButton = new QPushButton(tr("Manage external code..."), propertyWidget);
+    m_manageExternalCodeButton->setObjectName(QStringLiteral("manageExternalCodeButton"));
+    propertyLayout->addWidget(m_manageExternalCodeButton);
+    connect(m_manageExternalCodeButton, &QPushButton::clicked, this, &MainWindow::showExternalCodeManagement);
     m_propertiesDock->setWidget(propertyWidget);
     addDockWidget(Qt::RightDockWidgetArea, m_propertiesDock);
 
@@ -603,6 +608,8 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     });
     connect(m_workspacePathEdit, &QLineEdit::textChanged,
             this, &MainWindow::invalidateGenerationContext);
+    connect(m_workspacePathEdit, &QLineEdit::textChanged,
+            this, &MainWindow::invalidateExternalCodeContext);
 
     connect(m_deleteAction, &QAction::triggered, this, [this] { m_scene->deleteSelectedItems(); });
     connect(m_connectAction, &QAction::triggered, this, [this] {
@@ -672,11 +679,13 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
                 showCanvasContextMenu(target, screenPosition, scenePosition);
             });
     connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] {
+        invalidateExternalCodeContext();
         updatePropertyEditor();
         updateGenerationUi();
     });
     m_scene->setSemanticChangeHandler([this] {
         if (m_replacingProject) return;
+        invalidateExternalCodeContext();
         updatePropertyEditor();
         updateProjectTitle();
         invalidateGenerationContext();
@@ -700,6 +709,8 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
 
 MainWindow::~MainWindow()
 {
+    if (m_externalCodeDialog)
+        QObject::disconnect(m_externalCodeDialog, nullptr, this, nullptr);
     if (m_reviewDialog)
         QObject::disconnect(m_reviewDialog, nullptr, this, nullptr);
     QObject::disconnect(m_generationController, nullptr, this, nullptr);
@@ -868,6 +879,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::resetProjectGenerationContext()
 {
+    ++m_projectEpoch;
+    invalidateExternalCodeContext();
     m_generationSnapshot = {};
     m_generationNodeId.clear();
     if (m_reviewDialog) {
@@ -1046,6 +1059,7 @@ void MainWindow::retranslateUi()
     m_propertiesDockAction->setText(tr("Properties"));
     m_nodePropertiesEditor->retranslateUi();
     m_applyPropertiesButton->setText(tr("Apply"));
+    m_manageExternalCodeButton->setText(tr("Manage external code..."));
 
     m_buildDock->setWindowTitle(tr("Build and export"));
     m_buildDockAction->setText(tr("Build and export"));
@@ -1283,6 +1297,7 @@ void MainWindow::cancelConnection()
 
 void MainWindow::updatePropertyEditor()
 {
+    m_manageExternalCodeButton->hide();
     const QString id = selectedNodeId();
     const bool editable = !id.isEmpty();
     m_nodePropertiesEditor->setEditorEnabled(editable);
@@ -1295,9 +1310,67 @@ void MainWindow::updatePropertyEditor()
     for (const BlueprintNode &node : m_document.nodes) {
         if (node.id == id) {
             m_nodePropertiesEditor->setNode(node);
+            m_manageExternalCodeButton->setVisible(node.type == NodeType::ExternalCode);
             return;
         }
     }
+}
+
+void MainWindow::invalidateExternalCodeContext()
+{
+    if (!m_externalCodeDialog) return;
+    const auto dialog = m_externalCodeDialog;
+    QObject::disconnect(dialog, nullptr, this, nullptr);
+    m_externalCodeDialog = nullptr;
+    dialog->invalidateContext();
+}
+
+void MainWindow::showExternalCodeManagement()
+{
+    const QString id = selectedNodeId();
+    const auto it = std::find_if(m_document.nodes.cbegin(), m_document.nodes.cend(),
+                               [&id](const BlueprintNode &node) { return node.id == id; });
+    if (it == m_document.nodes.cend() || it->type != NodeType::ExternalCode) return;
+    BlueprintNode draft = *it;
+    m_nodePropertiesEditor->applyTo(&draft);
+    if (draft != *it) {
+        QPointer<QMessageBox> prompt(new QMessageBox(QMessageBox::Information, tr("Apply external contract first"),
+                           tr("Apply the inspector changes before managing external code. Imports bind only to the applied contract."),
+                           QMessageBox::Ok, this));
+        prompt->setTextFormat(Qt::PlainText);
+        prompt->exec();
+        if (prompt) prompt->deleteLater();
+        return;
+    }
+    if (m_externalCodeDialog) {
+        m_externalCodeDialog->show();
+        m_externalCodeDialog->raise();
+        return;
+    }
+    const BlueprintDocument snapshot = m_document;
+    const BlueprintNode node = *it;
+    const QString workspaceText = m_workspacePathEdit->text();
+    const QString workspace = workspaceText.trimmed().isEmpty() ? QString() : QDir::cleanPath(workspaceText.trimmed());
+    const quint64 epoch = m_projectEpoch;
+    QPointer<MainWindow> owner(this);
+    auto current = [owner, snapshot, node, workspaceText, epoch] {
+        return owner && owner->m_projectEpoch == epoch && owner->m_document == snapshot
+               && owner->selectedNodeId() == node.id && owner->m_workspacePathEdit->text() == workspaceText;
+    };
+    auto writable = [owner, current, node] {
+        if (!current()) return false;
+        BlueprintNode draft = node;
+        owner->m_nodePropertiesEditor->applyTo(&draft);
+        return draft == node && owner->m_generationController->state() != GenerationController::State::Generating
+               && !owner->m_reviewDialog && !owner->m_buildService->isRunning();
+    };
+    auto *dialog = new ExternalCodeDialog(node, workspace, current, writable, this);
+    m_externalCodeDialog = dialog;
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    connect(dialog, &QObject::destroyed, this, [this, dialog] {
+        if (m_externalCodeDialog == dialog) m_externalCodeDialog = nullptr;
+    });
+    dialog->show();
 }
 
 QString MainWindow::selectedNodeId() const

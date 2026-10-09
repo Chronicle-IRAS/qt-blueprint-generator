@@ -1063,6 +1063,8 @@ void BlueprintSceneTest::directNodeEditorCancelDoesNotMutateDocument()
 void BlueprintSceneTest::mainWindowPropertyEditorPreservesAllFields()
 {
     MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
     QVERIFY(window.addNodeOfType(NodeType::LogicModule));
     const QString id = window.document().nodes.constFirst().id;
     auto *editor = window.findChild<NodePropertiesEditor *>(
@@ -1100,6 +1102,8 @@ void BlueprintSceneTest::mainWindowPropertyEditorPreservesAllFields()
 void BlueprintSceneTest::propertyDockTracksUndoRedoAndDoesNotReapplyStaleValues()
 {
     MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
     QVERIFY(window.addNodeOfType(NodeType::LogicModule));
     const QString id = window.document().nodes.constFirst().id;
     auto *nameEdit = window.findChild<QLineEdit *>(QStringLiteral("nodeNameEdit"));
@@ -1150,6 +1154,8 @@ void BlueprintSceneTest::propertyDockIsDisabledForMultiSelection()
 void BlueprintSceneTest::propertyDraftSurvivesLayoutAndStructuredRowsApply()
 {
     MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
     QVERIFY(window.addNodeOfType(NodeType::LogicModule));
     const QString id = window.document().nodes.constFirst().id;
     auto *nameEdit = window.findChild<QLineEdit *>(QStringLiteral("nodeNameEdit"));
