@@ -4,6 +4,9 @@
 
 ## 当前状态
 
+- 2026-10-10（发布收尾）：PR #48 已合入远端 `main`，合并提交 `33503f85308a93d7ab68b96db9031faa42449f1d`；Candidate Review Unicode 草稿与 Diff 缺陷已修复，原 MVP 14 项验收标准均通过。下方“待合并修复”的记录描述初轮验收时的历史状态，当前结论以 `doc/mvp-acceptance-report.md` 为准。
+- 2026-10-10（真实 AI 验收）：在上述 main 使用一个有效的 `Start → LogicModule(add_one) → End` 蓝图和独立临时 Workspace，经生产 OpenAI-compatible 客户端调用 DeepSeek `deepseek-flash`，HTTP 200。一次真实请求返回三个候选文件；通过生产 Candidate Review 控件原字节接受后，Manifest 全部 accepted，受保护文件哈希未变。工作区真实 CMake 配置/编译成功、CTest 2/2；Export 哈希复核后，导出工程独立构建及 CTest 2/2 成功。输入 810、输出 578，共 1388 tokens；未查询实际账单。仅覆盖一个简单 LogicModule，离屏 GUI 测试不等同真人桌面点验。
+- 2026-10-10（发布准备）：独立 `chore/mvp-release-finalization` 分支整理验收报告、README、双语 `v0.1.0-mvp` 发布说明及密钥忽略规则。全新完整构建成功，最终 CTest 30/30（234.22 秒）通过，导出登录示例 4/4；30 份 QtTest XML 无失败，仅有 Windows 大小写别名 GUI fixture 的平台限制跳过。120 个跟踪文件与本地源码 ZIP 清单一致，已知凭据精确匹配和通用密钥扫描无命中，未混入二进制或本机实测日志；本轮无额外付费 API 请求。本阶段只提交指向 main 的 PR，须人工合并后再验证最终 main、创建 annotated Tag 和源码 Pre-release。Runtime Assembly、行级 Code Review、AI 返工尚未实现，本任务未启动后续开发。
 - 2026-10-10：基于最新远端 `main`（`c009bab`，已合并 PR #45/#46/#47）完成原 MVP 逐项验收，完整构建和基线 CTest 30/30（240.51 秒）通过。独立复核另外发现 Candidate Review 普通编辑会将未编辑的 NBSP / U+2028 归一化，并漏掉对应 Diff；在独立 `fix/mvp-candidate-unicode` worktree 中先以字节及高亮回归检出四处失败，再最小修复草稿与 Diff 的原始文本读取。
 - 修复后的 Candidate Review QtTest 24 项通过，最终完整构建与 CTest 30/30（237.78 秒）、导出示例 4/4 通过；独立 Review Ready，无未解决问题。测试明细仅跳过 Windows 无法创建大小写别名文件的 GUI fixture，其他文件保护及画布像素回归实际执行。未调用真实 AI，历史真实联调证据与人工验收边界见 `doc/mvp-acceptance-report.md`；当前 main 须先合并修复 PR 才能正式收口验收，未实施后续运行时装配。
 - 2026-10-09：从远端 `main`（`cb05233`）创建独立 worktree 和 `feature/issue-32-main-integration`，普通合并 `feature/issue-32-workspace-editor`（`c17d66c`，包含 PR #44）。保留 main 的蓝图持久化、ExternalCode GUI 与原有安全校验；引入工作区浏览、编辑、安全保存、Build/Export 预检、目录选择、scaffold 错误详情和画布局部重绘修复。原工作区的未提交修改及数据未动，集成分支等待指向 main 的 PR 审核。
