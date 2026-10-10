@@ -95,6 +95,7 @@ try {
 - [项目方向与后续路线](doc/project-roadmap.md)
 - [界面样式与缩放验收指南](doc/visual-style-verification.md)
 - [MVP 实施计划](doc/mvp-implementation-plan.md)
+- [MVP 验收报告](doc/mvp-acceptance-report.md)
 - [实现进度](doc/implementation-progress.md)
 - [中英文界面切换计划](doc/plans/2026-09-09-bilingual-ui.md)
 - [C++/Python 混合开发后续规划](doc/multilanguage-development-design.md)

@@ -1,9 +1,11 @@
 # 实现进度
 
-更新时间：2026-10-09（Asia/Shanghai）
+更新时间：2026-10-10（Asia/Shanghai）
 
 ## 当前状态
 
+- 2026-10-10：基于最新远端 `main`（`c009bab`，已合并 PR #45/#46/#47）完成原 MVP 逐项验收，完整构建和基线 CTest 30/30（240.51 秒）通过。独立复核另外发现 Candidate Review 普通编辑会将未编辑的 NBSP / U+2028 归一化，并漏掉对应 Diff；在独立 `fix/mvp-candidate-unicode` worktree 中先以字节及高亮回归检出四处失败，再最小修复草稿与 Diff 的原始文本读取。
+- 修复后的 Candidate Review QtTest 24 项通过，最终完整构建与 CTest 30/30（237.78 秒）、导出示例 4/4 通过；独立 Review Ready，无未解决问题。测试明细仅跳过 Windows 无法创建大小写别名文件的 GUI fixture，其他文件保护及画布像素回归实际执行。未调用真实 AI，历史真实联调证据与人工验收边界见 `doc/mvp-acceptance-report.md`；当前 main 须先合并修复 PR 才能正式收口验收，未实施后续运行时装配。
 - 2026-10-09：从远端 `main`（`cb05233`）创建独立 worktree 和 `feature/issue-32-main-integration`，普通合并 `feature/issue-32-workspace-editor`（`c17d66c`，包含 PR #44）。保留 main 的蓝图持久化、ExternalCode GUI 与原有安全校验；引入工作区浏览、编辑、安全保存、Build/Export 预检、目录选择、scaffold 错误详情和画布局部重绘修复。原工作区的未提交修改及数据未动，集成分支等待指向 main 的 PR 审核。
 - 冲突处理：CMake 源文件及翻译目标取并集，翻译目录保留两套界面文本，进度文档保留双方历史。MainWindow 仅保留一套初始化和关闭入口，按蓝图、源码的顺序确认未保存修改，再执行关闭清理；成功的新建、打开和另存为不擅自切换工作区。关闭中已明确完成的首次保存仍按原有项目身份规则清理旧上下文，随后取消源码提示不会回滚该保存；同目录保存后取消则保留原会话。
 - 独立规格 Review 通过；质量 Review 发现并修复了原工作区编辑器的 Unicode 保存转换与分隔符越界问题。先复现 5 类字符的字节变化及删除分隔符时的越界，再统一使用原始文本表示并记录原始段落分隔符；文件路径、磁盘身份、哈希、manifest 及只读保护逻辑保持不变。修复复审结论 Ready，无剩余 Important/Critical。README、使用指南及路线文档已同步，未来的运行时装配和 AI Review 未实施。

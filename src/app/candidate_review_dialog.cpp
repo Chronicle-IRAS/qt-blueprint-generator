@@ -11,7 +11,19 @@
 #include <QGridLayout>
 #include "ui/theme.h"
 #include <QTextBlock>
+#include <QTextDocument>
 #include <QVBoxLayout>
+
+namespace {
+QString sourceText(const QPlainTextEdit *editor)
+{
+    // Keep source characters such as NBSP and U+2028; only Qt's structural
+    // paragraph boundaries use the existing LF draft convention.
+    QString text = editor->document()->toRawText();
+    text.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+    return text;
+}
+}
 
 struct CandidateReviewDialog::Impl {
     enum class Status { None, PreviewError, RefreshError, Refreshed, ConsistencyError, AcceptError, Accepted, RejectError, Rejected, CancelError };
@@ -79,7 +91,7 @@ struct CandidateReviewDialog::Impl {
     }
     void diff() {
         auto highlight = [](QPlainTextEdit *editor, QPlainTextEdit *other, QColor color) {
-            auto lines = editor->toPlainText().split('\n'), otherLines = other->toPlainText().split('\n');
+            auto lines = sourceText(editor).split('\n'), otherLines = sourceText(other).split('\n');
             QList<QTextEdit::ExtraSelection> selections;
             for (int i = 0; i < lines.size(); ++i) {
                 if (i < otherLines.size() && lines[i] == otherLines[i]) continue;
@@ -195,7 +207,7 @@ CandidateReviewDialog::CandidateReviewDialog(const BlueprintDocument &snapshot, 
     d->accept->setProperty("role", "primary");
     for (const auto &file : result.files) { d->files.append({file.relativePath, {}, std::nullopt, false, false}); d->list->addItem(file.relativePath); }
     connect(d->list, &QListWidget::currentRowChanged, this, [this](int row) { d->select(row); });
-    connect(d->candidate, &QPlainTextEdit::textChanged, this, [this] { if (d->row >= 0) d->files[d->row].draft = d->candidate->toPlainText(); d->diff(); });
+    connect(d->candidate, &QPlainTextEdit::textChanged, this, [this] { if (d->row >= 0) d->files[d->row].draft = sourceText(d->candidate); d->diff(); });
     connect(d->accept, &QPushButton::clicked, this, [this] { d->acceptFile(false); });
     connect(d->editAccept, &QPushButton::clicked, this, [this] { d->acceptFile(true); });
     connect(d->reject, &QPushButton::clicked, this, [this] { d->rejectFile(); });
