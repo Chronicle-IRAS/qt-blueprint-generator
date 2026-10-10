@@ -12,6 +12,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QTemporaryDir>
+#include <QTextCursor>
 #include <QTimer>
 #include <QtTest>
 
@@ -191,6 +192,74 @@ private slots:
         button->click();
         QCOMPARE(read(currentPath(dir.path())), QByteArray("// edited\n"));
         QCOMPARE(read(dir.path() + "/candidates/review/logic/" + path), QByteArray("// candidate\n"));
+    }
+    void keyboardEditPreservesUnicodeAndOriginalCandidate_data()
+    {
+        QTest::addColumn<QChar>("character");
+        QTest::addColumn<bool>("acceptEdited");
+        QTest::newRow("nbsp-edited") << QChar(0x00a0) << true;
+        QTest::newRow("line-separator-edited") << QChar(0x2028) << true;
+        QTest::newRow("nbsp-original") << QChar(0x00a0) << false;
+        QTest::newRow("line-separator-original") << QChar(0x2028) << false;
+    }
+    void keyboardEditPreservesUnicodeAndOriginalCandidate()
+    {
+        QFETCH(QChar, character);
+        QFETCH(bool, acceptEdited);
+        const auto original = (QStringLiteral("const char *s = \"a") + character
+            + QStringLiteral("b\";\n")).toUtf8();
+        auto result = candidate();
+        result.files[0].content = QString::fromUtf8(original);
+        QTemporaryDir dir;
+        QVERIFY(ProjectScaffolder::create(blueprint(), dir.path()));
+        QVERIFY(GenerationService::persistCandidate(dir.path(), "review", result, "fake", "prompt"));
+        CandidateReviewDialog dialog(blueprint(), dir.path(), "review", result);
+        dialog.show();
+        auto *editor = dialog.findChild<QPlainTextEdit *>("candidateEditor"); QVERIFY(editor);
+        auto *files = dialog.findChild<QListWidget *>("candidateFiles"); QVERIFY(files);
+        editor->setFocus();
+        editor->moveCursor(QTextCursor::End);
+        QTest::keyClicks(editor, "//x");
+        files->setCurrentRow(1);
+        files->setCurrentRow(0);
+        ReviewTranslator translator;
+        QApplication::installTranslator(&translator);
+        QEvent languageChange(QEvent::LanguageChange);
+        QApplication::sendEvent(&dialog, &languageChange);
+        auto *button = dialog.findChild<QPushButton *>(acceptEdited
+            ? "editAcceptCandidateButton" : "acceptCandidateButton"); QVERIFY(button);
+        button->click();
+        QCOMPARE(read(currentPath(dir.path())), acceptEdited ? original + "//x" : original);
+        QCOMPARE(state(dir.path()), QString("accepted"));
+        QCOMPARE(state(dir.path(), secondPath), QString("pending"));
+        QCOMPARE(read(dir.path() + "/candidates/review/logic/" + path), original);
+    }
+    void diffHighlightsUnicodeDifferences_data()
+    {
+        QTest::addColumn<QChar>("character");
+        QTest::addColumn<QChar>("replacement");
+        QTest::newRow("nbsp-versus-space") << QChar(0x00a0) << QChar(' ');
+        QTest::newRow("line-separator-versus-newline") << QChar(0x2028) << QChar('\n');
+    }
+    void diffHighlightsUnicodeDifferences()
+    {
+        QFETCH(QChar, character);
+        QFETCH(QChar, replacement);
+        const auto source = QStringLiteral("const char *s = \"a") + character
+            + QStringLiteral("b\";\n");
+        auto result = candidate();
+        result.files[0].content = source;
+        QTemporaryDir dir;
+        QVERIFY(ProjectScaffolder::create(blueprint(), dir.path()));
+        QVERIFY(GenerationService::persistCandidate(dir.path(), "review", result, "fake", "prompt"));
+        auto currentSource = source;
+        currentSource.replace(character, replacement);
+        QVERIFY(write(currentPath(dir.path()), currentSource.toUtf8()));
+        CandidateReviewDialog dialog(blueprint(), dir.path(), "review", result);
+        auto *current = dialog.findChild<QPlainTextEdit *>("currentEditor"); QVERIFY(current);
+        auto *next = dialog.findChild<QPlainTextEdit *>("candidateEditor"); QVERIFY(next);
+        QVERIFY(!current->extraSelections().isEmpty());
+        QVERIFY(!next->extraSelections().isEmpty());
     }
     void rejectsAndCancelsWithoutWritingProject()
     {
