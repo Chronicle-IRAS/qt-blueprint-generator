@@ -6,6 +6,8 @@ Qt Blueprint Generator 是一个面向 Qt 6 Widgets 项目的可视化蓝图编�
 
 蓝图是项目结构和模块契约的主数据源。AI 返回的代码不会直接覆盖工程文件，而是先进入候选区，经过预览和人工确认后再写入。
 
+原 MVP 的 14 项验收标准已通过，Candidate Review 支持 Unicode 草稿保留和对应差异高亮。真实 DeepSeek 验收使用一个简单 Logic Module，完成生成、候选接受、构建、测试及导出；结果及适用边界见 [MVP 验收报告](doc/mvp-acceptance-report.md)。`v0.1.0-mvp` 定位为源码 Pre-release，不包含二进制或 Windows 安装包；[双语发布说明](doc/releases/v0.1.0-mvp.md) 记录核心功能与已知限制，发布状态以仓库的 Tag 和 Release 为准。
+
 ## 核心能力
 
 - 六类蓝图节点：Start、End、UI Page、Logic Module、Decision 和 External Code。
