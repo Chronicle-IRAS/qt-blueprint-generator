@@ -3,6 +3,7 @@
 #include "app/workspace_browser_widget.h"
 #include "ai/fake_ai_client.h"
 #include "generation/project_scaffolder.h"
+#include "blueprint/blueprint_validator.h"
 #include "editor/blueprint_scene.h"
 #include "editor/node_item.h"
 #include <QAction>
@@ -14,12 +15,16 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QTimer>
+#include <QToolBar>
 #include <QtTest>
 
 namespace {
@@ -51,6 +56,21 @@ void prepare(MainWindow &window, const QString &workspace)
     QVERIFY(window.scene()->connectNodes("start", "logic"));
     QVERIFY(window.scene()->connectNodes("logic", "end"));
     window.scene()->nodeItem("logic")->setSelected(true);
+    window.show();
+}
+void prepareDecision(MainWindow &window, const QString &workspace)
+{
+    window.findChild<QLineEdit *>("workspacePathEdit")->setText(workspace);
+    for (auto p : {qMakePair("start", NodeType::Start), qMakePair("decision", NodeType::Decision),
+                   qMakePair("yes", NodeType::End), qMakePair("no", NodeType::End)}) {
+        BlueprintNode n; n.id = p.first; n.type = p.second; n.name = p.first;
+        n.description = "Complete module contract";
+        QVERIFY(window.scene()->addNode(n, {}));
+    }
+    QVERIFY(window.scene()->connectNodes("start", "decision"));
+    QVERIFY(window.scene()->connectNodes("decision", "yes", "true"));
+    QVERIFY(window.scene()->connectNodes("decision", "no", "false"));
+    window.scene()->nodeItem("decision")->setSelected(true);
     window.show();
 }
 QByteArray readFile(const QString &path)
@@ -95,6 +115,82 @@ private slots:
         QApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
     }
     void init() { QSettings().clear(); }
+    void generationActionsExposeBothModes()
+    {
+        MainWindow window;
+        QVERIFY(window.setLanguage("en"));
+        auto *runtime = window.findChild<QAction *>("generateSelectedNodeAction");
+        auto *legacy = window.findChild<QAction *>("generateLegacyModuleAction");
+        auto *ai = window.findChild<QMenu *>("aiMenu");
+        auto *toolbar = window.findChild<QToolBar *>("blueprintToolbar");
+        QVERIFY(runtime && ai && toolbar);
+        QVERIFY2(legacy, "The GUI must expose an explicit module-only v1 generation action");
+        QCOMPARE(runtime->text(), QString("Generate runtime module"));
+        QCOMPARE(legacy->text(), QString("Generate module only (legacy v1)"));
+        QVERIFY(ai->actions().contains(runtime));
+        QVERIFY(ai->actions().contains(legacy));
+        QCOMPARE(ai->actions().indexOf(legacy), ai->actions().indexOf(runtime) + 1);
+        QVERIFY(toolbar->actions().contains(runtime));
+        QCOMPARE(toolbar->widgetForAction(runtime)->property("role").toString(), QString("primary"));
+        QVERIFY(!runtime->isEnabled());
+        QVERIFY(!legacy->isEnabled());
+    }
+    void runtimeGenerationIsDisabledForDecision()
+    {
+        QTemporaryDir dir;
+        int calls = 0;
+        MainWindow window([&](const AiProviderSettings &, QObject *parent) {
+            ++calls; return new DeferredClient(parent);
+        });
+        prepareDecision(window, dir.path());
+        QVERIFY(BlueprintValidator::validate(window.document(), {dir.path()}).isEmpty());
+        auto *runtime = window.findChild<QAction *>("generateSelectedNodeAction");
+        QVERIFY(runtime);
+        QVERIFY(!runtime->isEnabled());
+        const auto before = fileHashes(dir.path());
+        runtime->trigger();
+        QCOMPARE(calls, 0);
+        QCOMPARE(fileHashes(dir.path()), before);
+        QVERIFY(!window.findChild<CandidateReviewDialog *>());
+    }
+    void legacyDecisionGenerationUsesModuleOnlyContracts()
+    {
+        QTemporaryDir dir;
+        DeferredClient *client = nullptr;
+        MainWindow window([&](const AiProviderSettings &, QObject *parent) {
+            client = new DeferredClient(parent); return client;
+        });
+        prepareDecision(window, dir.path());
+        QVERIFY(BlueprintValidator::validate(window.document(), {dir.path()}).isEmpty());
+        auto *legacy = window.findChild<QAction *>("generateLegacyModuleAction");
+        auto *runtime = window.findChild<QAction *>("generateSelectedNodeAction");
+        QVERIFY(legacy && runtime);
+        QVERIFY(legacy->isEnabled());
+        QVERIFY(!runtime->isEnabled());
+        legacy->trigger();
+        QVERIFY(client);
+        QVERIFY(client->request.prompt.contains("src/modules/decision/implementation/"));
+        QVERIFY(client->request.prompt.contains("virtual bool decide("));
+        QCOMPARE(QJsonDocument::fromJson(readFile(dir.path()+"/generation-manifest.json"))
+                     .object().value("version").toInt(), 1);
+        QVERIFY(!QFileInfo::exists(dir.path()+"/generated-project/src/runtime/workflow_controller.cpp"));
+        QVERIFY(!legacy->isEnabled());
+        QVERIFY(!runtime->isEnabled());
+        emit client->responseReady(client->request.requestId, response().replace("logic", "decision"));
+        auto *dialog = window.findChild<CandidateReviewDialog *>();
+        QVERIFY(dialog);
+        QVERIFY(!legacy->isEnabled());
+        QVERIFY(!runtime->isEnabled());
+        dialog->findChild<QPushButton *>("acceptCandidateButton")->click();
+        QCOMPARE(readFile(dir.path()+"/generated-project/src/modules/decision/implementation/worker.cpp"),
+                 QByteArray("// candidate"));
+        QVERIFY(readFile(dir.path()+"/generation-manifest.json").contains("accepted"));
+        QVERIFY(!legacy->isEnabled());
+        dialog->reject();
+        QTRY_VERIFY(!window.findChild<CandidateReviewDialog *>());
+        QVERIFY(legacy->isEnabled());
+        QVERIFY(!runtime->isEnabled());
+    }
     void browseCanceledOnFirstLaunchPreservesDefaultInput()
     {
         MainWindow window;
@@ -318,6 +414,21 @@ private slots:
         QVERIFY(!window.findChild<CandidateReviewDialog *>());
         QVERIFY(window.findChild<QLabel *>("generationStatus")->text().contains("new workspace"));
     }
+    void legacyGenerationRejectsRuntimeWorkspaceWithoutWriting()
+    {
+        QTemporaryDir dir; int calls = 0;
+        MainWindow window([&](const AiProviderSettings &, QObject *parent) { ++calls; return new DeferredClient(parent); });
+        QVERIFY(window.setLanguage("en")); prepare(window, dir.path());
+        QVERIFY(ProjectScaffolder::createRuntime(window.document(), dir.path()));
+        const auto before = fileHashes(dir.path());
+        auto *legacy = window.findChild<QAction *>("generateLegacyModuleAction");
+        QVERIFY(legacy);
+        QVERIFY(legacy->isEnabled());
+        legacy->trigger();
+        QCOMPARE(calls, 0); QCOMPARE(fileHashes(dir.path()), before);
+        QVERIFY(!window.findChild<CandidateReviewDialog *>());
+        QVERIFY(window.findChild<QLabel *>("generationStatus")->text().contains("new workspace"));
+    }
     void runtimeGenerationRejectsLabeledFlowWithoutWriting()
     {
         QTemporaryDir dir; int calls = 0;
@@ -328,6 +439,7 @@ private slots:
         QVERIFY(window.scene()->deleteEdge(window.document().edges.first().id));
         QVERIFY(window.scene()->connectNodes("start", "logic", "true"));
         window.scene()->clearSelection(); window.scene()->nodeItem("logic")->setSelected(true);
+        QVERIFY(BlueprintValidator::validate(window.document(), {dir.path()}).isEmpty());
         const auto before = fileHashes(dir.path());
         window.findChild<QAction *>("generateSelectedNodeAction")->trigger();
         QCOMPARE(calls, 0); QCOMPARE(fileHashes(dir.path()), before);
@@ -443,41 +555,60 @@ private slots:
             ->findChild<QPushButton *>("cancelRemainingButton")->click();
         QTRY_VERIFY(!window.findChild<CandidateReviewDialog *>());
     }
+    void selectionEligibilityAndCancellation_data()
+    {
+        QTest::addColumn<bool>("legacyMode");
+        QTest::newRow("runtime-v2") << false;
+        QTest::newRow("module-only-v1") << true;
+    }
     void selectionEligibilityAndCancellation()
     {
+        QFETCH(bool, legacyMode);
         QTemporaryDir dir;
+        int calls = 0;
         QPointer<DeferredClient> client;
         MainWindow window([&](const AiProviderSettings &, QObject *parent) {
+            ++calls;
             client = new DeferredClient(parent); return client.data();
         });
-        auto *generate = window.findChild<QAction *>("generateSelectedNodeAction");
+        auto *runtime = window.findChild<QAction *>("generateSelectedNodeAction");
+        auto *legacy = window.findChild<QAction *>("generateLegacyModuleAction");
+        QVERIFY(runtime && legacy);
+        auto *generate = legacyMode ? legacy : runtime;
         auto *cancel = window.findChild<QAction *>("cancelGenerationAction");
         auto *status = window.findChild<QLabel *>("generationStatus");
         QVERIFY(!generate->isEnabled());
+        QVERIFY(!runtime->isEnabled()); QVERIFY(!legacy->isEnabled());
         prepare(window, dir.path());
-        QVERIFY(generate->isEnabled());
+        QVERIFY(runtime->isEnabled()); QVERIFY(legacy->isEnabled());
         auto decision = window.document().nodes.at(1);
         decision.type = NodeType::Decision;
         QVERIFY(window.scene()->editNode("logic", decision));
-        QVERIFY(generate->isEnabled());
+        QVERIFY(!runtime->isEnabled()); QVERIFY(legacy->isEnabled());
         decision.type = NodeType::UiPage;
         QVERIFY(window.scene()->editNode("logic", decision));
         QVERIFY(generate->isEnabled());
         decision.type = NodeType::LogicModule;
         QVERIFY(window.scene()->editNode("logic", decision));
         window.scene()->nodeItem("start")->setSelected(true);
-        QVERIFY(!generate->isEnabled());
+        QVERIFY(!runtime->isEnabled()); QVERIFY(!legacy->isEnabled());
         window.scene()->clearSelection();
         window.scene()->nodeItem("start")->setSelected(true);
-        QVERIFY(!generate->isEnabled());
+        QVERIFY(!runtime->isEnabled()); QVERIFY(!legacy->isEnabled());
         window.scene()->clearSelection();
         window.scene()->nodeItem("logic")->setSelected(true);
         generate->trigger();
         QVERIFY(client); QVERIFY(cancel->isEnabled()); QVERIFY(!generate->isEnabled());
+        QVERIFY(!runtime->isEnabled()); QVERIFY(!legacy->isEnabled());
+        const auto whileGenerating = fileHashes(dir.path());
+        (legacyMode ? runtime : legacy)->trigger();
+        QCOMPARE(calls, 1);
+        QCOMPARE(fileHashes(dir.path()), whileGenerating);
         QVERIFY(status->text().contains("Generating"));
         cancel->trigger();
         QVERIFY(status->text().contains("Cancelled"));
         QVERIFY(!cancel->isEnabled()); QVERIFY(generate->isEnabled());
+        QVERIFY(runtime->isEnabled()); QVERIFY(legacy->isEnabled());
         if (client) emit client->responseReady(client->request.requestId, response());
         QCoreApplication::processEvents();
         QVERIFY(!window.findChild<CandidateReviewDialog *>());
@@ -518,30 +649,96 @@ private slots:
         window.findChild<QLineEdit *>("workspacePathEdit")->setText(dir.path()+"/other");
         QVERIFY(status->text().contains("Cancelled"));
     }
+    void selectionGenerateReviewAccept_data()
+    {
+        QTest::addColumn<bool>("legacyMode");
+        QTest::addColumn<bool>("existingWorkspace");
+        QTest::newRow("fresh-runtime-v2") << false << false;
+        QTest::newRow("existing-runtime-v2") << false << true;
+        QTest::newRow("fresh-module-only-v1") << true << false;
+        QTest::newRow("existing-module-only-v1") << true << true;
+    }
     void selectionGenerateReviewAccept()
     {
+        QFETCH(bool, legacyMode);
+        QFETCH(bool, existingWorkspace);
         QTemporaryDir dir;
         QString model;
+        int calls = 0;
         MainWindow window([&](const AiProviderSettings &settings, QObject *parent) {
+            ++calls;
             model = settings.model;
             auto *fake = new FakeAiClient(parent); fake->setSuccessfulResponse(response()); return fake;
         });
         AiProviderSettings settings; settings.model = "offline-model";
         QSettings store; QVERIFY(settings.save(store));
         prepare(window, dir.path());
-        auto *generate = window.findChild<QAction *>("generateSelectedNodeAction");
+        QVERIFY(BlueprintValidator::validate(window.document(), {dir.path()}).isEmpty());
+        const QString previousPath = "src/modules/logic/implementation/previous.cpp";
+        const QByteArray previousContent = "// previously accepted candidate";
+        QJsonObject previousManifest;
+        if (existingWorkspace) {
+            QVERIFY(legacyMode ? ProjectScaffolder::create(window.document(), dir.path())
+                               : ProjectScaffolder::createRuntime(window.document(), dir.path()));
+            const GenerationResult previous{"logic", "Previous candidate",
+                {{previousPath, {}, QString::fromUtf8(previousContent)}}};
+            QVERIFY(GenerationService::persistCandidate(dir.path(), "previous", previous, "offline-model", "previous prompt"));
+            CandidateReviewDialog previousReview(window.document(), dir.path(), "previous", previous,
+                nullptr, legacyMode ? ProjectScaffolder::Mode::ModulesOnly : ProjectScaffolder::Mode::LinearRuntime);
+            previousReview.show();
+            auto *acceptPrevious = previousReview.findChild<QPushButton *>("acceptCandidateButton");
+            QVERIFY(acceptPrevious && acceptPrevious->isEnabled());
+            acceptPrevious->click();
+            QCOMPARE(readFile(dir.path()+"/generated-project/"+previousPath), previousContent);
+            previousManifest = QJsonDocument::fromJson(readFile(dir.path()+"/generation-manifest.json")).object();
+            QCOMPARE(previousManifest.value("batches").toObject().value("previous").toObject()
+                         .value("files").toObject().value(previousPath).toObject().value("state").toString(),
+                     QString("accepted"));
+            previousReview.reject();
+        }
+        auto *runtime = window.findChild<QAction *>("generateSelectedNodeAction");
+        auto *legacy = window.findChild<QAction *>("generateLegacyModuleAction");
+        QVERIFY(runtime && legacy);
+        auto *generate = legacyMode ? legacy : runtime;
         QVERIFY(generate); QVERIFY(generate->isEnabled()); generate->trigger();
         QTRY_VERIFY(window.findChild<CandidateReviewDialog *>());
+        QCOMPARE(calls, 1);
         QCOMPARE(model, QString("offline-model"));
+        QCOMPARE(QJsonDocument::fromJson(readFile(dir.path()+"/generation-manifest.json"))
+                     .object().value("version").toInt(), legacyMode ? 1 : 2);
+        QCOMPARE(QFileInfo::exists(dir.path()+"/generated-project/src/runtime/workflow_controller.cpp"), !legacyMode);
+        const auto protectedBeforeAccept = fileHashes(dir.path()+"/generated-project");
         auto *dialog = window.findChild<CandidateReviewDialog *>();
         QVERIFY(dialog->findChild<QListWidget *>("candidateFiles"));
         QCOMPARE(dialog->findChild<QListWidget *>("candidateFiles")->count(), 1);
+        QVERIFY(!runtime->isEnabled()); QVERIFY(!legacy->isEnabled());
+        const auto whileReviewing = fileHashes(dir.path());
+        (legacyMode ? runtime : legacy)->trigger();
+        QCOMPARE(calls, 1);
+        QCOMPARE(fileHashes(dir.path()), whileReviewing);
         QVERIFY(!QFileInfo::exists(dir.path()+"/generated-project/src/modules/logic/implementation/worker.cpp"));
         QVERIFY(readFile(dir.path()+"/generation-manifest.json").contains("pending"));
         confirmNextDialog();
         dialog->findChild<QPushButton *>("acceptCandidateButton")->click();
         QCOMPARE(readFile(dir.path()+"/generated-project/src/modules/logic/implementation/worker.cpp"), QByteArray("// candidate"));
         QVERIFY(readFile(dir.path()+"/generation-manifest.json").contains("accepted"));
+        QCOMPARE(QJsonDocument::fromJson(readFile(dir.path()+"/generation-manifest.json"))
+                     .object().value("version").toInt(), legacyMode ? 1 : 2);
+        auto protectedAfterAccept = fileHashes(dir.path()+"/generated-project");
+        protectedAfterAccept.remove("src/modules/logic/implementation/worker.cpp");
+        QCOMPARE(protectedAfterAccept, protectedBeforeAccept);
+        if (existingWorkspace) {
+            QCOMPARE(readFile(dir.path()+"/generated-project/"+previousPath), previousContent);
+            const auto manifest = QJsonDocument::fromJson(readFile(dir.path()+"/generation-manifest.json")).object();
+            QCOMPARE(manifest.value("files").toObject().value(previousPath),
+                     previousManifest.value("files").toObject().value(previousPath));
+            QCOMPARE(manifest.value("batches").toObject().value("previous"),
+                     previousManifest.value("batches").toObject().value("previous"));
+        }
+        QVERIFY(!runtime->isEnabled()); QVERIFY(!legacy->isEnabled());
+        dialog->reject();
+        QTRY_VERIFY(!window.findChild<CandidateReviewDialog *>());
+        QVERIFY(runtime->isEnabled()); QVERIFY(legacy->isEnabled());
     }
     void editRejectLanguageAndContextReview()
     {

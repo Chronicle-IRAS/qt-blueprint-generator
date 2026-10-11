@@ -468,8 +468,10 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_aiMenu->setObjectName(QStringLiteral("aiMenu"));
     m_aiSettingsAction = m_aiMenu->addAction(tr("AI Settings..."));
     m_aiSettingsAction->setObjectName(QStringLiteral("aiSettingsAction"));
-    m_generateAction = m_aiMenu->addAction(tr("Generate selected node"));
+    m_generateAction = m_aiMenu->addAction(tr("Generate runtime module"));
     m_generateAction->setObjectName(QStringLiteral("generateSelectedNodeAction"));
+    m_generateLegacyAction = m_aiMenu->addAction(tr("Generate module only (legacy v1)"));
+    m_generateLegacyAction->setObjectName(QStringLiteral("generateLegacyModuleAction"));
     m_cancelGenerationAction = m_aiMenu->addAction(tr("Cancel generation"));
     m_cancelGenerationAction->setObjectName(QStringLiteral("cancelGenerationAction"));
     m_blueprintToolbar->addSeparator();
@@ -649,7 +651,10 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_buildService = new BuildService(this);
     m_generationController = factory ? new GenerationController(std::move(factory), this)
                                      : new GenerationController(this);
-    connect(m_generateAction, &QAction::triggered, this, &MainWindow::startGeneration);
+    connect(m_generateAction, &QAction::triggered, this,
+            [this] { startGeneration(ProjectScaffolder::Mode::LinearRuntime); });
+    connect(m_generateLegacyAction, &QAction::triggered, this,
+            [this] { startGeneration(ProjectScaffolder::Mode::ModulesOnly); });
     connect(m_cancelGenerationAction, &QAction::triggered,
             m_generationController, &GenerationController::cancel);
     connect(m_generationController, &GenerationController::stateChanged,
@@ -1116,7 +1121,8 @@ void MainWindow::retranslateUi()
     m_resetViewAction->setText(tr("Reset View"));
     m_aiMenu->setTitle(tr("AI"));
     m_aiSettingsAction->setText(tr("AI Settings..."));
-    m_generateAction->setText(tr("Generate selected node"));
+    m_generateAction->setText(tr("Generate runtime module"));
+    m_generateLegacyAction->setText(tr("Generate module only (legacy v1)"));
     m_cancelGenerationAction->setText(tr("Cancel generation"));
     updateGenerationUi();
     m_languageMenu->setTitle(tr("Language"));
@@ -1170,17 +1176,24 @@ void MainWindow::setBuildToolConfiguration(const QString &cmakeExecutable,
     m_buildArguments = buildArguments;
 }
 
-void MainWindow::startGeneration()
+void MainWindow::startGeneration(ProjectScaffolder::Mode mode)
 {
-    if (!m_generateAction->isEnabled())
+    const QAction *action = mode == ProjectScaffolder::Mode::LinearRuntime
+        ? m_generateAction : m_generateLegacyAction;
+    if (!action->isEnabled())
         return;
     m_generationNodeId = selectedNodeId();
     // Capture before start(): injected clients may complete synchronously.
     m_generationSnapshot = m_document;
     QSettings settings;
-    m_generationController->startRuntime(m_generationSnapshot, m_generationNodeId,
-                                 m_workspacePathEdit->text().trimmed(),
-                                 AiProviderSettings::load(settings));
+    if (mode == ProjectScaffolder::Mode::LinearRuntime)
+        m_generationController->startRuntime(m_generationSnapshot, m_generationNodeId,
+                                             m_workspacePathEdit->text().trimmed(),
+                                             AiProviderSettings::load(settings));
+    else
+        m_generationController->start(m_generationSnapshot, m_generationNodeId,
+                                     m_workspacePathEdit->text().trimmed(),
+                                     AiProviderSettings::load(settings));
     updateGenerationUi();
 }
 
@@ -1197,17 +1210,20 @@ void MainWindow::updateGenerationUi()
     if (!m_generationController)
         return;
     const auto state = m_generationController->state();
-    bool generatable = false;
+    bool runtimeGeneratable = false;
+    bool legacyGeneratable = false;
     const QString id = selectedNodeId();
     if (m_scene->selectedItems().size() == 1) {
         for (const auto &node : m_document.nodes) {
-            if (node.id == id)
-                generatable = node.type == NodeType::LogicModule || node.type == NodeType::UiPage
-                    || node.type == NodeType::Decision;
+            if (node.id == id) {
+                runtimeGeneratable = node.type == NodeType::LogicModule || node.type == NodeType::UiPage;
+                legacyGeneratable = runtimeGeneratable || node.type == NodeType::Decision;
+            }
         }
     }
-    m_generateAction->setEnabled(generatable && state != GenerationController::State::Generating
-                                && !m_reviewDialog);
+    const bool canStart = state != GenerationController::State::Generating && !m_reviewDialog;
+    m_generateAction->setEnabled(runtimeGeneratable && canStart);
+    m_generateLegacyAction->setEnabled(legacyGeneratable && canStart);
     m_cancelGenerationAction->setEnabled(state == GenerationController::State::Generating);
     QString status;
     switch (state) {
@@ -1400,6 +1416,7 @@ void MainWindow::showCanvasContextMenu(QGraphicsItem *target, const QPoint &scre
         editAction->setObjectName(QStringLiteral("contextEditNodeAction"));
         connect(editAction, &QAction::triggered, this, [this, nodeId] { editNodeFromCanvas(nodeId); });
         menu.addAction(m_generateAction);
+        menu.addAction(m_generateLegacyAction);
         menu.addSeparator();
         menu.addAction(m_deleteAction);
     } else if (dynamic_cast<EdgeItem *>(target)) {

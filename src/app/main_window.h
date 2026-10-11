@@ -90,7 +90,7 @@ private:
     void resetWindowLayout();
     void appendBuildLog(const QString &text);
     QString selectedNodeId() const;
-    void startGeneration();
+    void startGeneration(ProjectScaffolder::Mode mode);
     void updateGenerationUi();
     void showValidationDiagnostics();
     void invalidateGenerationContext();
@@ -119,6 +119,7 @@ private:
     QPointer<ExternalCodeDialog> m_externalCodeDialog;
     quint64 m_projectEpoch = 0;
     QAction *m_generateAction = nullptr;
+    QAction *m_generateLegacyAction = nullptr;
     QAction *m_cancelGenerationAction = nullptr;
     QLabel *m_generationStatus = nullptr;
     QString m_generationNodeId;

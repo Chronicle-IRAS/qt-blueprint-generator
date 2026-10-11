@@ -6,7 +6,7 @@
 
 ## Runtime Assembly Phase 1 当前范围
 
-新生成使用 `startRuntime()` / `createRuntime()`，创建 manifest v2 工程。确定性生成器负责受保护的 `main.cpp`、WorkflowController、CMake 和公共契约，AI 负责当前节点 `implementation/` 与 `tests/`，必须定义契约声明的固定 `createModule_HASH` factory，返回保护契约类的 `std::unique_ptr`；装配器不猜测 AI 的具体类名。manifest 仍严格保留 `version`、`blueprintSha256`、`modules`、`protectedFiles`、`files`、`batches` 六个字段，只接受版本 1 或 2。原 `create()` / `start()` 保留 module-only v1 原字节产物；两种模式不互迁，旧工程继续 Build / Export，新 GUI 运行时使用新的空工作区。
+默认运行时生成使用 `startRuntime()` / `createRuntime()`，创建 manifest v2 工程。确定性生成器负责受保护的 `main.cpp`、WorkflowController、CMake 和公共契约，AI 负责当前节点 `implementation/` 与 `tests/`，必须定义契约声明的固定 `createModule_HASH` factory，返回保护契约类的 `std::unique_ptr`；装配器不猜测 AI 的具体类名。manifest 仍严格保留 `version`、`blueprintSha256`、`modules`、`protectedFiles`、`files`、`batches` 六个字段，只接受版本 1 或 2。AI 菜单及节点右键菜单另有明确的 legacy v1 模块生成动作，通过原 `create()` / `start()` 保留 module-only v1 原字节产物和占位入口；既有 v1 工程可继续生成候选及 Build / Export。两种模式不互迁，运行时失败不自动回退到旧版，新运行时使用新的空工作区。
 
 支持 `Start → 零个或多个 LogicModule → 可选的唯一末端 UiPage → End`，按 Flow 连线执行一次启动链。第一个模块的 Inputs 为空；后续仅从直接前驱 Outputs 绑定同名且声明类型相同的输入，没有重命名、默认值、转换或全局上下文。端口类型限定为 `bool`、`int`、`double`、`QString`、`QByteArray`、`QStringList`、`QVariantList`、`QVariantMap` 和 `QVariant`；输出键必须与声明一致，值必须有效，除接受任意有效值的 `QVariant` 外必须匹配精确 Qt 类型。末端 UiPage factory 接收 Inputs 并复制页面后续使用的数据；控制器显示并持续持有页面。End 只表示启动链终点，有页面时进入 Qt 事件循环，仅逻辑链执行后直接退出。
 

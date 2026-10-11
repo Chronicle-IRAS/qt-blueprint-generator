@@ -154,7 +154,8 @@
     <message><source>Choose an existing workspace directory</source><translation>选择已有的工作区目录</translation></message>
     <message><source>Select workspace directory</source><translation>选择工作区目录</translation></message>
     <message><source>Workspace Editor</source><translation>工作区编辑器</translation></message>
-    <message><source>Generate selected node</source><translation>生成选中节点</translation></message>
+    <message><source>Generate runtime module</source><translation>生成运行时模块</translation></message>
+    <message><source>Generate module only (legacy v1)</source><translation>仅生成模块（旧版 v1）</translation></message>
     <message><source>Cancel generation</source><translation>取消生成</translation></message>
     <message><source>Ready to generate</source><translation>可以开始生成</translation></message>
     <message><source>Generating</source><translation>正在生成</translation></message>

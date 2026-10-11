@@ -119,6 +119,7 @@ private slots:
     void nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName_data();
     void nodeCardHidesTheTypeCaptionWhenNameIsTheTypeName();
     void contextMenusFollowTheLanguageSwitch();
+    void generationActionsFollowTheLanguageSwitch();
     void workspaceBrowseFollowsTheLanguageSwitch();
 
 private:
@@ -462,14 +463,16 @@ void LanguageSwitchTest::contextMenusFollowTheLanguageSwitch()
     menu = openContextMenu(view->viewport(), nodePoint);
     QVERIFY(menu.opened);
     QCOMPARE(menu.entries,
-             QStringList({QStringLiteral("Edit node"), QStringLiteral("Generate selected node"),
+             QStringList({QStringLiteral("Edit node"), QStringLiteral("Generate runtime module"),
+                          QStringLiteral("Generate module only (legacy v1)"),
                           QStringLiteral("---"), QStringLiteral("Delete")}));
 
     QVERIFY(window.setLanguage(QStringLiteral("zh_CN")));
     menu = openContextMenu(view->viewport(), nodePoint);
     QVERIFY(menu.opened);
     QCOMPARE(menu.entries,
-             QStringList({QStringLiteral("编辑节点"), QStringLiteral("生成选中节点"),
+             QStringList({QStringLiteral("编辑节点"), QStringLiteral("生成运行时模块"),
+                          QStringLiteral("仅生成模块（旧版 v1）"),
                           QStringLiteral("---"), QStringLiteral("删除")}));
 
     const QPoint blank(16, 16);
@@ -487,6 +490,28 @@ void LanguageSwitchTest::contextMenusFollowTheLanguageSwitch()
     menu = openContextMenu(view->viewport(), blank);
     QVERIFY(menu.opened);
     QCOMPARE(menu.entries.constFirst(), QStringLiteral("Add node"));
+}
+
+void LanguageSwitchTest::generationActionsFollowTheLanguageSwitch()
+{
+    MainWindow window;
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    auto *runtime = window.findChild<QAction *>(QStringLiteral("generateSelectedNodeAction"));
+    auto *legacy = window.findChild<QAction *>(QStringLiteral("generateLegacyModuleAction"));
+    auto *aiMenu = window.findChild<QMenu *>(QStringLiteral("aiMenu"));
+    QVERIFY(runtime && legacy && aiMenu);
+    QVERIFY(aiMenu->actions().contains(runtime));
+    QVERIFY(aiMenu->actions().contains(legacy));
+    QCOMPARE(runtime->text(), QStringLiteral("Generate runtime module"));
+    QCOMPARE(legacy->text(), QStringLiteral("Generate module only (legacy v1)"));
+    QVERIFY(window.setLanguage(QStringLiteral("zh_CN")));
+    QCOMPARE(runtime->text(), QStringLiteral("生成运行时模块"));
+    QCOMPARE(legacy->text(), QStringLiteral("仅生成模块（旧版 v1）"));
+    QVERIFY(window.setLanguage(QStringLiteral("en")));
+    QCOMPARE(runtime->text(), QStringLiteral("Generate runtime module"));
+    QCOMPARE(legacy->text(), QStringLiteral("Generate module only (legacy v1)"));
+    QCOMPARE(window.findChild<QAction *>(QStringLiteral("generateSelectedNodeAction")), runtime);
+    QCOMPARE(window.findChild<QAction *>(QStringLiteral("generateLegacyModuleAction")), legacy);
 }
 
 QTEST_MAIN(LanguageSwitchTest)

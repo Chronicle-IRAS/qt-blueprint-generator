@@ -4,7 +4,7 @@
 
 **Goal:** Generate an application that executes a linear blueprint through stable module factories, passes declared Qt values, and displays the terminal page instead of a placeholder window.
 
-**Architecture:** Preserve the MVP module-only API and version-1 workspaces. Add an explicit linear-runtime scaffold with a version-2 manifest of the same six-field shape, protected fixed factory contracts, and an unrolled WorkflowController. The production GUI uses the runtime entry point; generation and Candidate Review pin the scaffold mode throughout their existing revalidation lifecycle.
+**Architecture:** Preserve the MVP module-only API and version-1 workspaces. Add an explicit linear-runtime scaffold with a version-2 manifest of the same six-field shape, protected fixed factory contracts, and an unrolled WorkflowController. The production GUI defaults to runtime generation and offers an explicit legacy module-only action; generation and Candidate Review pin the chosen scaffold mode throughout their existing revalidation lifecycle.
 
 **Tech Stack:** C++17, Qt 6 Widgets/Test, QVariantMap, CMake/Ninja, existing manifest/transaction/candidate APIs. Base: `main bb7fc4bb5e6e691e007f1bfea25445faa4ae29fc`. Preserve annotated MVP tag object `95e1dd4be539e56778db079456c1f15076013036`.
 
@@ -58,7 +58,7 @@ Modify narrowly:
 - `workspace_io.cpp`: explicit v1/v2 recognition with all six-field schema and record checks retained.
 - `generation_controller.h/.cpp`: runtime entry point, shared implementation, captured mode in both scaffold revalidation points, in-memory CandidateBatch mode, exact factory responsibility in the actual prompt.
 - `candidate_review_dialog.h/.cpp`: optional appended mode argument with legacy default; both pre-accept scaffold revalidation points use that pinned mode.
-- `main_window.cpp`: Generate calls runtime entry point and passes batch mode into Candidate Review. No new GUI mode switch or unrelated lifecycle changes.
+- `main_window.cpp`: default Generate calls the runtime entry point; the explicit legacy action calls the module-only entry point. Pass batch mode into Candidate Review, with no automatic fallback, persisted mode switch or unrelated lifecycle changes.
 - `CMakeLists.txt`, `tests/CMakeLists.txt`: source and tests registration; retain all translation targets.
 - `tests/tst_generation_workflow.cpp`: runtime preparations for existing GUI protection tests, plus unsupported topology/old workspace rejection; preserve all original assertions.
 - `tests/tst_blueprint_persistence.cpp`, `tests/tst_workspace_main_integration.cpp`: adapt only generation lifecycle fixtures to runtime-valid inputs and v2 scaffolds. Keep generic persistence metadata, legacy browsing/External fixtures, and all existing assertions; add GUI rejection checks with zero provider calls and unchanged workspace/source state.
@@ -132,7 +132,7 @@ ctest --test-dir C:/bp-runtime-assembly-build -R '^runtime_(assembly|end_to_end)
 - [x] Generate fixed factories in runtime contracts. Main creates QApplication, runs the controller, reports failures, and enters the event loop only for a displayed page.
 - [x] CMake links the generated controller into `generated_app`, including explicit references to every fixed factory. An empty/partial/legacy-only candidate set must not link successfully.
 - [x] Retain exact module-only output and explicitly reject cross-version scaffold requests without changing any workspace bytes.
-- [x] Route GUI requests through `startRuntime`, keep old `start` as the legacy API, and pin mode in the success callback, CandidateBatch and both Candidate Review accept rechecks.
+- [x] Route default GUI requests through `startRuntime`, keep old `start` as the legacy API, and pin mode in the success callback, CandidateBatch and both Candidate Review accept rechecks.
 - [x] Prompts explicitly require definitions of protected factory signatures, not just derived classes. The output JSON remains unchanged.
 - [x] Run focused runtime and generation lifecycle tests, then the complete suite including workflow/controller, Candidate Review, workspace protection, scaffold and manifest tests. Keep every pre-existing protection assertion.
 
@@ -171,3 +171,29 @@ Delivery gate after verification: check the staged diff/status and sensitive pat
 The independent worktree is `C:/Users/Lenovo/.config/superpowers/worktrees/project/runtime-assembly-phase-1`. Configure with Qt `E:/Qt/6.9.3/mingw_64` and compiler `E:/Qt/Tools/mingw1310_64/bin/g++.exe`; prepend Qt/MinGW/Ninja to PATH. Editor baseline fresh build and CTest passed 30/30 in 204.04 seconds before any implementation. A generated CTest XML logging helper lives outside Git; it does not change test selections or environments.
 
 Final verification on 2026-10-11: full build succeeded; runtime focused CTest 2/2 (153.09 seconds), lifecycle focused CTest 2/2 (71.95 seconds), and final full CTest 32/32 (226.39 seconds) passed. All 32 detailed QtTest XML files parsed completely: 984 pass, zero fail, one pre-existing Windows case-alias picker skip. Generated and exported runtime project CTest each passed 4/4, and both executables were actually launched. An external logger helper's duplicate output arguments were corrected and the full suite rerun; no production code was changed for that tooling issue. Real paid API requests: zero.
+
+## PR #50 compatibility review follow-up
+
+The owner's review identified a real GUI compatibility gap: preserving legacy core APIs alone does not let ordinary users generate additional candidates in existing v1 workspaces. This follow-up restores that explicit GUI entry without changing runtime contracts or silently falling back after a runtime failure.
+
+Files: `src/app/main_window.h/.cpp` for two named actions and explicit mode routing; `tests/tst_generation_workflow.cpp` for GUI mode/workspace/Candidate regressions; `tests/tst_blueprint_scene.cpp` and `tests/tst_language_switch.cpp` for shared menu actions, enablement and translations; `translations/BlueprintEditor_zh_CN.ts` for the two action labels. Product documentation is updated by the primary agent; Git operations and test runs remain centralized.
+
+- [x] Add GUI tests before the fix. Look up an explicit `generateLegacyModuleAction`, trigger real QActions, and observe the missing entry as a behavioral assertion failure, not a compiler failure. Compiled Red reports: workflow 4 pass / 10 fail, node menu 2 pass / 1 fail, language 2 pass / 2 fail. Enhanced fresh/existing workspace continuation rows also failed at the missing action after their real persistence/accept preparations succeeded.
+- [x] Verify runtime remains the preferred AI-menu/toolbar action (`generateSelectedNodeAction`). Add the legacy action to the AI menu and node context menu, not a global persisted mode or automatic mode detector. Labels must distinguish runtime generation from module-only legacy generation in English and Chinese.
+- [x] Route each action to an explicitly chosen mode through a shared private method:
+
+```cpp
+void startGeneration(ProjectScaffolder::Mode mode);
+// Runtime action: startGeneration(ProjectScaffolder::Mode::LinearRuntime)
+// Legacy action:  startGeneration(ProjectScaffolder::Mode::ModulesOnly)
+```
+
+Use the corresponding action's enabled guard, capture the existing blueprint/node/workspace snapshot, and call only `startRuntime()` or `start()` for the chosen mode. Reuse the existing CandidateBatch mode and Candidate Review rechecks unchanged. Runtime targets LogicModule/UiPage, legacy targets LogicModule/UiPage/Decision; both retain exact-one-selection and generating/review guards.
+
+- [x] Cover fresh and existing v1 legacy generation and Candidate Accept, v2 runtime generation, both cross-version refusals without provider calls or writes, and a generic-valid Decision blueprint explicitly supported by legacy. Runtime validation failures must never call legacy as a fallback. Existing-workspace fixtures preserve a real previously accepted file and its manifest/batch records across new GUI acceptance.
+- [x] Preserve all previous protection, lifecycle and repaint assertions. Change menu label/ordering/type expectations only where the new explicit actions require it. Validate shared QAction identity and language switching, including a legacy Candidate still using v1 revalidation.
+- [x] Run focused GUI/generation/runtime tests with exactly one XML logger per registration, then full CTest. Focused 6/6 (53.91 seconds) and full 32/32 (258.75 seconds) passed; all 32 XML reports parsed: 993 pass, zero fail, one existing platform skip. All 250 source translations match after XML newline normalization, with no missing, extra, unfinished or duplicate entries.
+- [x] Independent specification review approved the targeted compatibility adjustment; no specification fixes required.
+- [x] Complete independent quality/safety review and record its final assessment before Git delivery. Ready; no unresolved Critical, Important or Minor findings. The reviewer independently inspected the diff, both JUnit evidence and all 32 detailed reports; production APIs and mode-pinned safety checks remain unchanged.
+
+After verification, append a normal fix commit and push to the existing PR #50 branch. Reply to the review comment with the actual changes and tests. Do not merge, rewrite history, alter the MVP Tag, request paid AI or start another runtime phase.
