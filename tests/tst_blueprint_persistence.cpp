@@ -61,6 +61,20 @@ void populate(MainWindow &window)
                                          QStringLiteral("result")));
 }
 
+void populateRuntime(MainWindow &window)
+{
+    // Keep the persistence fixture's richer metadata and labels for round-trip
+    // coverage; only generation lifecycle tests need the linear runtime subset.
+    populate(window);
+    auto logic = window.document().nodes.at(1);
+    logic.inputs.clear();
+    QVERIFY(window.scene()->editNode(QStringLiteral("logic"), logic));
+    const auto edges = window.document().edges;
+    for (const auto &edge : edges) QVERIFY(window.scene()->deleteEdge(edge.id));
+    QVERIFY(window.scene()->connectNodes(QStringLiteral("start"), QStringLiteral("logic")));
+    QVERIFY(window.scene()->connectNodes(QStringLiteral("logic"), QStringLiteral("end")));
+}
+
 QAbstractButton *messageButton(QMessageBox *box, QMessageBox::StandardButton answer)
 {
     if (auto *button = box->button(answer)) return button;
@@ -318,7 +332,7 @@ private slots:
             return client = new DelayedClient(parent);
         });
         QTemporaryDir first, second, workspace;
-        populate(window);
+        populateRuntime(window);
         QVERIFY(window.saveProjectAs(first.path()));
         if (operation == "open")
             QVERIFY(BlueprintProjectStore::save(second.path(), window.document(), window.scene()->layoutSnapshot()));
@@ -370,7 +384,7 @@ private slots:
             return client = new DelayedClient(parent);
         });
         QTemporaryDir first, second, workspace;
-        populate(window);
+        populateRuntime(window);
         QVERIFY(window.saveProjectAs(first.path()));
         if (operation == "open")
             QVERIFY(BlueprintProjectStore::save(second.path(), window.document(), window.scene()->layoutSnapshot()));
@@ -425,7 +439,7 @@ private slots:
                 return client = new DelayedClient(parent);
             });
         QTemporaryDir first, second, workspace;
-        populate(*window);
+        populateRuntime(*window);
         QVERIFY(window->saveProjectAs(first.path()));
         if (operation == "open")
             QVERIFY(BlueprintProjectStore::save(second.path(), window->document(), window->scene()->layoutSnapshot()));

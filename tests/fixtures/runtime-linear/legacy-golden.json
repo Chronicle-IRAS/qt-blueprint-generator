@@ -1,0 +1,25 @@
+{
+    "batches": {},
+    "blueprintSha256": "accd8d23e8ee51313048e553a72400165bc84e2454df90b7afe61f95f1749b7c",
+    "files": {},
+    "modules": ["a_second", "page", "z_first"],
+    "protectedFiles": {
+        "CMakeLists.txt": "21e19b76a7646309809ae2f1041e38e85055914d144ecbae80156e944cea9bb6",
+        "README.md": "e2fbf0561938218828e18cc61f661beeeba5a8bfa1f14eca84517cc1bf46cfbd",
+        "src/contracts/blueprint.json": "2eb6e61414835c06ed3e4c35374da6723449949c223ca9ed04d07c669fbf60ec",
+        "src/contracts/source-blueprint.json": "accd8d23e8ee51313048e553a72400165bc84e2454df90b7afe61f95f1749b7c",
+        "src/contracts/types.h": "ee90c15b574c9c96fb50731b0773dbae5dcf59369044915ba688d3cd4ba2524c",
+        "src/main.cpp": "f6a729ff3d055412abd2a0fe08bae5ba47e21da2a4b234b17e21f7a169a22f6e",
+        "src/modules/a_second/contract.h": "07e6011d98d9b6dc0b2a052cf93565315ee337838f19bf12d707e71c5ab17505",
+        "src/modules/a_second/implementation/placeholder.h": "dd91deced478d776c69fa799c414f0126e5e2d9dd6414ee4e427bb5737ff1054",
+        "src/modules/page/contract.h": "ceba9679076f0ffa8c95782ce51c8d53e39b8173f2ea24cffaed242dc699ae8e",
+        "src/modules/page/implementation/placeholder.h": "dd91deced478d776c69fa799c414f0126e5e2d9dd6414ee4e427bb5737ff1054",
+        "src/modules/z_first/contract.h": "4193f1a91befb2619cd9e98ded9fbf98e4e156998671fc4819d6c392eec80122",
+        "src/modules/z_first/implementation/placeholder.h": "dd91deced478d776c69fa799c414f0126e5e2d9dd6414ee4e427bb5737ff1054",
+        "tests/a_second/placeholder.h": "3993c1186daf030cbc853b9ac1adca465f53ada3047c261f670fc56cdd43adcd",
+        "tests/page/placeholder.h": "3993c1186daf030cbc853b9ac1adca465f53ada3047c261f670fc56cdd43adcd",
+        "tests/scaffold_smoke.cpp": "d430343737f78e3328a77102a6bb567c93391f96e6b807f6795d6af91fa3c6ca",
+        "tests/z_first/placeholder.h": "3993c1186daf030cbc853b9ac1adca465f53ada3047c261f670fc56cdd43adcd"
+    },
+    "version": 1
+}

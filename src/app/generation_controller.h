@@ -4,6 +4,7 @@
 #include "blueprint/blueprint_document.h"
 #include "blueprint/blueprint_validator.h"
 #include "generation/generation_service.h"
+#include "generation/project_scaffolder.h"
 #include <functional>
 
 struct CandidateBatch
@@ -11,6 +12,7 @@ struct CandidateBatch
     QString generationId;
     QString workspace;
     GenerationResult result;
+    ProjectScaffolder::Mode mode = ProjectScaffolder::Mode::ModulesOnly;
 };
 Q_DECLARE_METATYPE(CandidateBatch)
 
@@ -29,6 +31,8 @@ public:
     // Take snapshots before any factory or signal callback can modify caller state.
     bool start(BlueprintDocument document, QString nodeId,
                QString absoluteWorkspace, AiProviderSettings provider);
+    bool startRuntime(BlueprintDocument document, QString nodeId,
+                      QString absoluteWorkspace, AiProviderSettings provider);
     void cancel();
     // A project identity switch ends the session even if its semantic content is equal.
     void resetContext();
@@ -46,6 +50,8 @@ signals:
     void stateChanged(GenerationController::State state);
     void candidateReady(const CandidateBatch &batch);
 private:
+    bool startInMode(BlueprintDocument document, QString nodeId, QString workspace,
+                     AiProviderSettings provider, ProjectScaffolder::Mode mode);
     void finish(State state, const char *safeError = nullptr, const QString &localDetail = {});
     ClientFactory m_factory;
     State m_state = State::Idle;

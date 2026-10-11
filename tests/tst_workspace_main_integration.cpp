@@ -4,6 +4,7 @@
 #include "app/workspace_browser_widget.h"
 #include "ai/ai_client.h"
 #include "blueprint/blueprint_project_store.h"
+#include "blueprint/blueprint_validator.h"
 #include "editor/blueprint_scene.h"
 #include "editor/node_item.h"
 #include "generation/project_scaffolder.h"
@@ -11,12 +12,16 @@
 #include <QAction>
 #include <QDockWidget>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QKeySequence>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMap>
 #include <QMenu>
 #include <QMessageBox>
 #include <QPlainTextEdit>
@@ -80,6 +85,17 @@ QByteArray readBytes(const QString &path)
     QFile file(path);
     return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
 }
+QMap<QString, QByteArray> workspaceFiles(const QString &workspace)
+{
+    QMap<QString, QByteArray> files;
+    QDirIterator iterator(workspace, QDir::Files | QDir::Hidden | QDir::System,
+                          QDirIterator::Subdirectories);
+    while (iterator.hasNext()) {
+        const auto path = iterator.next();
+        files.insert(QDir(workspace).relativeFilePath(path), readBytes(path));
+    }
+    return files;
+}
 bool writeBytes(const QString &path, const QByteArray &bytes)
 {
     if (!QDir().mkpath(QFileInfo(path).absolutePath())) return false;
@@ -114,11 +130,14 @@ QPlainTextEdit *sourceEditor(MainWindow &window)
 {
     return window.findChild<QPlainTextEdit *>("workspacePreview");
 }
-void prepare(MainWindow &window, const QString &project, const QString &workspace, bool includeExternal = false)
+void prepare(MainWindow &window, const QString &project, const QString &workspace, bool includeExternal = false,
+             ProjectScaffolder::Mode mode = ProjectScaffolder::Mode::ModulesOnly)
 {
     populate(window, includeExternal);
     if (!project.isEmpty()) QVERIFY(window.saveProjectAs(project));
-    QVERIFY(ProjectScaffolder::create(window.document(), workspace));
+    const auto scaffold = mode == ProjectScaffolder::Mode::LinearRuntime
+        ? &ProjectScaffolder::createRuntime : &ProjectScaffolder::create;
+    QVERIFY(scaffold(window.document(), workspace, nullptr));
     QVERIFY(writeBytes(workspace + "/generated-project/src/user.cpp", "// original\n"));
     window.findChild<QLineEdit *>("workspacePathEdit")->setText(workspace);
     QVERIFY(browser(window)->setWorkspacePath(workspace));
@@ -192,7 +211,7 @@ private slots:
         MainWindow window([&](const AiProviderSettings &, QObject *parent) {
             client = new DeferredClient(parent); return client.data();
         });
-        prepare(window, project.path(), workspace.path());
+        prepare(window, project.path(), workspace.path(), false, ProjectScaffolder::Mode::LinearRuntime);
         startGeneration(window);
         QVERIFY(window.scene()->moveNode("logic", QPointF(50, 80)));
         const auto document = window.document();
@@ -219,7 +238,7 @@ private slots:
         MainWindow window([&](const AiProviderSettings &, QObject *parent) {
             client = new DeferredClient(parent); return client.data();
         });
-        prepare(window, project.path(), workspace.path());
+        prepare(window, project.path(), workspace.path(), false, ProjectScaffolder::Mode::LinearRuntime);
         startGeneration(window);
         QVERIFY(client);
         client->reply();
@@ -254,7 +273,7 @@ private slots:
         MainWindow window([&](const AiProviderSettings &, QObject *parent) {
             client = new DeferredClient(parent); return client.data();
         });
-        prepare(window, project.path(), workspace.path());
+        prepare(window, project.path(), workspace.path(), false, ProjectScaffolder::Mode::LinearRuntime);
         startGeneration(window);
         QVERIFY(window.scene()->moveNode("logic", QPointF(50, 80)));
         const QString source = sourceEditor(window)->toPlainText();
@@ -289,7 +308,8 @@ private slots:
         const bool saveSucceeds = saveKind != "failed";
         if (!saveSucceeds)
             QVERIFY(writeBytes(project.filePath("generation-manifest.json"), "{}"));
-        prepare(window, firstSave ? QString() : project.path(), workspace.path());
+        prepare(window, firstSave ? QString() : project.path(), workspace.path(), false,
+                ProjectScaffolder::Mode::LinearRuntime);
         startGeneration(window);
         QVERIFY(client);
         client->reply();
@@ -380,7 +400,7 @@ private slots:
         MainWindow window([&](const AiProviderSettings &, QObject *parent) {
             client = new DeferredClient(parent); return client.data();
         });
-        prepare(window, project.path(), workspace.path());
+        prepare(window, project.path(), workspace.path(), false, ProjectScaffolder::Mode::LinearRuntime);
         QVERIFY(BlueprintProjectStore::save(other.path(), window.document(), window.scene()->layoutSnapshot()));
         startGeneration(window);
         auto *controller = window.findChild<GenerationController *>();
@@ -418,7 +438,7 @@ private slots:
         MainWindow window([&](const AiProviderSettings &, QObject *parent) {
             client = new DeferredClient(parent); return client.data();
         });
-        prepare(window, project.path(), workspace.path());
+        prepare(window, project.path(), workspace.path(), false, ProjectScaffolder::Mode::LinearRuntime);
         QVERIFY(BlueprintProjectStore::save(other.path(), window.document(), window.scene()->layoutSnapshot()));
         startGeneration(window);
         QVERIFY(window.scene()->moveNode("logic", QPointF(50, 80)));
@@ -451,6 +471,71 @@ private slots:
         verifySource(window, workspace.path(), source);
         QCOMPARE(window.findChild<GenerationController *>()->state(), GenerationController::State::Generating);
         QVERIFY(client);
+    }
+
+    void unsupportedRuntimeGenerationPreservesWorkspaceAndSource_data()
+    {
+        QTest::addColumn<bool>("runtimeWorkspace");
+        QTest::addColumn<QString>("reason");
+        QTest::newRow("legacy-v1-workspace") << false << QString("Workspace scaffold mode changed; use a new workspace");
+        QTest::newRow("nonterminal-ui-topology") << true << QString("Runtime UiPage must be terminal, directly before End: page");
+    }
+    void unsupportedRuntimeGenerationPreservesWorkspaceAndSource()
+    {
+        QFETCH(bool, runtimeWorkspace);
+        QFETCH(QString, reason);
+        QTemporaryDir project, workspace;
+        int providerCalls = 0;
+        MainWindow window([&](const AiProviderSettings &, QObject *parent) {
+            ++providerCalls;
+            return new DeferredClient(parent);
+        });
+        QVERIFY(window.setLanguage("en"));
+        prepare(window, project.path(), workspace.path(), false,
+                runtimeWorkspace ? ProjectScaffolder::Mode::LinearRuntime : ProjectScaffolder::Mode::ModulesOnly);
+        if (runtimeWorkspace) {
+            BlueprintNode page;
+            page.id = "page";
+            page.type = NodeType::UiPage;
+            page.name = "Page";
+            page.description = "A page before the logic module";
+            QVERIFY(window.scene()->addNode(page, QPointF(110, 80)));
+            const auto edges = window.document().edges;
+            for (const auto &edge : edges)
+                if (edge.source == "start") QVERIFY(window.scene()->deleteEdge(edge.id));
+            QVERIFY(window.scene()->connectNodes("start", "page"));
+            QVERIFY(window.scene()->connectNodes("page", "logic"));
+        }
+        const auto before = workspaceFiles(workspace.path());
+        QVERIFY(before.contains("generation-manifest.json"));
+        QCOMPARE(QJsonDocument::fromJson(before.value("generation-manifest.json")).object().value("version").toInt(),
+                 runtimeWorkspace ? 2 : 1);
+        const auto document = window.document();
+        const auto layout = window.scene()->layoutSnapshot();
+        const int history = window.scene()->undoStack()->index();
+        const bool modified = window.isModified();
+        const QString source = sourceEditor(window)->toPlainText();
+        window.scene()->clearSelection();
+        window.scene()->nodeItem("logic")->setSelected(true);
+        auto *action = window.findChild<QAction *>("generateSelectedNodeAction");
+        auto *controller = window.findChild<GenerationController *>();
+        QVERIFY(action && action->isEnabled());
+        QVERIFY(controller);
+        QVERIFY(BlueprintValidator::validate(window.document()).isEmpty());
+        action->trigger();
+        QCOMPARE(controller->state(), GenerationController::State::Failed);
+        QCOMPARE(providerCalls, 0);
+        QVERIFY(!controller->candidateBatch());
+        QVERIFY(!window.findChild<CandidateReviewDialog *>());
+        const auto status = window.findChild<QLabel *>("generationStatus")->text();
+        QVERIFY2(status.contains("Failed") && status.contains(reason), qPrintable(status));
+        QCOMPARE(workspaceFiles(workspace.path()), before);
+        QVERIFY(!QFileInfo::exists(workspace.filePath("candidates")));
+        QCOMPARE(window.document(), document);
+        QCOMPARE(window.scene()->layoutSnapshot(), layout);
+        QCOMPARE(window.scene()->undoStack()->index(), history);
+        QCOMPARE(window.isModified(), modified);
+        verifySource(window, workspace.path(), source);
     }
 
     void fileSaveAndAppearanceRespectDirtyOwners()

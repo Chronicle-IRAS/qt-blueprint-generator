@@ -2,6 +2,7 @@
 
 #include "blueprint/blueprint_document.h"
 #include "generation/generation_service.h"
+#include "generation/project_scaffolder.h"
 #include <QDialog>
 #include <memory>
 
@@ -11,7 +12,8 @@ class CandidateReviewDialog final : public QDialog
 public:
     CandidateReviewDialog(const BlueprintDocument &snapshot, const QString &workspace,
                           const QString &generationId, const GenerationResult &result,
-                          QWidget *parent = nullptr);
+                          QWidget *parent = nullptr,
+                          ProjectScaffolder::Mode mode = ProjectScaffolder::Mode::ModulesOnly);
     void invalidateContext();
     ~CandidateReviewDialog() override;
     void reject() override;

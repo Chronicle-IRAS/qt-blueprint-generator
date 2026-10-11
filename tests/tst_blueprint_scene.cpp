@@ -1922,13 +1922,17 @@ void BlueprintSceneTest::canvasContextMenuAddsNodeAtRightClickPosition()
 
 void BlueprintSceneTest::nodeContextMenuFollowsGenerateEligibility()
 {
-    const auto generatable = [](NodeType type) {
-        return type == NodeType::UiPage || type == NodeType::LogicModule || type == NodeType::Decision;
+    const auto runtimeGeneratable = [](NodeType type) {
+        return type == NodeType::UiPage || type == NodeType::LogicModule;
+    };
+    const auto legacyGeneratable = [&runtimeGeneratable](NodeType type) {
+        return runtimeGeneratable(type) || type == NodeType::Decision;
     };
     const QVector<NodeType> types{NodeType::Start, NodeType::End, NodeType::UiPage,
                                   NodeType::LogicModule, NodeType::Decision, NodeType::ExternalCode};
     for (const NodeType type : types) {
         MainWindow window;
+        QVERIFY(window.setLanguage(QStringLiteral("en")));
         window.show();
         QApplication::processEvents();
         QVERIFY(window.addNodeOfType(type));
@@ -1941,8 +1945,10 @@ void BlueprintSceneTest::nodeContextMenuFollowsGenerateEligibility()
             view->viewport(), view->mapFromScene(item->sceneBoundingRect().center()));
         QVERIFY(probe.opened);
         QStringList expected{QStringLiteral("Edit node")};
-        expected.append(generatable(type) ? QStringLiteral("Generate selected node")
-                                          : QStringLiteral("Generate selected node|disabled"));
+        expected.append(runtimeGeneratable(type) ? QStringLiteral("Generate runtime module")
+                                                 : QStringLiteral("Generate runtime module|disabled"));
+        expected.append(legacyGeneratable(type) ? QStringLiteral("Generate module only (legacy v1)")
+                                                : QStringLiteral("Generate module only (legacy v1)|disabled"));
         expected.append(QStringLiteral("---"));
         expected.append(QStringLiteral("Delete"));
         QCOMPARE(probe.entries, expected);
@@ -1951,10 +1957,16 @@ void BlueprintSceneTest::nodeContextMenuFollowsGenerateEligibility()
         // The menu reuses the shared toolbar actions instead of duplicating them.
         auto *deleteAction = window.findChild<QAction *>(QStringLiteral("deleteSelectionAction"));
         auto *generateAction = window.findChild<QAction *>(QStringLiteral("generateSelectedNodeAction"));
-        QVERIFY(deleteAction && generateAction);
+        auto *legacyAction = window.findChild<QAction *>(QStringLiteral("generateLegacyModuleAction"));
+        auto *aiMenu = window.findChild<QMenu *>(QStringLiteral("aiMenu"));
+        QVERIFY(deleteAction && generateAction && legacyAction && aiMenu);
         QVERIFY(probe.actions.contains(deleteAction));
         QVERIFY(probe.actions.contains(generateAction));
-        QCOMPARE(generateAction->isEnabled(), generatable(type));
+        QVERIFY(probe.actions.contains(legacyAction));
+        QVERIFY(aiMenu->actions().contains(generateAction));
+        QVERIFY(aiMenu->actions().contains(legacyAction));
+        QCOMPARE(generateAction->isEnabled(), runtimeGeneratable(type));
+        QCOMPARE(legacyAction->isEnabled(), legacyGeneratable(type));
     }
 }
 

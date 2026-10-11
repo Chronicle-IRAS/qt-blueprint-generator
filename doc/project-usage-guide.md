@@ -4,7 +4,7 @@
 
 Qt Blueprint Generator 是一个 Qt 6 Widgets 蓝图编辑器。它用节点和有向连线描述桌面应用的页面、业务模块、条件分支及已有代码，再把蓝图编译成稳定的中间表示和 AI 提示词。生成结果先进入候选区，人工确认后才能写入工程。
 
-当前 MVP 使用 C++17、Qt 6 和 CMake。它已经具备蓝图模型、静态校验、交互画布、提示词编译、OpenAI-compatible 客户端、工程骨架、候选审核、外部代码导入、构建和导出的核心实现，并有一条离线登录示例验证完整链路。
+项目使用 C++17、Qt 6 和 CMake。原 MVP 已具备蓝图模型、静态校验、交互画布、提示词编译、OpenAI-compatible 客户端、工程骨架、候选审核、外部代码导入、构建和导出，并有 legacy v1 离线登录示例。Runtime Assembly Phase 1 已接入 GUI 的新生成路径，支持线性启动链和可选末端页面，已完成离线验证，等待 PR 审核；使用范围和运行步骤见 8.2。
 
 ## 2. 当前能直接使用的功能
 
@@ -24,7 +24,9 @@ Qt Blueprint Generator 是一个 Qt 6 Widgets 蓝图编辑器。它用节点和�
 | 工作区选择、普通源码编辑与受保护文件只读浏览 | Browse / 浏览按钮及 Workspace Editor 面板 | 可直接使用 |
 | 蓝图工程新建、打开、保存、另存为及布局恢复 | File / 文件菜单 | 可直接使用 |
 | AI 代码生成、候选对照、编辑和接受/拒绝 | 工具栏、AI 菜单及候选审核窗口 | 可直接使用 |
+| 明确的旧版 v1 模块生成及已有工程继续生成 | AI 菜单、节点右键菜单的旧版动作 | 与默认运行时生成分开选择，不自动回退 |
 | 工程骨架创建与一致性复验 | GUI 生成流程自动调用 | 可直接使用 |
+| 新生成工程的线性运行时装配 | 默认运行时生成；构建后从终端运行 `generated_app` | Phase 1 已实现并通过离线验证，等待 PR 审核 |
 | 外部代码导入、验证、只读查看及确认后重新导入 | External Code 节点属性面板 | 可直接使用 |
 
 需要长期保留蓝图时，使用 `File / 文件` 菜单保存工程。关闭前若有修改会提供保存、放弃和取消；程序不会自动保存或自动恢复未保存的蓝图。
@@ -113,6 +115,8 @@ cmake --build $buildRoot
 | `Decision / 条件分支` | 根据布尔结果选择后续路径 |
 | `External Code / 外部代码` | 已有 C/C++ 代码的只读黑盒模块 |
 
+这张表描述编辑器的六类节点。新 GUI 生成的 Phase 1 运行时只接受一条具有唯一 Start、唯一 End、零个或多个 Logic Module 和可选唯一末端 UI Page 的链；Decision、External Code、多 End 等仍可编辑，但不能用于本阶段运行时生成。
+
 新节点会出现在画布中央附近。拖动节点本体只移动节点；拖动空白画布会平移视图，平移过程中光标显示为闭合手形，松开左键立即结束。鼠标滚轮以鼠标所在位置为中心缩放，范围为 25% 到 300%；平移过程中滚轮缩放仍然可用。按住 Shift 或 Ctrl 拖动空白画布仍然是框选多个节点，按住 Ctrl 或 Shift 点击节点或连线也仍然用于增加或减少选择。画布右键菜单中的 `Fit View / 适应视图` 和 `Reset View / 重置视图` 可以随时框住全部节点或恢复初始视图。
 
 ### 5.2 编辑属性
@@ -121,7 +125,7 @@ cmake --build $buildRoot
 
 单击一个节点时，右侧 `Properties / 属性` 面板仍会显示同一组字段，可作为 Inspector 和辅助编辑入口；修改后点击 `Apply / 应用`。同时选中多个节点时，属性面板不会修改其中任何一个节点。
 
-输入和输出区域使用表格，每行是一个端口，依次填写名称、类型和说明。点击 `Add input / 添加输入` 或 `Add output / 添加输出` 新增一行，点击该行的 `Delete / 删除` 移除。类型是蓝图中的接口文本，例如 `QString`、`bool` 或项目自定义类型，不要求在编辑时解析为 C++ 类型。
+输入和输出区域使用表格，每行是一个端口，依次填写名称、类型和说明。点击 `Add input / 添加输入` 或 `Add output / 添加输出` 新增一行，点击该行的 `Delete / 删除` 移除。类型是蓝图中的接口文本，例如 `QString`、`bool` 或项目自定义类型，不要求在编辑时解析为 C++ 类型。Phase 1 运行时会进一步限制类型与绑定规则，自定义类型不能通过运行时生成校验，详见 8.2.1；明确选择旧版模块生成时保留原有接口文本规则。
 
 约束和验收标准区域同样按行编辑。点击 `Add constraint / 添加约束` 或 `Add criterion / 添加验收标准` 新增一项，再直接填写文本。空列表、空字符串、重复项、排列顺序和首尾空白都会原样保留；编辑器不会擅自整理或去重。
 
@@ -170,12 +174,13 @@ cmake --build $buildRoot
 | 右键位置 | 菜单项 |
 |---|---|
 | 空白画布 | `Add node / 添加节点`（与工具栏相同的节点类型）、`Select All / 全选`、`Fit View / 适应视图`、`Reset View / 重置视图` |
-| 节点 | `Edit node / 编辑节点`、`Generate selected node / 生成选中节点`、`Delete / 删除` |
+| 节点 | `Edit node / 编辑节点`、`Generate runtime module / 生成运行时模块`、`Generate module only (legacy v1) / 仅生成模块（旧版 v1）`、`Delete / 删除` |
 | 连线 | `Delete / 删除` |
 
 - 右键一个尚未选中的节点或连线时，它会替代原选择成为当前操作对象；右键已经在多选中的节点或连线时保留原有多选；右键空白画布不改变当前选择。
-- 菜单项的作用范围与顶部入口保持一致：`Delete / 删除` 作用于当前 selection（多选时会删除全部选中对象），`Edit node / 编辑节点` 打开右键点击的那个节点，`Generate selected node / 生成选中节点` 与工具栏共用同一个动作。
-- `Generate selected node` 只对 `UI Page`、`Logic Module` 或 `Decision` 节点可用，并且要求当前恰好选中一个对象：右键 `Start`、`End`、`External Code` 节点或当前是多选时，该菜单项显示为不可用。
+- 菜单项的作用范围与顶部入口保持一致：`Delete / 删除` 作用于当前 selection（多选时会删除全部选中对象），`Edit node / 编辑节点` 打开右键点击的那个节点；运行时生成与工具栏、AI 菜单共用默认动作，旧版模块生成与 AI 菜单共用另一个明确动作。
+- 运行时生成只对 `UI Page` 或 `Logic Module` 节点可用；旧版模块生成还支持 `Decision`。两者均要求当前恰好选中一个对象：右键 `Start`、`End`、`External Code` 节点或当前是多选时均不可用，生成或候选审核进行中也不可用。
+- 默认运行时生成还会校验整张蓝图，包含 Decision 的蓝图不会自动改走旧版；需要仅生成该模块时，由用户明确选择旧版动作。
 - 从空白画布菜单添加节点时，新节点出现在右键点击的位置，而不是画布中央。
 - `Select All` 选中画布上的全部节点和连线；`Fit View` 按全部节点范围调整视图并保留 25%–300% 的缩放限制；`Reset View` 恢复 100% 缩放和初始位置。
 
@@ -208,7 +213,7 @@ cmake --build $buildRoot
 
 ## 6. 运行离线登录示例
 
-离线示例是目前验证完整生成链路最直接的方法。它会读取 `tests/fixtures/login-demo/blueprint.json` 和固定 Fake AI 响应，创建工程、接受候选、构建、导出并运行导出项目自己的测试，全程不访问模型服务。
+这一节保留原 MVP 的 legacy v1 模块工程示例。它会读取 `tests/fixtures/login-demo/blueprint.json` 和固定 Fake AI 响应，创建工程、接受候选、构建、导出并运行导出项目自己的测试，全程不访问模型服务。示例含 Decision 与多个 End，其测试调用模块并验证登录流程；它不通过新的 Phase 1 运行时生成校验，也不表示生成入口自动执行该图。新运行时离线测试见 8.2.4。
 
 只做临时验收：
 
@@ -301,19 +306,87 @@ $env:BLUEPRINT_AI_API_KEY = '<paste the key only in this terminal>'
 
 ### 8.2 从窗口生成与审核代码
 
+工具栏默认使用 `Generate runtime module / 生成运行时模块`（v2）。AI 菜单及节点右键菜单另有 `Generate module only (legacy v1) / 仅生成模块（旧版 v1）`，可在新空目录或与蓝图匹配的已有 v1 工作区继续生成 Logic Module、UI Page、Decision 的模块候选。旧版动作保留原通用校验和文件保护，不装配执行流程，也不要求 v2 factory。运行时失败不会自动回退；每个动作均拒绝复用另一版本的工作区。下面步骤描述默认运行时流程，旧版共享候选审核步骤，但 Build 后的主入口仍为原占位窗口。
+
 1. 在底部构建面板填写工作目录的绝对路径，或使用 `Browse / 浏览` 选择目录。目录必须预先存在；首次使用建议选择专门的空目录，不要使用源码仓库或存放其他重要文件的目录。
-2. 完成有效蓝图，例如 `Start → Logic Module → End`，填写模块说明并选中一个可生成节点。可生成类型为 UI Page、Logic Module、Decision；未选中、选中多个节点或选中 Start、End、External Code 时，生成入口不可用。
-3. 通过工具栏或 AI 菜单发起生成。窗口显示当前节点和请求状态；生成期间可以取消。真实生成最多等待 180 秒，失败时显示经过脱敏的错误类别，不显示服务商原始响应。
+2. 完成符合 Phase 1 的线性蓝图，例如 `Start → Logic Module → UI Page → End`，填写模块说明、端口及验收标准，并选中一个 Logic Module 或末端 UI Page。第一个模块不能声明输入，后续输入按 8.2.1 绑定。选中 Decision 时默认运行时动作不可用，只有明确的旧版模块动作可用；未选中、选中多个对象或选中 Start、End、External Code 时，两种生成入口均不可用。
+3. 通过工具栏或 AI 菜单发起运行时生成。窗口显示当前节点和请求状态；生成期间可以取消。真实生成最多等待 180 秒，失败时显示经过脱敏的错误类别，不显示服务商原始响应。
 4. 生成成功后会打开候选审核窗口。左侧列出本次返回的文件，右侧对照当前工程内容与候选内容，并以基础逐行高亮标记差异。这不是专业语义 Diff；插入一行也可能使后续多行标为不同。
 5. 逐个选择文件：可以接受原候选、编辑候选后接受，或拒绝文件。拒绝不会改写当前工程。接受仅写入所选文件，并记录候选状态和文件哈希。
 6. 如果显示 Conflict，说明当前文件与生成基线不一致。仔细检查手工修改，只有明确确认后才会覆盖。审核后文件又被其他程序修改时，旧预览不能继续接受；先刷新预览，再重新检查和确认。
-7. 取消剩余候选不会回滚已经接受的文件。候选内容和审核记录保留用于追溯。接受后可按第 7 节自行构建与导出；编辑器不会自动运行模型返回的代码。
+7. 取消剩余候选不会回滚已经接受的文件。候选内容和审核记录保留用于追溯。对链中的每个 Logic Module 和 UI Page 分别 Generate，并人工审核、接受所需实现与测试，确认各节点的固定 factory 已定义。
+8. 按第 7 节点击 Build，构建包含 `generated_app` 的完整工程；通过后按 8.2.3 从终端运行，再 Export 到空目录并独立构建运行。编辑器没有 Run 入口，不会自动执行模型返回的代码。
 
 生成请求固定绑定发起时的蓝图、节点和工作目录，之后切换选择不会把结果写到另一个节点。修改蓝图语义或工作目录会使进行中的请求和打开的审核失效。仅拖动节点或切换界面语言不会改变生成内容。
 
-工作目录中的骨架和契约必须与蓝图匹配。初始化失败会显示具体原因，例如蓝图与工作区不匹配、受保护文件变化或缺失；失败时不会开始 AI 请求，也不会自动清空或覆盖旧工程。蓝图变更后旧工作目录不会自动迁移；出现不匹配提示时，请使用新的工作目录。不要手工修改受保护的契约、占位文件或工程骨架以绕过校验。
+工作目录中的骨架和契约必须与蓝图和生成模式匹配。初始化失败会显示具体原因，例如不支持的运行时蓝图、v1/v2 工作区模式不匹配、受保护文件变化或缺失；失败时不会开始 AI 请求，也不会自动清空或覆盖旧工程。蓝图变更或切换模式后旧工作目录不会自动迁移；出现不匹配提示时，请使用新的空工作目录。不要手工修改受保护的契约、主入口、控制器、占位文件或 CMake 骨架以绕过校验。
 
-当前审核窗口面向本次生成，不提供重启后重新加载历史候选的入口。关闭编辑器前应完成审核；未处理候选虽然仍在磁盘，但需要核心 API 才能继续处理。生成工程目前只提供占位主窗口，不会自动连接和执行业务节点。
+当前审核窗口面向本次生成，不提供重启后重新加载历史候选的入口。关闭编辑器前应完成审核；未处理候选虽然仍在磁盘，但需要核心 API 才能继续处理。
+
+#### 8.2.1 支持的启动链与数据契约
+
+运行时支持 `Start → 零个或多个 Logic Module → 可选的唯一末端 UI Page → End`。必须恰好有一个 Start、一个 End，全部节点都处于同一条连通链。页面若存在，必须直接连接 End，且没有输出端口；Start 和 End 不能声明端口。按 Flow 连线的方向执行，不按节点 ID、JSON 数组顺序或画布位置执行。核心 `createRuntime()` 接受只有 Start / End 的空链；GUI Generate 需要选中一个可生成模块，因此窗口内的生成步骤至少包含一个 Logic Module 或 UI Page。
+
+第一个模块的 Inputs 为空。每个后续输入必须在直接前驱的 Outputs 中有同名、同声明类型的端口；控制器仅传入该节点声明的输入键，不保留所有前序输出为全局上下文。不支持重命名、默认值、外部初始输入和转换；即使 `int` 可以转成 `double`，或者一个端口声明为 `QVariant`，两端声明类型不同仍不能绑定。
+
+`Inputs` 和 `Outputs` 使用 `QVariantMap`，可声明的端口类型为 `bool`、`int`、`double`、`QString`、`QByteArray`、`QStringList`、`QVariantList`、`QVariantMap` 和 `QVariant`。同一输入列表或输出列表中的端口名称必须非空且唯一。Logic Module 返回的输出键必须与声明精确一致，不能缺少或多出键；每个值必须有效，并匹配声明的精确 Qt metatype。声明为 `QVariant` 的输出接受任意有效 QVariant，但不接受无效值。缺失、无效、类型错误、空 factory 结果或模块异常均使应用启动失败。
+
+末端 UI Page factory 消费传入的 Inputs，并在构造页面时复制后续使用的数据；Inputs 引用只在 factory 调用期间有效，不能保留给异步事件或回调。控制器实际调用 `show()`，并以 `std::unique_ptr` 持有页面跨 Qt 事件循环；factory 接收空 parent，不能另设父对象、建立第二个所有者或自行删除返回对象。控制器关闭 `WA_DeleteOnClose`，避免窗口自行删除与所有权冲突。End 表示启动链装配完成；有页面时继续事件循环，普通窗口由用户关闭，仅逻辑链执行完成后直接退出。
+
+本阶段不支持 Decision、External Code 运行时、带标签连线、分支、合流、环、并行、多页面、非末端页面、页面输出、Start/End 端口、外部初始输入、自定义端口类型或隐式转换。六类节点的编辑能力保持可用；没有新增页面交互驱动后续流程、行级 Review、AI 返工或其他前端框架。
+
+#### 8.2.2 固定 factory 与文件保护
+
+GUI 的默认运行时动作使用 `GenerationController::startRuntime()` 和 `ProjectScaffolder::createRuntime()`。每个 v2 节点的受保护契约声明一个固定的 `createModule_HASH` factory，HASH 来自节点 ID；实际名称、命名空间和参数应以当前 `contract.h` 为准。Logic factory 接收 `QObject *parent`，UI Page factory 接收 `const Inputs &inputs, QWidget *parent`，都返回该保护契约类的 `std::unique_ptr`。Logic 实现必须重写 `execute(const Inputs &)`。AI 可自行命名具体实现类和文件，装配器通过固定 factory 调用，不猜测这些名称。
+
+factory 必须在当前节点 `src/modules/<node-id>/implementation/` 的 `.cpp` 或 `.cc` 文件中定义，使用契约中的精确命名空间和签名；默认参数只保留在受保护声明，定义中不要重复。AI 候选只能写入该节点的 `implementation/` 或 `tests/<node-id>/`，扩展名限定为 `.h`、`.hpp`、`.cpp`、`.cc`；每个测试 `.cpp` / `.cc` 都是独立可执行程序，需提供自己的 main。主入口、WorkflowController、CMake、公共类型、节点契约和保护占位文件由系统生成并保持只读，候选不能接管它们。
+
+Accept 只表示所选内容已写入并记录哈希，不能证明 factory 存在或业务正确。CMake configure、`blueprint_modules` 编译或 `scaffold_smoke` 成功也不能证明完整应用可构建；缺少任意 factory 时，`generated_app` 会在链接阶段失败。应人工检查候选，再构建完整应用并实际运行。
+
+#### 8.2.3 构建、运行与独立导出
+
+完成全部节点的人工 Accept 后，在 Build and Export 面板选择独立构建目录并执行 Build。终端也可显式构建应用 target；以下路径应与实际工作区和面板配置一致，并沿用第 3 节的 Qt / MinGW 环境：
+
+```powershell
+$runtimeWorkspace = 'C:\bp-runtime-workspace'
+$runtimeBuild = 'C:\bp-runtime-build'
+$runtimeProject = Join-Path $runtimeWorkspace 'generated-project'
+$env:PATH = "$qtRoot\bin;$mingwRoot\bin;$ninjaRoot;$env:PATH"
+cmake -S $runtimeProject -B $runtimeBuild -G Ninja `
+  -DBUILD_TESTING=ON `
+  -DCMAKE_PREFIX_PATH="$qtRoot"
+cmake --build $runtimeBuild --target generated_app
+& (Join-Path $runtimeBuild 'generated_app.exe')
+```
+
+Qt 的 `bin` 与构建所用 Qt 版本、编译器及架构必须匹配。带 UI Page 的普通应用不会像离线 fixture 那样自动退出；检查页面内容和交互后关闭窗口。逻辑链执行完成会直接退出，启动失败返回非零退出码。
+
+在 GUI 中 Export 到已存在的空目录后，可独立构建和运行导出工程。以下 `$runtimeExport` 指向导出目录本身：
+
+```powershell
+$runtimeExport = 'C:\bp-runtime-export'
+$runtimeExportBuild = 'C:\bp-runtime-export-build'
+cmake -S $runtimeExport -B $runtimeExportBuild -G Ninja `
+  -DBUILD_TESTING=ON `
+  -DCMAKE_PREFIX_PATH="$qtRoot"
+cmake --build $runtimeExportBuild
+ctest --test-dir $runtimeExportBuild --output-on-failure --no-tests=error
+& (Join-Path $runtimeExportBuild 'generated_app.exe')
+```
+
+Windows 开发诊断需要捕获 Qt 启动错误时，可在当前终端临时设置通用 Qt 环境变量 `QT_FORCE_STDERR_LOGGING=1`，将 `qCritical` 等日志送入 stderr；使用后移除该环境变量。它用于开发日志诊断，不是生成应用的生产测试开关，也不会使窗口自动退出。通过 Qt Creator 设置项目环境变量的方法见 [Qt Creator 官方说明](https://doc.qt.io/qtcreator/creator-how-set-project-environment.html)。
+
+#### 8.2.4 v1 兼容与验证边界
+
+`generation-manifest.json` 仍严格包含六个字段：`version`、`blueprintSha256`、`modules`、`protectedFiles`、`files` 和 `batches`，仅接受版本 1 或 2。GUI 的明确旧版动作调用原 `ProjectScaffolder::create()` 与 `GenerationController::start()`，保留 module-only v1 的原字节产物和占位入口；默认运行时动作使用 v2。两种模式不会自动迁移、互相复用工作区或在失败时自动回退。已有 v1 工程可继续在 GUI 生成候选、审核接受及 Build / Export；要生成新运行时，请选择新的空工作区。
+
+新增离线 `tests/fixtures/runtime-linear/` 使用固定 Fake AI 响应，经生成控制器和 Candidate Review 人工接受入口构建应用；测试实际启动 `generated_app`，检查 Flow 顺序、传值、真实页面显示和持有，并独立构建运行导出结果。fixture 为验证而自行退出，不能将其退出行为当成普通应用行为。可运行专项测试：
+
+```powershell
+ctest --test-dir $buildRoot -C Debug -R '^runtime_(assembly|end_to_end)$' --output-on-failure
+```
+
+Phase 1 完整 CTest 32/32 通过，独立规格与代码质量复审无阻塞项，验证明细见[实现进度](implementation-progress.md)。本阶段未对 v2 factory 发起真实付费 DeepSeek 验证；原 MVP 一个简单 Logic Module 的真实生成、接受、构建和导出实测属于 legacy v1，第 6 节登录示例和下面的人工集成工具也继续使用 v1，不能据此认定新运行时已通过真实模型验收。
 
 ### 8.3 构建和运行人工集成工具
 
@@ -375,7 +448,7 @@ New-Item -ItemType Directory -Path $manualWorkspace -ErrorAction Stop | Out-Null
 
 管理操作使用已应用的节点契约，不会自动提交属性草稿。导入、验证和查看不改变蓝图语义、布局或 Undo/Redo；修改契约后旧导入会验证失败，Undo 回原契约可恢复验证。切换项目、节点或工作目录后旧管理上下文失效，需重新打开。生成或候选审核进行中不允许写入外部代码。
 
-外部模块不会作为 AI 生成目标；相邻模块的提示词只包含人工填写的接口契约，不把外部源码发送给模型。查看器只读；候选接受不得写入外部文件。导入不等于自动链接或运行外部库，本阶段不实现运行时模块装配。
+外部模块不会作为 AI 生成目标；相邻模块的提示词只包含人工填写的接口契约，不把外部源码发送给模型。查看器只读；候选接受不得写入外部文件。导入不等于自动链接或运行外部库，Runtime Assembly Phase 1 不支持 External Code 运行时装配；包含外部模块的蓝图仍可编辑和管理导入，但不通过新 GUI 运行时生成校验。
 
 专项测试：
 
@@ -404,6 +477,9 @@ ctest --test-dir $buildRoot -C Debug -R '^generation_service$' --output-on-failu
 # 工程骨架与候选流程
 ctest --test-dir $buildRoot -C Debug -R '^project_scaffolder$' --output-on-failure
 
+# 线性运行时契约与实际应用启动
+ctest --test-dir $buildRoot -C Debug -R '^runtime_(assembly|end_to_end)$' --output-on-failure
+
 # 构建、导出和恢复
 ctest --test-dir $buildRoot -C Debug -R '^project_exporter$' --output-on-failure
 ```
@@ -428,7 +504,15 @@ ctest --test-dir $buildRoot -C Debug -R '^project_exporter$' --output-on-failure
 
 ### 无法生成，或提示工作目录与蓝图不匹配
 
-先确认正在运行最新构建，并检查是否只选中了一个可生成节点、蓝图是否有效、工作目录是否为已存在的绝对路径。已有工作目录只接受与其契约一致的蓝图；修改蓝图后可改用新目录。认证失败或缺少密钥时，在设置好环境变量的终端中重新启动编辑器，再检查 AI 设置。
+先确认正在运行最新构建，并检查是否只选中了一个可生成节点、所选动作与工作区版本是否一致、工作目录是否为已存在的绝对路径。默认运行时动作还要求蓝图符合 8.2.1 的线性限制；已有 v1 工程请明确选择旧版模块动作，要使用 v2 时另选新的空目录。已变化的蓝图也需匹配的新工作区，已有目录只接受与其契约和模式一致的蓝图，不会自动回退或覆盖。认证失败或缺少密钥时，在设置好环境变量的终端中重新启动编辑器，再检查 AI 设置。
+
+### Accept 或 smoke 已成功，为什么完整 Build 仍报 `createModule_...` 未定义？
+
+Accept 只写入文件，smoke 只检查骨架；它们不会替代应用链接。检查每个节点实现目录内是否在 `.cpp` / `.cc` 中定义了对应受保护契约的 factory，并核对命名空间、参数和返回类型。仅有具体类、头文件声明或模块测试成功仍不足以完成应用链接。补齐实现后重新配置和构建完整 `generated_app`。
+
+### 应用启动后没有窗口，或提示输出类型错误
+
+仅 Logic Module 的蓝图正常执行后直接退出。要显示窗口，使用唯一末端 UI Page 并生成、接受其 factory。启动失败时，检查每个 Logic Module 的输出是否包含精确声明的键、有效值和精确 Qt 类型；`int` / `double` 等不会隐式转换。第一个模块 Inputs 为空，后续只从直接前驱同名、同声明类型端口取值。Windows 下需要捕获 Qt 错误日志时，按 8.2.3 临时设置 `QT_FORCE_STDERR_LOGGING=1`。
 
 ## 12. 相关文档
 
