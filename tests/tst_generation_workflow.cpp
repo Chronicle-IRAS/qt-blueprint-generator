@@ -264,7 +264,7 @@ private slots:
         prepare(window, dir.path());
         auto old = window.document();
         if (failure == "mismatch") old.nodes[1].description += " old contract";
-        if (failure != "untracked") QVERIFY(ProjectScaffolder::create(old, dir.path()));
+        if (failure != "untracked") QVERIFY(ProjectScaffolder::createRuntime(old, dir.path()));
         if (failure != "mismatch") QVERIFY(writeFile(dir.path() + "/generated-project/src/main.cpp", "// manual source"));
         const auto before = fileHashes(dir.path());
         auto *generate = window.findChild<QAction *>("generateSelectedNodeAction");
@@ -305,6 +305,34 @@ private slots:
         dialog->findChild<QPushButton *>("acceptCandidateButton")->click();
         QCOMPARE(readFile(dir.path()+"/generated-project/src/modules/logic/implementation/worker.cpp"), QByteArray("// candidate"));
         QVERIFY(readFile(dir.path()+"/generation-manifest.json").contains("accepted"));
+    }
+    void runtimeGenerationRejectsLegacyWorkspaceWithoutWriting()
+    {
+        QTemporaryDir dir; int calls = 0;
+        MainWindow window([&](const AiProviderSettings &, QObject *parent) { ++calls; return new DeferredClient(parent); });
+        QVERIFY(window.setLanguage("en")); prepare(window, dir.path());
+        QVERIFY(ProjectScaffolder::create(window.document(), dir.path()));
+        const auto before = fileHashes(dir.path());
+        window.findChild<QAction *>("generateSelectedNodeAction")->trigger();
+        QCOMPARE(calls, 0); QCOMPARE(fileHashes(dir.path()), before);
+        QVERIFY(!window.findChild<CandidateReviewDialog *>());
+        QVERIFY(window.findChild<QLabel *>("generationStatus")->text().contains("new workspace"));
+    }
+    void runtimeGenerationRejectsLabeledFlowWithoutWriting()
+    {
+        QTemporaryDir dir; int calls = 0;
+        MainWindow window([&](const AiProviderSettings &, QObject *parent) { ++calls; return new DeferredClient(parent); });
+        QVERIFY(window.setLanguage("en")); prepare(window, dir.path());
+        // Labels on an ordinary flow remain valid in the generic editor, but the
+        // runtime subset rejects them before invoking the provider or scaffolding.
+        QVERIFY(window.scene()->deleteEdge(window.document().edges.first().id));
+        QVERIFY(window.scene()->connectNodes("start", "logic", "true"));
+        window.scene()->clearSelection(); window.scene()->nodeItem("logic")->setSelected(true);
+        const auto before = fileHashes(dir.path());
+        window.findChild<QAction *>("generateSelectedNodeAction")->trigger();
+        QCOMPARE(calls, 0); QCOMPARE(fileHashes(dir.path()), before);
+        QVERIFY(!window.findChild<CandidateReviewDialog *>());
+        QVERIFY(window.findChild<QLabel *>("generationStatus")->text().contains("empty labels"));
     }
     void staleResponseCannotReplaceNewRequest()
     {

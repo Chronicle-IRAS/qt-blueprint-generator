@@ -68,6 +68,8 @@ qt_add_library(BlueprintEditorCore STATIC
     src/generation/prompt_compiler.h
     src/generation/project_scaffolder.cpp
     src/generation/project_scaffolder.h
+    src/generation/runtime_assembler.cpp
+    src/generation/runtime_assembler.h
     src/generation/workspace_io.cpp
     src/generation/workspace_io.h
     src/generation/candidate_store.cpp

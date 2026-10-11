@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "projectId": "runtime-linear",
+  "projectName": "Runtime Linear",
+  "target": "qt6-widgets-cpp17-cmake",
+  "nodes": [
+    {"id":"start","type":"Start","name":"Start","description":"Start assembly","inputs":[],"outputs":[],"constraints":[],"acceptanceCriteria":[]},
+    {"id":"z_first","type":"LogicModule","name":"Produce","description":"Produce a message","inputs":[],"outputs":[{"name":"message","type":"QString","description":"Message"}],"constraints":[],"acceptanceCriteria":[]},
+    {"id":"a_second","type":"LogicModule","name":"Transform","description":"Transform the actual message","inputs":[{"name":"message","type":"QString","description":"Message"}],"outputs":[{"name":"message","type":"QString","description":"Transformed message"}],"constraints":[],"acceptanceCriteria":[]},
+    {"id":"page","type":"UiPage","name":"Display","description":"Display the real result","inputs":[{"name":"message","type":"QString","description":"Message"}],"outputs":[],"constraints":[],"acceptanceCriteria":[]},
+    {"id":"end","type":"End","name":"End","description":"Assembly complete","inputs":[],"outputs":[],"constraints":[],"acceptanceCriteria":[]}
+  ],
+  "edges": [
+    {"id":"flow1","source":"start","target":"z_first","label":""},
+    {"id":"flow2","source":"z_first","target":"a_second","label":""},
+    {"id":"flow3","source":"a_second","target":"page","label":""},
+    {"id":"flow4","source":"page","target":"end","label":""}
+  ]
+}

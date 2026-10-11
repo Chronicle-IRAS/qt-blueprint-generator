@@ -37,6 +37,7 @@ struct CandidateReviewDialog::Impl {
     CandidateReviewDialog *q;
     BlueprintDocument snapshot;
     QString workspace, generation, node;
+    ProjectScaffolder::Mode mode = ProjectScaffolder::Mode::ModulesOnly;
     QVector<File> files;
     int row = -1;
     bool valid = true;
@@ -133,7 +134,9 @@ struct CandidateReviewDialog::Impl {
     void acceptFile(bool edited) {
         if (!valid || row < 0 || files[row].finished || !files[row].preview) return;
         QString error;
-        if (!ProjectScaffolder::create(snapshot, workspace, &error)) {
+        const auto scaffold = mode == ProjectScaffolder::Mode::LinearRuntime
+            ? &ProjectScaffolder::createRuntime : &ProjectScaffolder::create;
+        if (!scaffold(snapshot, workspace, &error)) {
             setStatus(Status::ConsistencyError, error); return;
         }
         // Preserve the exact hashes the user inspected across the confirmation dialog.
@@ -146,7 +149,7 @@ struct CandidateReviewDialog::Impl {
             if (!confirmed) return;
         }
         if (!valid) return;
-        if (!ProjectScaffolder::create(snapshot, workspace, &error)) {
+        if (!scaffold(snapshot, workspace, &error)) {
             setStatus(Status::ConsistencyError, error); return;
         }
         auto content = edited ? std::optional<QByteArray>(files[row].draft.toUtf8()) : std::nullopt;
@@ -177,10 +180,10 @@ struct CandidateReviewDialog::Impl {
 };
 
 CandidateReviewDialog::CandidateReviewDialog(const BlueprintDocument &snapshot, const QString &workspace,
-    const QString &generationId, const GenerationResult &result, QWidget *parent)
+    const QString &generationId, const GenerationResult &result, QWidget *parent, ProjectScaffolder::Mode mode)
     : QDialog(parent), d(std::make_unique<Impl>())
 {
-    d->q = this; d->snapshot = snapshot; d->workspace = workspace; d->generation = generationId; d->node = result.nodeId;
+    d->q = this; d->snapshot = snapshot; d->workspace = workspace; d->generation = generationId; d->node = result.nodeId; d->mode = mode;
     resize(1000, 650);
     auto *layout = new QVBoxLayout(this);
     auto *summary = new QLabel(result.summary, this); summary->setTextFormat(Qt::PlainText); summary->setWordWrap(true); layout->addWidget(summary);

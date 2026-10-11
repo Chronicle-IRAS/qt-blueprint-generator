@@ -141,7 +141,7 @@ bool loadManifest(const QString &workspace, QJsonObject &manifest, QString *erro
     if (parse.error != QJsonParseError::NoError || !document.isObject()) return fail(error, "Malformed generation manifest");
     manifest = document.object();
     static const QRegularExpression hash("\\A[a-f0-9]{64}\\z");
-    if (manifest.size() != 6 || manifest.value("version") != 1 || !hash.match(manifest.value("blueprintSha256").toString()).hasMatch()
+    if (manifest.size() != 6 || (manifest.value("version") != 1 && manifest.value("version") != 2) || !hash.match(manifest.value("blueprintSha256").toString()).hasMatch()
         || !manifest.value("modules").isArray() || !manifest.value("protectedFiles").isObject()
         || !manifest.value("files").isObject() || !manifest.value("batches").isObject())
         return fail(error, "Malformed generation manifest schema");

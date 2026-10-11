@@ -41,8 +41,22 @@ GenerationController::GenerationController(ClientFactory factory, QObject *paren
 {
 }
 
+bool GenerationController::startRuntime(BlueprintDocument document, QString nodeId,
+                                        QString workspace, AiProviderSettings provider)
+{
+    return startInMode(std::move(document), std::move(nodeId), std::move(workspace), std::move(provider),
+                       ProjectScaffolder::Mode::LinearRuntime);
+}
+
 bool GenerationController::start(BlueprintDocument document, QString nodeId,
                                  QString workspace, AiProviderSettings provider)
+{
+    return startInMode(std::move(document), std::move(nodeId), std::move(workspace), std::move(provider),
+                       ProjectScaffolder::Mode::ModulesOnly);
+}
+
+bool GenerationController::startInMode(BlueprintDocument document, QString nodeId,
+                                      QString workspace, AiProviderSettings provider, ProjectScaffolder::Mode mode)
 {
     if (m_state == State::Generating) return false;
     m_batch.reset();
@@ -66,7 +80,9 @@ bool GenerationController::start(BlueprintDocument document, QString nodeId,
         return fail(QT_TR_NOOP("Fix blueprint validation errors before generating."));
     }
     QString scaffoldError;
-    if (!ProjectScaffolder::create(document, workspace, &scaffoldError)) {
+    const auto scaffold = mode == ProjectScaffolder::Mode::LinearRuntime
+        ? &ProjectScaffolder::createRuntime : &ProjectScaffolder::create;
+    if (!scaffold(document, workspace, &scaffoldError)) {
         // This detail comes from local workspace checks, never from the AI provider.
         finish(State::Failed, QT_TR_NOOP("Could not initialize workspace scaffold: %1"), scaffoldError);
         return false;
@@ -94,6 +110,15 @@ bool GenerationController::start(BlueprintDocument document, QString nodeId,
                          "- Include the actual node contract above and derive from its class, using its exact namespace and signatures.\n"
                          "- The contract include is \"modules/%1/contract.h\" and the shared types include is \"contracts/types.h\". Do not infer header paths from module metadata.\n"
                          "- Each test .cpp/.cc is a separate executable and must provide its own main() (or Qt Test main macro).\n").arg(nodeId);
+    if (mode == ProjectScaffolder::Mode::LinearRuntime)
+        *prompt += QStringLiteral("\nRuntime implementation duties:\n"
+            "- Define the exact factory declared in the protected contract, in its exact namespace, in a .cpp/.cc file under the implementation root.\n"
+            "- Return std::unique_ptr of the protected contract class; the concrete class name and implementation filename are your choice.\n"
+            "- Default arguments belong only in the protected declaration; omit them from factory definitions. Factories must return a non-null value.\n"
+            "- LogicModule must implement execute(const Inputs &) and return exactly the declared output keys with valid values and exact declared Qt metatypes. QVariant accepts any valid value.\n"
+            "- UiPage factory must construct the actual QWidget from the supplied Inputs. Please copy values the page retains: the factory's Inputs reference is valid only during the call; do not retain this reference for asynchronous UI work.\n"
+            "- Runtime owns factory results and passes nullptr parents. Do not introduce a second owner or delete the returned objects.\n"
+            "- The protected controller binds direct predecessor outputs by exact port name/type, executes logic in flow order, then shows the terminal page. End means startup assembly completed.\n");
     if (!m_factory) return fail(QT_TR_NOOP("AI client is unavailable."));
     auto *session = new QObject(this);
     IAiClient *client = m_factory(provider, session);
@@ -115,10 +140,10 @@ bool GenerationController::start(BlueprintDocument document, QString nodeId,
     const QString generationId = QStringLiteral("generation_") + token.toString(QUuid::Id128);
     const QString capturedWorkspace = m_workspace;
     connect(service, &GenerationService::generationSucceeded, this,
-            [this, token, document, capturedWorkspace, provider, prompt = *prompt, generationId]
+            [this, token, document, capturedWorkspace, provider, prompt = *prompt, generationId, mode, scaffold]
             (const QUuid &, const GenerationResult &result) {
         if (m_token != token || m_state != State::Generating) return;
-        if (!ProjectScaffolder::create(document, capturedWorkspace)) {
+        if (!scaffold(document, capturedWorkspace, nullptr)) {
             finish(State::Failed, QT_TR_NOOP("The workspace scaffold changed during generation."));
             return;
         }
@@ -126,7 +151,7 @@ bool GenerationController::start(BlueprintDocument document, QString nodeId,
             finish(State::Failed, QT_TR_NOOP("The generated candidate could not be safely saved."));
             return;
         }
-        const CandidateBatch batch{generationId, capturedWorkspace, result};
+        const CandidateBatch batch{generationId, capturedWorkspace, result, mode};
         m_batch = batch;
         const QPointer<GenerationController> guard(this);
         finish(State::Success);

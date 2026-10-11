@@ -603,3 +603,25 @@ set_tests_properties(manual_ai_integration_offline PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
 )
+foreach(runtime_test IN ITEMS runtime_assembly runtime_end_to_end)
+    set(runtime_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_${runtime_test}.moc")
+    add_custom_command(OUTPUT "${runtime_moc}"
+        COMMAND Qt6::moc -o "tst_${runtime_test}.moc" "${CMAKE_CURRENT_SOURCE_DIR}/tst_${runtime_test}.cpp"
+        DEPENDS "tst_${runtime_test}.cpp" WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+    qt_add_executable(tst_${runtime_test} "tst_${runtime_test}.cpp" "${runtime_moc}")
+    set_target_properties(tst_${runtime_test} PROPERTIES AUTOMOC OFF)
+    target_include_directories(tst_${runtime_test} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+    target_link_libraries(tst_${runtime_test} PRIVATE BlueprintEditorCore Qt6::Test)
+    target_compile_definitions(tst_${runtime_test} PRIVATE
+        RUNTIME_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/runtime-linear"
+        RUNTIME_CMAKE_COMMAND="${CMAKE_COMMAND}"
+        RUNTIME_CTEST_COMMAND="${CMAKE_CTEST_COMMAND}"
+        RUNTIME_CMAKE_GENERATOR="${CMAKE_GENERATOR}"
+        RUNTIME_MAKE_PROGRAM="${CMAKE_MAKE_PROGRAM}"
+        RUNTIME_CXX_COMPILER="${CMAKE_CXX_COMPILER}"
+        RUNTIME_QT_CMAKE_DIR="${Qt6_DIR}")
+    add_test(NAME ${runtime_test} COMMAND tst_${runtime_test})
+    set_tests_properties(${runtime_test} PROPERTIES TIMEOUT 600
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+endforeach()

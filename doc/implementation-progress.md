@@ -1,9 +1,15 @@
 # 实现进度
 
-更新时间：2026-10-10（Asia/Shanghai）
+更新时间：2026-10-11（Asia/Shanghai）
 
 ## 当前状态
 
+- 2026-10-11（Runtime Assembly Phase 1 完成验证，等待 PR 审核）：基于 `main` 的 `bb7fc4bb5e6e691e007f1bfea25445faa4ae29fc` 在独立 `feature/runtime-assembly-phase-1` 工作树实现线性运行时。GUI Generate 使用新增 `startRuntime()` / `createRuntime()` 创建 v2 工程；原 `start()` / `create()` 继续生成 module-only v1 原字节产物，旧工作区不自动迁移，旧工程可继续 Build / Export。manifest 严格保持原六字段，仅接受版本 1 / 2；主入口、控制器、CMake 和契约仍受保护，AI 只能提供当前节点实现和测试，并定义固定 factory。独立规格审查、代码质量与安全复审无未解决 Critical / Important；本阶段仅交付指向 main 的 PR，不自动合并，也不启动后续阶段。
+- 本轮 TDD 证据：全新基线完整 CTest 30/30（204.04 秒）通过；先加入行为测试并确认可以编译，再观察 Red：runtime assembly 26 pass / 10 fail，runtime end-to-end 2 pass / 2 fail。基于冻结的 `bb7fc4` v1 产物建立 golden，记录 16 个受保护文件哈希，用于检查 legacy 原字节兼容。新增 runtime 专项 CTest 2/2（153.09 秒）通过，runtime assembly 36 项及 runtime end-to-end 5 项无失败；生命周期专项 CTest 2/2（71.95 秒）通过，工作区集成 21 项、持久化 23 项无失败或跳过。
+- 最终完整构建成功，完整 CTest 32/32（并行 4，226.39 秒）通过；32 份完整可解析 QtTest XML 共 984 pass / 0 fail / 1 skip，唯一跳过为 Windows 无法通过真实选择器创建大小写别名的既有 ExternalCode GUI fixture，后端保护测试仍实际执行。新生成工程与导出工程各自 CTest 4/4，并实际启动生成应用验证执行与页面显示；100% / 150% 画布局部重绘及中英文、主题回归均通过。首轮完整回归发现两组旧 GUI 生成 fixture 仍使用 v1 或不支持的运行时契约，仅调整生成用例的数据准备，保留通用序列化丰富 fixture 及所有原生命周期断言，并新增零 AI 调用、磁盘与源码草稿不变的拒绝回归。外部日志辅助脚本的重复 XML 参数已去重并重新完整验证，未改动产品代码。仓库文件敏感模式扫描无命中，MVP annotated Tag 对象及其指向未变。
+- Phase 1 语义与边界：支持 `Start → 零个或多个 LogicModule → 可选唯一末端 UiPage → End`，顺序沿 Flow；输入只取直接前驱同名、同声明类型的输出，第一个模块 Inputs 为空。启动时核对精确输出键、值有效性与 Qt 类型；页面 factory 接收 Inputs 并复制保留数据，控制器显示和持有页面跨 Qt 事件循环，仅逻辑链直接退出。不支持 Decision、ExternalCode 运行时、标签、分支、合流、环、并行、多/非末端页面、UiPage 输出、Start/End 端口、外部初始输入、自定义类型或隐式转换；六类节点编辑仍保留，没有新增 GUI Run、行级 Review、AI 返工或前端框架。
+- 新增离线 `runtime-linear` fixture 与端到端测试实际启动生成应用，检查执行顺序、传值、页面显示与生命周期，并覆盖缺失 factory 的完整应用链接失败及导出后独立构建运行。fixture 自行退出，普通生成应用不会自动退出。本轮未调用真实付费 AI；此前 MVP 的简单 LogicModule DeepSeek 实测属于 legacy v1，不是 v2 factory 的真实模型验收。README、使用指南和路线文档已同步当前产品语义与验证边界。
+- 2026-10-10（源码发布）：`v0.1.0-mvp` 源码 Pre-release 已发布，`main` 为 `bb7fc4bb5e6e691e007f1bfea25445faa4ae29fc`。下方发布准备及等待人工合并的文字保留为当时的历史记录。
 - 2026-10-10（发布收尾）：PR #48 已合入远端 `main`，合并提交 `33503f85308a93d7ab68b96db9031faa42449f1d`；Candidate Review Unicode 草稿与 Diff 缺陷已修复，原 MVP 14 项验收标准均通过。下方“待合并修复”的记录描述初轮验收时的历史状态，当前结论以 `doc/mvp-acceptance-report.md` 为准。
 - 2026-10-10（真实 AI 验收）：在上述 main 使用一个有效的 `Start → LogicModule(add_one) → End` 蓝图和独立临时 Workspace，经生产 OpenAI-compatible 客户端调用 DeepSeek `deepseek-flash`，HTTP 200。一次真实请求返回三个候选文件；通过生产 Candidate Review 控件原字节接受后，Manifest 全部 accepted，受保护文件哈希未变。工作区真实 CMake 配置/编译成功、CTest 2/2；Export 哈希复核后，导出工程独立构建及 CTest 2/2 成功。输入 810、输出 578，共 1388 tokens；未查询实际账单。仅覆盖一个简单 LogicModule，离屏 GUI 测试不等同真人桌面点验。
 - 2026-10-10（发布准备）：独立 `chore/mvp-release-finalization` 分支整理验收报告、README、双语 `v0.1.0-mvp` 发布说明及密钥忽略规则。全新完整构建成功，最终 CTest 30/30（234.22 秒）通过，导出登录示例 4/4；30 份 QtTest XML 无失败，仅有 Windows 大小写别名 GUI fixture 的平台限制跳过。120 个跟踪文件与本地源码 ZIP 清单一致，已知凭据精确匹配和通用密钥扫描无命中，未混入二进制或本机实测日志；本轮无额外付费 API 请求。本阶段只提交指向 main 的 PR，须人工合并后再验证最终 main、创建 annotated Tag 和源码 Pre-release。Runtime Assembly、行级 Code Review、AI 返工尚未实现，本任务未启动后续开发。

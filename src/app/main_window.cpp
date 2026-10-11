@@ -660,7 +660,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     connect(m_generationController, &GenerationController::candidateReady, this,
             [this](const CandidateBatch &batch) {
         auto *dialog = new CandidateReviewDialog(m_generationSnapshot, batch.workspace,
-                                                 batch.generationId, batch.result, this);
+                                                 batch.generationId, batch.result, this, batch.mode);
         m_reviewDialog = dialog;
         dialog->setAttribute(Qt::WA_DeleteOnClose);
         dialog->setWindowModality(Qt::ApplicationModal);
@@ -1178,7 +1178,7 @@ void MainWindow::startGeneration()
     // Capture before start(): injected clients may complete synchronously.
     m_generationSnapshot = m_document;
     QSettings settings;
-    m_generationController->start(m_generationSnapshot, m_generationNodeId,
+    m_generationController->startRuntime(m_generationSnapshot, m_generationNodeId,
                                  m_workspacePathEdit->text().trimmed(),
                                  AiProviderSettings::load(settings));
     updateGenerationUi();
