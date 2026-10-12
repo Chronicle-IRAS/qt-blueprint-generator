@@ -49,7 +49,7 @@ capabilities 是宿主可审核的声明，不是 OS sandbox；在 Sidecar 中�
 ## NodeDefinition 示例
 
 下面是完整蓝图示例中 logic-module 的示意定义：name/description 可编辑，输出固定为 message:QString。
-它只展示一版最小定义，不代表完整 Qt 插件已经实现，也不限制未来定义通过 getPorts(properties) 提供动态端口。
+它只展示一版最小定义，不代表完整 Qt 插件已经实现，也不限制未来定义通过 getPorts(properties, previousPorts, context) 提供动态端口。
 propertiesSchema 以 JSON Schema 风格表达；采用哪个正式 dialect 与校验器仍需契约验证。
 
 ```json
@@ -74,8 +74,11 @@ propertiesSchema 以 JSON Schema 风格表达；采用哪个正式 dialect 与�
 }
 ```
 
-定义版本变化需显式升级诊断；不能读取旧实例时重新生成随机端口 ID。
-动态端口 ID 必须持久化，名称和顺序与身份分开；宿主复验端口快照与定义导出的契约。
+getPorts 接收已持久化 previousPorts 和宿主建立的 PortResolutionContext，只计算端口提案；宿主拥有实例 ID 的分配与对账权威。
+动态属性条目持久化宿主管理的 itemId/portId；只在用户显式新增条目时一次分配，两者不由显示名、数组位置或插件随机值推导。
+context.itemPortIds 从这些条目形成已分配的 itemId→portId 映射；插件必须复用它与 previousPorts，普通属性编辑、重排和同版本 reload 不重新分配 ID，rename 保持 ID。
+宿主核对新增/保留/删除项及 ID、方向、kind/type。connected port 的删除或类型/方向/kind 变化默认拒绝；只有用户明确批准列出受影响 Edge/Channel 的删除或重连计划，且全图复验通过，才原子提交 properties/ports/edges/channels；取消或失败保留原状态，不能静默 drop/retarget。
+定义升级不是 reload：需显式选择版本迁移、给出旧 itemId/portId 到新定义的无歧义映射并尽量保留 ID，展示受影响连接后复验。缺映射、歧义或验证失败保留旧 node/ports/edges/channels；不能自动升级或按名称猜配。
 data/event/control 都要求显式 typeId；event 必须绑定注册事件类型，不能成为无类型消息通道。
 宿主先检查方向、kind、类型、基数、端点存在和 Unit 边界，插件再追加语义限制，不能越过宿主拒绝。
 
@@ -89,6 +92,8 @@ type Diagnostic = { code: string; severity: "error" | "warning";
   message: string; nodeId?: string; portId?: string; unitId?: string };
 type Port = { id: string; name: string; direction: "in" | "out";
   kind: "control" | "data" | "event"; typeId: string };
+type PortResolutionContext = { nodeId: string; operation: "edit" | "reload" | "migration";
+  itemPortIds: Readonly<Record<string, string>> };
 type Node = { id: string; unitId: string; typeId: string;
   nodeDefinitionVersion: string; properties: Json; ports: Port[] };
 type Endpoint = { nodeId: string; portId: string };
@@ -99,7 +104,8 @@ type PluginLock = { pluginId: string; package: string; version: string;
 type DriverBindingRef = { id: string; unitId: string; sha256: string };
 type Channel = { id: string; source: Endpoint & { unitId: string };
   target: Endpoint & { unitId: string }; wireSchema: { typeId: string; schema: Json };
-  bridge: { pluginId: string; version: string; driverBindingId: string; configuration: Json } };
+  bridge: { pluginId: string; version: string; configuration: Json;
+    endpointDriverBindingIds?: { source?: string[]; target?: string[] } } };
 type CoreGraphIR = { coreIrVersion: string; coreIrSha256: string; projectId: string;
   units: BuildUnit[]; nodes: Node[]; edges: Edge[]; channels: Channel[];
   pluginLocks: PluginLock[]; driverBindingRefs: DriverBindingRef[] };
@@ -123,7 +129,8 @@ type BuildPlan = { unitId: string; toolchainId: string; arguments: string[] };
 interface NodeDefinition {
   typeId: string; nodeDefinitionVersion: string; propertiesSchema: Json;
   supportedTargets: string[];
-  getPorts(properties: Readonly<Json>): Port[];
+  getPorts(properties: Readonly<Json>, previousPorts: readonly Port[],
+    context: Readonly<PortResolutionContext>): Port[];
   validateNode(node: Readonly<Node>): Diagnostic[];
   validateConnection(edge: Readonly<Edge>, graph: Readonly<UnitCoreIR>): Diagnostic[];
 }
@@ -195,7 +202,7 @@ scaffold 由可信 [ProjectScaffolder](../../src/generation/project_scaffolder.h
 | v2 → LegacyQt | 单 Unit 线性 control 流；data 边与直接前驱同名同类型绑定完全一致 | 分支/标签/event/跨 Unit、重命名、跳跃取值、隐式转换 |
 | Embedded Target | 明确芯片/SDK/工具链适配、启动/链接配置和完整目标工程 | 不支持的芯片/SDK、缺驱动/工具链或无法真实交叉编译 |
 | 用户驱动 | Snapshot/Reference 的显式绑定、接口与字节哈希；AI 只接收接口 | 哈希变化、越界路径、不兼容接口 |
-| Bridge | 稳定端点 unitId/nodeId/portId、wireSchema、锁定适配器版本及驱动/配置 | 缺失任一契约，或把跨 Unit 关系当普通边 |
+| Bridge | 稳定端点 unitId/nodeId/portId、wireSchema、锁定适配器版本/配置；按 source/target 可选驱动依赖 | 缺必需端点依赖、提供的绑定不匹配，或把跨 Unit 关系当普通边 |
 
 Qt 适配必须显式映射注册类型到当前九种 Qt 声明类型，不用 QVariant 或类型名字猜转换。
 当前 Runtime [Assembler](../../src/generation/runtime_assembler.cpp) 只支持线性 Flow、首模块空输入和精确前驱绑定；控制端口不能伪造旧 Start/End PortSpec。
@@ -203,6 +210,8 @@ legacy v1 `create()/start()` 原字节产物、runtime `createRuntime()/startRun
 v1 → v2 只允许显式复制，保留原图/layout/Flow/label/opaque，不猜造 data edge；无法表达时诊断或留在 legacy。
 Snapshot 拟复用当前 [ExternalCodeImporter](../../src/workspace/external_code_importer.h)，Reference 未来设计；当前 Runtime 不执行 ExternalCode。
 Embedded 毕业验收需真实交叉编译有效工程，不要求烧录/硬件运行；Bridge 本次仅设计，无物理通信实现。
+Bridge 的 endpointDriverBindingIds 可省略、为空对象或每侧空数组；Qt-Qt IPC/WebSocket 等无导入驱动的 Bridge 不应被要求虚构绑定。锁定 Bridge 版本的契约分别声明 source/target 所需依赖及接口；声明某侧必需驱动而缺失时仍失败关闭。
+提供的每个 ID 都须核对存在/去重、所属 Unit 等于该侧 endpoint.unitId、接口被该 Bridge 接受且哈希有效；不能把另一 Unit 的驱动错绑到此侧，也不把两端强制共用一个全局 driver ID。示例见[Channel 提案](blueprint-schema-v2.md#channel-与驱动提案)。
 
 旧 [generation manifest](../../src/generation/workspace_io.cpp) v1/v2 严格保持六字段 `version/blueprintSha256/modules/protectedFiles/files/batches`，Candidate JSON 与五字段 ExternalCode import manifest 不变。
 Unit/pluginLocks/产物索引只能进入独立 Draft `unit-artifacts.draft.json` 的 workspaceManifestVersion 契约，不给旧清单添加字段。
@@ -210,11 +219,13 @@ Unit/pluginLocks/产物索引只能进入独立 Draft `unit-artifacts.draft.json
 ## 未来验证条件
 
 - 定义与实例字段/类型一致，动态端口 ID 稳定；包、定义、API、蓝图与目标 IR 版本分别拒绝不兼容值。
+- 显式新增动态项只分配一次 ID；rename/reorder/普通 edit/同版本 reload 保持 ID；connected 删除/类型变化及歧义升级拒绝或经明确批准原子迁移，失败保留原 node/ports/edges/channels。
 - 依赖缺失/冲突/循环、加载失败、停用与崩溃不会丢文档或留下可接受的过期结果。
 - 进程内/Sidecar 同 fixture 的语义 IR 与诊断一致；取消、乱序、非法 framing、超时与消息限制可验证。
 - 同语义不同布局的 CoreGraphIR/摘要一致；UnitCoreIR 投影隔离；相同投影与锁/配置的 lower 输出确定，不支持语义诊断并拒绝。
 - 可信服务拒绝越权路径、受保护文件修改及过期 context，插件 manifest 不能豁免这些规则；不可信插件拒绝加载。
 - Qt 严格适配及 legacy 字节/factory 回归通过；Embedded 完整目标工程真实交叉编译，不能用宿主 smoke 替代。
 - 跨 Unit 普通边即使同目标仍被拒绝；Channel/Bridge 只在显式类型和版本完整时可规划，通信另行验收。
+- 无驱动 Bridge 允许省略/空端点依赖；必需依赖缺失、错误侧 Unit、接口/哈希错误失败关闭，两端依赖独立校验。
 
 本次只定义文档边界，不实现宿主、RPC、插件 Registry、适配器、驱动绑定或新测试。

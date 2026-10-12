@@ -52,8 +52,10 @@ workspaceManifestVersion 与这些版本独立，当前 generation manifest 的 
 
 `targetId` 如 `org.blueprint.qt/widgets`，不能由 pluginId、UI 语言或包名隐式推导。
 节点插件可以不同于 Unit 目标提供者，但必须存在该目标对该节点的显式编译支持。
-`ports` 是实例端口快照；插件定义或 getPorts(properties) 导出端口后，宿主核对 ID、方向、种类与类型一致。
-动态端口的 ID 保存在实例配置中，重排、改名不改变 ID；删除/重建必须诊断已有边。
+`ports` 是已持久化实例快照；getPorts(properties, previousPorts, context) 接收该快照与宿主的 PortResolutionContext，返回待复验提案，不自行分配实例 ID。
+动态属性条目持久化宿主管理的 itemId/portId（由对应 propertiesSchema 声明）；宿主只在显式新增时一次分配并提供 context.itemPortIds 的 itemId→portId 映射，不靠显示名/数组位置对账。
+普通属性 edit、重排、rename 与同版本 reload 复用原 ID。connected port 删除或类型/方向/kind 变化默认拒绝；仅经用户明确批准受影响 Edge/Channel 的删除或重连计划、全图复验后，才原子提交 properties/ports/edges/channels；失败/取消保留原状态，不静默丢边或改绑。
+定义升级需显式版本迁移及旧 itemId/portId 到新定义的无歧义映射，尽量保留 ID；缺映射/歧义/复验失败保留旧 node/ports/edges/channels。reload 不自动升级，也不按名称猜配。
 control 也有类型，如宿主定义的 `org.blueprint.core/control-flow@1`；data 示例用 `org.blueprint.qt/QString@1`。
 event 使用注册的明确事件类型，不能用空类型、任意 JSON 或默认 QVariant 代替契约。
 端口 ID 在节点内唯一；连线引用 ID，不引用显示名或数组索引。
@@ -136,12 +138,29 @@ event 使用注册的明确事件类型，不能用空类型、任意 JSON 或�
 
 普通边的两个节点 unitId 必须相等，即使两个 Unit 都使用 `org.blueprint.qt/widgets` 也不能跨接。
 跨 Unit/Target 通过 Channel 的 `source/target` 明确指定 `unitId/nodeId/portId`。
-Channel 还要求 `wireSchema`、`bridge`；bridge 含 `pluginId/version/driverBindingId/configuration`。
+Channel 还要求 `wireSchema`、`bridge`；bridge 必需字段为 `pluginId/version/configuration`，可选 `endpointDriverBindingIds` 按 `source/target` 分组为 binding ID 数组。
 Bridge 包须在 pluginLocks 中锁定，bridge.version 绑定该 Bridge 实现的适配器版本，端点目标类型与 wireSchema 的编码/解码映射须显式支持。
-wireSchema 是传输数据契约，不是 Qt/C++ 内存类型；Bridge 缺失、映射不兼容或驱动失效则禁止生成。
+wireSchema 是传输数据契约，不是 Qt/C++ 内存类型；Bridge 缺失、映射不兼容或必需端点依赖缺失则禁止生成。
+无导入驱动的 Qt-Qt IPC/WebSocket 等 Bridge 可省略 endpointDriverBindingIds、用空对象或每侧空数组；锁定 Bridge 版本的契约逐侧声明必需驱动及允许接口，不能因可选字段就放过必需依赖缺失。
+提供的 binding ID 逐侧核对存在/去重、所属 Unit 等于该侧 endpoint.unitId、接口兼容与哈希有效；不能把另一 Unit 的驱动错绑到此侧，不强制两端共用一个全局 driver ID。
 
-以下仅是未来 Channel 记录片段，不是上述单 Unit 蓝图的附加项或完整可加载文件。
-它假设另一完整蓝图已有 device-main、receiver、serial-driver 和相应插件锁；不表示串口通信已实现。
+以下两个独立片段都是未来 Draft Channel 示例，不是上述单 Unit 蓝图的附加项或当前可加载文件，均不表示通信已实现。
+无驱动片段假设另一完整蓝图已有 Qt Unit desktop-main/desktop-peer、相应节点/端口及 IPC Bridge 锁，driverBindings 可为空：
+
+```json
+{
+  "id": "ipc-message-channel",
+  "source": {"unitId": "desktop-main", "nodeId": "logic", "portId": "message-out"},
+  "target": {"unitId": "desktop-peer", "nodeId": "page", "portId": "message-in"},
+  "wireSchema": {"typeId": "org.blueprint.wire/message@1",
+    "schema": {"type": "object", "required": ["message"],
+      "properties": {"message": {"type": "string"}}, "additionalProperties": false}},
+  "bridge": {"pluginId": "org.blueprint.bridge.ipc", "version": "0.1.0-draft.1",
+    "configuration": {"codec": "utf8-json"}}
+}
+```
+
+有驱动片段另假设 device-main/receiver 与 serial Bridge 锁已定义；host-serial 绑定属于 desktop-main，device-uart 绑定属于 device-main，分别满足该 Bridge 两侧的驱动策略：
 
 ```json
 {
@@ -155,7 +174,7 @@ wireSchema 是传输数据契约，不是 Qt/C++ 内存类型；Bridge 缺失、
   },
   "bridge": {
     "pluginId": "org.blueprint.bridge.serial", "version": "0.1.0-draft.1",
-    "driverBindingId": "serial-driver",
+    "endpointDriverBindingIds": {"source": ["host-serial"], "target": ["device-uart"]},
     "configuration": {"codec": "utf8-json", "baudRate": 115200}
   }
 }
@@ -196,11 +215,12 @@ Qt 类型注册必须显式映射到当前允许的九种类型；QVariant 也�
 ## 未来契约测试的进入条件
 
 - 中文、端口改名/重排与多次保存保持 ID/边；位置变化不改变语义 IR，未知片段字节不丢失。
+- 动态端口显式新增只分配一次 ID；edit/rename/reorder/reload 保持 ID；connected 删除/类型变化及歧义升级拒绝或经明确批准原子迁移，失败保留原状态。
 - 同语义不同布局产生相同 CoreGraphIR/摘要；UnitCoreIR 投影隔离，TargetAdapter.lower 确定且拒绝不支持的语义。
 - 正反向版本拒绝；Schema 1 固定模型不误读 Schema 2，未识别新版本不会被降级保存。
 - 检出重复 ID、悬空端点、错误方向/kind/type、非法 Unit、跨 Unit 普通边和未注册类型。
 - 一图多插件与同插件多 Unit 正确区分，缺包/锁摘要变化/定义版本不兼容阻止生成。
-- Channel 两端、wireSchema、Bridge 锁与驱动完整绑定；无已验证通信适配器时不声称通信可运行。
+- Channel 两端、wireSchema 与 Bridge 锁完整绑定；无驱动 Bridge 允许省略/空依赖，必需端点依赖缺失、错侧 Unit、接口/哈希错误失败关闭；无已验证通信适配器时不声称通信可运行。
 - 显式复制保留原图/layout/opaque；LegacyQt 适配对不可表示语义诊断并零生成、零覆盖。
 - 新元数据与严格六字段旧清单分开验证，legacy 字节产物及 Runtime v2 固定 factory 回归保持。
 

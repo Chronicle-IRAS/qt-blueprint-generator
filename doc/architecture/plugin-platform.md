@@ -72,10 +72,12 @@ CoreGraphIR 是目标无关的全局语义：稳定节点/端口、显式边、U
 
 Port 有稳定 `id`、显示名、方向、`kind` 与显式 `typeId`。
 `kind` 分为 control/data/event，改名或移动不重建端口 ID，也不靠数组位置连线。
+动态端口由宿主在显式新增时一次分配并持久化 itemId/portId；getPorts(properties, previousPorts, context) 以快照和 itemPortIds 映射对账，edit/reload 不重新分配。connected 删除/类型变化须拒绝或经明确批准原子处理连接；定义升级须显式迁移/映射，失败保留原图，不自动 reload 升级。
 类型相同仍需检查方向、种类、基数和目标约束；不存在隐式类型、转换或猜测连线。
 普通 `edges` 只允许 Unit 内连接，两个 Qt Unit 之间也默认拒绝普通边。
 
-跨 Unit/Target 必须声明 `channels`：两端 `unitId/nodeId/portId`、wireSchema、Bridge 插件版本、驱动绑定与配置。
+跨 Unit/Target 必须声明 `channels`：两端 `unitId/nodeId/portId`、wireSchema、Bridge 插件版本与配置；可选 endpointDriverBindingIds 按 source/target 声明驱动依赖。
+无驱动 Bridge 可省略/留空绑定；锁定 Bridge 策略要求某侧驱动时，缺失仍失败关闭。提供的绑定必须与该侧 Unit、接口和哈希匹配，两侧不强制共用一个全局 driver ID。
 Channel 描述可审查的边界契约，不等同于网络、串口或物理链路已存在。
 wireSchema 不把 Qt `QString` 或 C++ 地址当成可传输格式；两端适配与编码需显式声明并验证。
 Bridge 是将两端目标表示映射到 wireSchema 的能力，不能成为绕过 Unit 校验的普通边。
