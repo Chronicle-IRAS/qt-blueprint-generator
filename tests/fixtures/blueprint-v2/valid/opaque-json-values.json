@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 2,
+  "projectId": "contract-demo",
+  "projectName": "",
+  "pluginLocks": [
+    {
+      "pluginId": "org.blueprint.qt",
+      "package": "org.blueprint.qt-package",
+      "version": "0.1.0-draft.1",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pluginApiVersion": "1.0-draft",
+      "futureLock": {}
+    },
+    {
+      "pluginId": "org.blueprint.bridge.serial",
+      "package": "org.blueprint.bridge.serial-package",
+      "version": "0.1.0-draft.1",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pluginApiVersion": "1.0-draft"
+    }
+  ],
+  "units": [
+    {
+      "id": "desktop-main",
+      "targetId": "org.blueprint.qt/widgets",
+      "pluginId": "org.blueprint.qt",
+      "settings": null,
+      "futureUnit": []
+    },
+    {
+      "id": "desktop-peer",
+      "targetId": "org.blueprint.qt/widgets",
+      "pluginId": "org.blueprint.qt",
+      "settings": [
+        "settings",
+        false
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "sender",
+      "unitId": "desktop-main",
+      "typeId": "org.blueprint.qt/logic-module",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": [
+        "opaque",
+        null,
+        42
+      ],
+      "ports": [
+        {
+          "id": "out",
+          "name": "",
+          "direction": "out",
+          "kind": "data",
+          "typeId": "org.blueprint.qt/QString@1",
+          "futurePort": {
+            "value": [
+              1,
+              2
+            ]
+          }
+        }
+      ],
+      "futureNode": {
+        "deep": [
+          {
+            "futurePort": [
+              "a",
+              null
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "receiver",
+      "unitId": "desktop-peer",
+      "typeId": "org.blueprint.qt/ui-page",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": false,
+      "ports": [
+        {
+          "id": "in",
+          "name": "in",
+          "direction": "in",
+          "kind": "data",
+          "typeId": "org.blueprint.qt/QString@1"
+        }
+      ]
+    },
+    {
+      "id": "local-consumer",
+      "unitId": "desktop-main",
+      "typeId": "org.blueprint.qt/logic-module",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": {},
+      "ports": [{"id": "in", "name": "in", "direction": "in", "kind": "data", "typeId": "org.blueprint.qt/QString@1"}]
+    }
+  ],
+  "edges": [
+    {
+      "id": "extra-edge",
+      "kind": "data",
+      "source": {
+        "nodeId": "sender",
+        "portId": "out",
+        "futureEdgeEndpoint": {"value": null}
+      },
+      "target": {
+        "nodeId": "local-consumer",
+        "portId": "in"
+      },
+      "futureEdge": [
+        null
+      ],
+      "description": "Structurally shaped only; semantic generation is not claimed."
+    }
+  ],
+  "channels": [
+    {
+      "id": "message-channel",
+      "source": {
+        "unitId": "desktop-main",
+        "nodeId": "sender",
+        "portId": "out",
+        "futureEndpoint": true
+      },
+      "target": {
+        "unitId": "desktop-peer",
+        "nodeId": "receiver",
+        "portId": "in"
+      },
+      "wireSchema": {
+        "typeId": "org.blueprint.wire/message@1",
+        "schema": null,
+        "futureWire": {
+          "$ref": "https://offline.invalid/wire-data"
+        }
+      },
+      "bridge": {
+        "pluginId": "org.blueprint.bridge.serial",
+        "version": "0.1.0-draft.1",
+        "configuration": "opaque bridge configuration",
+        "endpointDriverBindingIds": {
+          "source": [
+            "host-serial"
+          ],
+          "target": [
+            "peer-serial"
+          ],
+          "futurePolicy": {}
+        },
+        "futureBridge": {}
+      },
+      "futureChannel": null
+    }
+  ],
+  "driverBindings": [
+    {
+      "id": "host-serial",
+      "unitId": "desktop-main",
+      "mode": "Snapshot",
+      "interfaceContract": 17,
+      "files": [],
+      "futureBinding": {}
+    },
+    {
+      "id": "peer-serial",
+      "unitId": "desktop-peer",
+      "mode": "Reference",
+      "interfaceContract": null,
+      "files": [
+        {
+          "path": "drivers/serial.c",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "futureFile": {}
+        }
+      ],
+      "reference": {
+        "locator": "example://controlled-source/serial",
+        "metadata": [
+          null,
+          "future locator data only"
+        ]
+      }
+    }
+  ],
+  "extensions": {
+    "org.example.extra": {
+      "deep": [
+        null,
+        true,
+        9,
+        "中文",
+        {
+          "$ref": "https://offline.invalid/data-only",
+          "raw": "  preserve values  "
+        }
+      ]
+    }
+  },
+  "futureRoot": [
+    null,
+    {
+      "extra": true
+    }
+  ]
+}

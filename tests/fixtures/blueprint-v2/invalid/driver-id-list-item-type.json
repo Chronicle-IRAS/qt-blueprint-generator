@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 2,
+  "projectId": "contract-demo",
+  "projectName": "Contract Demo",
+  "pluginLocks": [],
+  "units": [],
+  "nodes": [],
+  "edges": [],
+  "channels": [
+    {
+      "id": "message-channel",
+      "source": {
+        "unitId": "desktop-main",
+        "nodeId": "sender",
+        "portId": "out"
+      },
+      "target": {
+        "unitId": "desktop-peer",
+        "nodeId": "receiver",
+        "portId": "in"
+      },
+      "wireSchema": {
+        "typeId": "org.blueprint.wire/message@1",
+        "schema": {
+          "type": "object",
+          "required": [
+            "message"
+          ],
+          "properties": {
+            "message": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "bridge": {
+        "pluginId": "org.blueprint.bridge.ipc",
+        "version": "0.1.0-draft.1",
+        "configuration": {
+          "codec": "utf8-json"
+        },
+        "endpointDriverBindingIds": {
+          "source": [
+            7
+          ]
+        }
+      }
+    }
+  ],
+  "driverBindings": []
+}

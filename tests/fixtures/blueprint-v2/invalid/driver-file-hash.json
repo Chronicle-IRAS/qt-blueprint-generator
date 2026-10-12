@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 2,
+  "projectId": "contract-demo",
+  "projectName": "Contract Demo",
+  "pluginLocks": [],
+  "units": [],
+  "nodes": [],
+  "edges": [],
+  "channels": [],
+  "driverBindings": [
+    {
+      "id": "host-serial",
+      "unitId": "desktop-main",
+      "mode": "Snapshot",
+      "interfaceContract": {
+        "interfaceId": "example/serial@1"
+      },
+      "files": [
+        {
+          "path": "drivers/serial.c",
+          "sha256": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Blueprint v2 structural contract (P0.1 Draft)",
+  "$comment": "Language-neutral structural validation only. No reader, semantic checker, plugin policy, migration, persistence or generation is implemented by this schema.",
+  "type": "object",
+  "required": ["schemaVersion", "projectId", "projectName", "pluginLocks", "units", "nodes", "edges", "channels", "driverBindings"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 2 },
+    "projectId": { "$ref": "#/$defs/NonEmptyString" },
+    "projectName": { "type": "string" },
+    "pluginLocks": { "type": "array", "items": { "$ref": "#/$defs/PluginLock" } },
+    "units": { "type": "array", "items": { "$ref": "#/$defs/BuildUnit" } },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/Node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/Edge" } },
+    "channels": { "type": "array", "items": { "$ref": "#/$defs/Channel" } },
+    "driverBindings": { "type": "array", "items": { "$ref": "#/$defs/DriverBinding" } },
+    "extensions": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "NonEmptyString": { "type": "string", "minLength": 1 },
+    "NamespacedId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\s@]+/[^/\\s@]+(?:@[^/\\s@]+)?$",
+      "description": "pluginId/localType with an optional @version suffix; no business node or Qt type enumeration. Registration and compatibility are semantic checks."
+    },
+    "Sha256": {
+      "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$",
+      "description": "Declared lowercase digest syntax only; actual package/file bytes are not verified."
+    },
+    "Json": {
+      "description": "Opaque JSON value: null, scalar, array or object. A wireSchema.schema value is not compiled or meta-validated here."
+    },
+    "PortKind": { "type": "string", "enum": ["control", "data", "event"] },
+    "PluginLock": {
+      "type": "object",
+      "required": ["pluginId", "package", "version", "sha256", "pluginApiVersion"],
+      "properties": {
+        "pluginId": { "$ref": "#/$defs/NonEmptyString" },
+        "package": { "$ref": "#/$defs/NonEmptyString" },
+        "version": { "$ref": "#/$defs/NonEmptyString" },
+        "sha256": { "$ref": "#/$defs/Sha256" },
+        "pluginApiVersion": { "$ref": "#/$defs/NonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "BuildUnit": {
+      "type": "object",
+      "required": ["id", "targetId", "pluginId", "settings"],
+      "properties": {
+        "id": { "$ref": "#/$defs/NonEmptyString" },
+        "targetId": { "$ref": "#/$defs/NamespacedId" },
+        "pluginId": { "$ref": "#/$defs/NonEmptyString" },
+        "settings": { "$ref": "#/$defs/Json" }
+      },
+      "additionalProperties": true
+    },
+    "Node": {
+      "type": "object",
+      "required": ["id", "unitId", "typeId", "nodeDefinitionVersion", "properties", "ports"],
+      "properties": {
+        "id": { "$ref": "#/$defs/NonEmptyString" },
+        "unitId": { "$ref": "#/$defs/NonEmptyString" },
+        "typeId": { "$ref": "#/$defs/NamespacedId" },
+        "nodeDefinitionVersion": { "$ref": "#/$defs/NonEmptyString" },
+        "properties": { "$ref": "#/$defs/Json" },
+        "ports": { "type": "array", "items": { "$ref": "#/$defs/Port" } }
+      },
+      "additionalProperties": true
+    },
+    "Port": {
+      "type": "object",
+      "required": ["id", "name", "direction", "kind", "typeId"],
+      "properties": {
+        "id": { "$ref": "#/$defs/NonEmptyString" },
+        "name": { "type": "string" },
+        "direction": { "type": "string", "enum": ["in", "out"] },
+        "kind": { "$ref": "#/$defs/PortKind" },
+        "typeId": { "$ref": "#/$defs/NamespacedId" }
+      },
+      "additionalProperties": true
+    },
+    "Endpoint": {
+      "type": "object",
+      "required": ["nodeId", "portId"],
+      "properties": {
+        "nodeId": { "$ref": "#/$defs/NonEmptyString" },
+        "portId": { "$ref": "#/$defs/NonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "Edge": {
+      "type": "object",
+      "required": ["id", "kind", "source", "target"],
+      "properties": {
+        "id": { "$ref": "#/$defs/NonEmptyString" },
+        "kind": { "$ref": "#/$defs/PortKind" },
+        "source": { "$ref": "#/$defs/Endpoint" },
+        "target": { "$ref": "#/$defs/Endpoint" }
+      },
+      "additionalProperties": true
+    },
+    "ChannelEndpoint": {
+      "type": "object",
+      "required": ["unitId", "nodeId", "portId"],
+      "properties": {
+        "unitId": { "$ref": "#/$defs/NonEmptyString" },
+        "nodeId": { "$ref": "#/$defs/NonEmptyString" },
+        "portId": { "$ref": "#/$defs/NonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "WireSchema": {
+      "type": "object",
+      "required": ["typeId", "schema"],
+      "properties": {
+        "typeId": { "$ref": "#/$defs/NamespacedId" },
+        "schema": { "$ref": "#/$defs/Json" }
+      },
+      "additionalProperties": true
+    },
+    "EndpointDriverBindingIds": {
+      "type": "object",
+      "properties": {
+        "source": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyString" }, "uniqueItems": true },
+        "target": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyString" }, "uniqueItems": true }
+      },
+      "additionalProperties": true,
+      "$comment": "Optional, empty object and empty side arrays are valid. Locked Bridge policy must later fail closed if a required side dependency is absent or mismatched."
+    },
+    "Bridge": {
+      "type": "object",
+      "required": ["pluginId", "version", "configuration"],
+      "properties": {
+        "pluginId": { "$ref": "#/$defs/NonEmptyString" },
+        "version": { "$ref": "#/$defs/NonEmptyString" },
+        "configuration": { "$ref": "#/$defs/Json" },
+        "endpointDriverBindingIds": { "$ref": "#/$defs/EndpointDriverBindingIds" }
+      },
+      "additionalProperties": true
+    },
+    "Channel": {
+      "type": "object",
+      "required": ["id", "source", "target", "wireSchema", "bridge"],
+      "properties": {
+        "id": { "$ref": "#/$defs/NonEmptyString" },
+        "source": { "$ref": "#/$defs/ChannelEndpoint" },
+        "target": { "$ref": "#/$defs/ChannelEndpoint" },
+        "wireSchema": { "$ref": "#/$defs/WireSchema" },
+        "bridge": { "$ref": "#/$defs/Bridge" }
+      },
+      "additionalProperties": true
+    },
+    "DriverFile": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/NonEmptyString" },
+        "sha256": { "$ref": "#/$defs/Sha256" }
+      },
+      "additionalProperties": true,
+      "$comment": "Path syntax, controlled roots, source location and portable export policy require a future driver implementation. This record does not access files."
+    },
+    "DriverBinding": {
+      "type": "object",
+      "required": ["id", "unitId", "mode", "interfaceContract", "files"],
+      "properties": {
+        "id": { "$ref": "#/$defs/NonEmptyString" },
+        "unitId": { "$ref": "#/$defs/NonEmptyString" },
+        "mode": { "type": "string", "enum": ["Snapshot", "Reference"] },
+        "interfaceContract": { "$ref": "#/$defs/Json" },
+        "files": { "type": "array", "items": { "$ref": "#/$defs/DriverFile" } }
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -3,6 +3,7 @@
 状态：Draft，2026-10-12。本文描述长期 Architecture B，不是已实现功能清单。
 蓝图 Schema v2、Plugin API v1、插件 manifest、RPC 和多 Unit 产物元数据均未冻结；当前程序不能加载这些提案。
 字段约定见[蓝图 Schema v2](blueprint-schema-v2.md)，插件边界见[Plugin API v1](plugin-api-v1.md)。
+P0.1 已增加 [Blueprint v2 机器结构 Schema、离线 fixtures 和 TS/Ajv/Vitest 工具](../../schemas/README.md)。它们只验证文档结构；Registry、应用 v2 读取器、新 Core IR/语义层均未实现，当前 GUI/C++ 仍读 Schema 1。
 
 ## 目标与当前基线
 
@@ -36,11 +37,11 @@ PR #50 已合入 `main`（`843138c`）；Runtime v2 的一个 LogicModule + 一�
 Qt Desktop Editor（毕业要求的 GUI）
   画布 / propertiesSchema 表单 / 文档与布局 / 诊断 / Candidate Review
                        |
-可信平台服务（初期保留已验证 C++/Qt 后端）
+可信平台服务（保留 C++/Qt 后端；新核心优先评估 TS/Node）
   v1 路径   |   未来 v2 读取器 / 语义校验 / 插件锁 / Unit 计划
   文件策略 / Candidate 写入与 Accept / scaffold / Build / Export 授权
                        |
-Plugin Host 抽象（具体语言和进程模型尚未选定）
+Plugin Host 抽象（TS/Node 优先评估；Cordis/进程模型未定）
   Registry / NodeDefinition / 端口与连线校验 / 生命周期 / 目标能力
        |                    |                       |
 Qt Target              Embedded Target          其他可信插件
@@ -87,11 +88,12 @@ Bridge 是将两端目标表示映射到 wireSchema 的能力，不能成为绕�
 
 | 方案 | 收益 | 代价及进入条件 |
 | --- | --- | --- |
-| C++/Qt 进程内 | 复用当前编译、候选和 UI 后端；少一个运行时 | 包/ABI 兼容、生命周期及崩溃影响需验证；不是沙箱 |
-| TypeScript/Cordis Sidecar | 可评估依赖、扩展与生命周期生态 | RPC、部署、取消与异常处理增加成本；先做最小离线证明 |
-| 按能力混合进程 | 可为特定 SDK 或工具选择语言 | 维护多种运行时和重复契约；只有具体收益成立才采用 |
+| C++/Qt 现有后端 | 复用已验证编译、候选和 UI 路径 | 继续维护，不迁移现有模块 |
+| TypeScript/Node 新核心 | 优先评估核心服务、protocol、NodeRegistry、IRCompiler、AIProvider | P0.1 仅采用其测试工具；服务及进程边界尚未实现 |
+| Cordis | 可评估依赖、扩展与生命周期生态 | 仍是候选，未成为宿主；需先验证 API、部署、取消和异常处理 |
+| 按具体 SDK/tool 混合语言 | 需求成立时可评估 Python 等 | 不预设 Python Worker，不新增无具体收益的运行时 |
 
-没有选定 TypeScript、Cordis、Python 或固定“两进程”架构。
+优先评估 TypeScript/Node 新核心不等于已交付插件宿主，也不预设固定“两进程”架构。
 Cordis 只是可选候选，其[官方仓库](https://github.com/cordiverse/cordis)提示 API 仍在开发，不据此承诺稳定宿主。
 先用同一组离线 fixture 比较进程内与 Sidecar 的语义结果、诊断、取消及失败行为。
 Sidecar 握手失败或崩溃不能丢失未保存文档，也不能触发自动迁移、Accept 或执行。
@@ -154,7 +156,7 @@ v2 → LegacyQt 只接受现有线性流程和直接前驱同名同声明类型�
 
 ## 分阶段收敛与完成依据
 
-1. Draft 契约：离线确认身份、字段、端口、锁、未知数据和迁移诊断；不冻结未经验证的协议。
+1. Draft 契约：P0.1 已实现机器结构 Schema 与离线 fixtures；引用/Unit/插件语义、动态 ID/未知原字节保存、IR/迁移诊断仍需后续实现，不冻结未经验证的协议。
 2. 最小 Registry：可信节点可编辑、依赖可解析、缺失插件可占位且不能生成，不预建大型框架。
 3. Qt Target：通过严格适配复用当前 Qt 后端，保留 legacy 与 Runtime v2 回归证据。
 4. Embedded Target：首个受支持适配器真实交叉编译完整工程；Qt GUI 仍是产品主体。

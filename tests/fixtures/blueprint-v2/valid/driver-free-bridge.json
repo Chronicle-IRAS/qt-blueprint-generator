@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 2,
+  "projectId": "contract-demo",
+  "projectName": "Contract Demo",
+  "pluginLocks": [
+    {
+      "pluginId": "org.blueprint.qt",
+      "package": "org.blueprint.qt-package",
+      "version": "0.1.0-draft.1",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pluginApiVersion": "1.0-draft"
+    },
+    {
+      "pluginId": "org.blueprint.bridge.ipc",
+      "package": "org.blueprint.bridge.ipc-package",
+      "version": "0.1.0-draft.1",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pluginApiVersion": "1.0-draft"
+    }
+  ],
+  "units": [
+    {
+      "id": "desktop-main",
+      "targetId": "org.blueprint.qt/widgets",
+      "pluginId": "org.blueprint.qt",
+      "settings": {}
+    },
+    {
+      "id": "desktop-peer",
+      "targetId": "org.blueprint.qt/widgets",
+      "pluginId": "org.blueprint.qt",
+      "settings": {}
+    }
+  ],
+  "nodes": [
+    {
+      "id": "sender",
+      "unitId": "desktop-main",
+      "typeId": "org.blueprint.qt/logic-module",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": {},
+      "ports": [
+        {
+          "id": "out",
+          "name": "out",
+          "direction": "out",
+          "kind": "data",
+          "typeId": "org.blueprint.qt/QString@1"
+        }
+      ]
+    },
+    {
+      "id": "receiver",
+      "unitId": "desktop-peer",
+      "typeId": "org.blueprint.qt/ui-page",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": {},
+      "ports": [
+        {
+          "id": "in",
+          "name": "in",
+          "direction": "in",
+          "kind": "data",
+          "typeId": "org.blueprint.qt/QString@1"
+        }
+      ]
+    }
+  ],
+  "edges": [],
+  "channels": [
+    {
+      "id": "message-channel",
+      "source": {
+        "unitId": "desktop-main",
+        "nodeId": "sender",
+        "portId": "out"
+      },
+      "target": {
+        "unitId": "desktop-peer",
+        "nodeId": "receiver",
+        "portId": "in"
+      },
+      "wireSchema": {
+        "typeId": "org.blueprint.wire/message@1",
+        "schema": {
+          "type": "object",
+          "required": [
+            "message"
+          ],
+          "properties": {
+            "message": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "bridge": {
+        "pluginId": "org.blueprint.bridge.ipc",
+        "version": "0.1.0-draft.1",
+        "configuration": {
+          "codec": "utf8-json"
+        }
+      }
+    }
+  ],
+  "driverBindings": []
+}

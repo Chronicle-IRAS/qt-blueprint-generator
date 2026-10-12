@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 2,
+  "projectId": "contract-demo",
+  "projectName": "Contract Demo",
+  "pluginLocks": [
+    {
+      "pluginId": "org.example.compute",
+      "package": "org.example.compute-package",
+      "version": "0.1.0-draft.1",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pluginApiVersion": "1.0-draft"
+    },
+    {
+      "pluginId": "org.example.audit",
+      "package": "org.example.audit-package",
+      "version": "0.1.0-draft.1",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pluginApiVersion": "1.0-draft"
+    }
+  ],
+  "units": [
+    {
+      "id": "worker-a",
+      "targetId": "org.example.compute/worker",
+      "pluginId": "org.example.compute",
+      "settings": {}
+    },
+    {
+      "id": "worker-b",
+      "targetId": "org.example.compute/worker",
+      "pluginId": "org.example.compute",
+      "settings": {}
+    }
+  ],
+  "nodes": [
+    {
+      "id": "calculate",
+      "unitId": "worker-a",
+      "typeId": "org.example.compute/calculate",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": {},
+      "ports": [
+        {
+          "id": "event-out",
+          "name": "event-out",
+          "direction": "out",
+          "kind": "event",
+          "typeId": "org.example.audit/Entry@3"
+        }
+      ]
+    },
+    {
+      "id": "audit",
+      "unitId": "worker-a",
+      "typeId": "org.example.audit/record",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": {},
+      "ports": [
+        {
+          "id": "event-in",
+          "name": "event-in",
+          "direction": "in",
+          "kind": "event",
+          "typeId": "org.example.audit/Entry@3"
+        }
+      ]
+    },
+    {
+      "id": "other-worker",
+      "unitId": "worker-b",
+      "typeId": "org.example.compute/calculate",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": {},
+      "ports": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "audit-event",
+      "kind": "event",
+      "source": {
+        "nodeId": "calculate",
+        "portId": "event-out"
+      },
+      "target": {
+        "nodeId": "audit",
+        "portId": "event-in"
+      }
+    }
+  ],
+  "channels": [],
+  "driverBindings": []
+}

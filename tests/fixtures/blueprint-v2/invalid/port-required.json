@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "projectId": "contract-demo",
+  "projectName": "Contract Demo",
+  "pluginLocks": [],
+  "units": [],
+  "nodes": [
+    {
+      "id": "sender",
+      "unitId": "desktop-main",
+      "typeId": "org.blueprint.qt/logic-module",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": {},
+      "ports": [
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "data",
+          "typeId": "org.blueprint.qt/QString@1"
+        }
+      ]
+    }
+  ],
+  "edges": [],
+  "channels": [],
+  "driverBindings": []
+}
