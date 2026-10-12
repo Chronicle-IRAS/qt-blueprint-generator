@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 2,
+  "projectId": "plugin-demo",
+  "projectName": "Plugin Demo",
+  "pluginLocks": [
+    {
+      "pluginId": "org.blueprint.qt",
+      "package": "org.blueprint.qt-package",
+      "version": "0.1.0-draft.1",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pluginApiVersion": "1.0-draft"
+    }
+  ],
+  "units": [
+    {
+      "id": "desktop-main",
+      "targetId": "org.blueprint.qt/widgets",
+      "pluginId": "org.blueprint.qt",
+      "settings": {}
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "unitId": "desktop-main",
+      "typeId": "org.blueprint.qt/start",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": {
+        "name": "Start"
+      },
+      "ports": [
+        {
+          "id": "flow-out",
+          "name": "flow-out",
+          "direction": "out",
+          "kind": "control",
+          "typeId": "org.blueprint.core/control-flow@1"
+        }
+      ]
+    },
+    {
+      "id": "logic",
+      "unitId": "desktop-main",
+      "typeId": "org.blueprint.qt/logic-module",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": {
+        "name": "Compute",
+        "description": "produce message"
+      },
+      "ports": [
+        {
+          "id": "flow-in",
+          "name": "flow-in",
+          "direction": "in",
+          "kind": "control",
+          "typeId": "org.blueprint.core/control-flow@1"
+        },
+        {
+          "id": "flow-out",
+          "name": "flow-out",
+          "direction": "out",
+          "kind": "control",
+          "typeId": "org.blueprint.core/control-flow@1"
+        },
+        {
+          "id": "message-out",
+          "name": "message-out",
+          "direction": "out",
+          "kind": "data",
+          "typeId": "org.blueprint.qt/QString@1"
+        }
+      ]
+    },
+    {
+      "id": "page",
+      "unitId": "desktop-main",
+      "typeId": "org.blueprint.qt/ui-page",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": {
+        "name": "Result",
+        "description": "display message"
+      },
+      "ports": [
+        {
+          "id": "flow-in",
+          "name": "flow-in",
+          "direction": "in",
+          "kind": "control",
+          "typeId": "org.blueprint.core/control-flow@1"
+        },
+        {
+          "id": "flow-out",
+          "name": "flow-out",
+          "direction": "out",
+          "kind": "control",
+          "typeId": "org.blueprint.core/control-flow@1"
+        },
+        {
+          "id": "message-in",
+          "name": "message-in",
+          "direction": "in",
+          "kind": "data",
+          "typeId": "org.blueprint.qt/QString@1"
+        }
+      ]
+    },
+    {
+      "id": "end",
+      "unitId": "desktop-main",
+      "typeId": "org.blueprint.qt/end",
+      "nodeDefinitionVersion": "1.0.0-draft.1",
+      "properties": {
+        "name": "End"
+      },
+      "ports": [
+        {
+          "id": "flow-in",
+          "name": "flow-in",
+          "direction": "in",
+          "kind": "control",
+          "typeId": "org.blueprint.core/control-flow@1"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "flow-1",
+      "kind": "control",
+      "source": {
+        "nodeId": "start",
+        "portId": "flow-out"
+      },
+      "target": {
+        "nodeId": "logic",
+        "portId": "flow-in"
+      }
+    },
+    {
+      "id": "flow-2",
+      "kind": "control",
+      "source": {
+        "nodeId": "logic",
+        "portId": "flow-out"
+      },
+      "target": {
+        "nodeId": "page",
+        "portId": "flow-in"
+      }
+    },
+    {
+      "id": "flow-3",
+      "kind": "control",
+      "source": {
+        "nodeId": "page",
+        "portId": "flow-out"
+      },
+      "target": {
+        "nodeId": "end",
+        "portId": "flow-in"
+      }
+    },
+    {
+      "id": "data-1",
+      "kind": "data",
+      "source": {
+        "nodeId": "logic",
+        "portId": "message-out"
+      },
+      "target": {
+        "nodeId": "page",
+        "portId": "message-in"
+      }
+    }
+  ],
+  "channels": [],
+  "driverBindings": [],
+  "extensions": {}
+}

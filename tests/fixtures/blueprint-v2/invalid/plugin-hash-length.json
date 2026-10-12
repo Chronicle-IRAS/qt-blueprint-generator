@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "projectId": "contract-demo",
+  "projectName": "Contract Demo",
+  "pluginLocks": [
+    {
+      "pluginId": "org.blueprint.qt",
+      "package": "org.blueprint.qt-package",
+      "version": "0.1.0-draft.1",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pluginApiVersion": "1.0-draft"
+    }
+  ],
+  "units": [],
+  "nodes": [],
+  "edges": [],
+  "channels": [],
+  "driverBindings": []
+}

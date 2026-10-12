@@ -22,10 +22,10 @@ Phase 1 不支持 Decision、ExternalCode 运行时、连线标签、分支、�
 
 ## 后续阶段与进入条件
 
-以下阶段是顺序收敛的 Draft 计划，各阶段需独立实现、验证和审核。参考[平台架构](architecture/plugin-platform.md)、[蓝图 Schema v2](architecture/blueprint-schema-v2.md)和[Plugin API v1](architecture/plugin-api-v1.md)。本次文档不冻结协议或选择新宿主。
+以下阶段是顺序收敛的 Draft 计划，各阶段需独立实现、验证和审核。参考[平台架构](architecture/plugin-platform.md)、[蓝图 Schema v2](architecture/blueprint-schema-v2.md)和[Plugin API v1](architecture/plugin-api-v1.md)。新核心服务、protocol、NodeRegistry、IRCompiler、AIProvider 优先评估 TS/Node；现有 C++/Qt 保留不迁移，Cordis 仍是候选，Python 仅按具体 SDK/tool 需求评估，不预设 Worker。新协议仍未冻结。
 
-1. **Draft 协议与兼容验证**：明确节点/类型命名空间、稳定端口、Unit、插件锁、未知节点保留与显式复制转换。保留现有 C++/Qt 后端；用离线契约样例验证边界后再考虑实现。蓝图、Plugin API、包版本、NodeDefinition 版本及 workspace manifest 版本分别管理。
-2. **最小插件注册与 Qt 编辑接入**：先支持可信插件定义的节点、属性与端口，提供缺失插件占位和禁止生成的诊断；不预建通用调度框架。TypeScript/Cordis 或其他本地 Sidecar 必须先证明结果一致、取消、异常及权限边界，仍是可选实现。
+1. **Draft 协议与兼容验证**：P0.1 已实现唯一机器 Blueprint v2 JSON Schema（Draft 2020-12）、离线 fixtures 和独立 TS/Ajv/Vitest 工具，运行见 [schemas/README](../schemas/README.md)。仅覆盖结构；对象 ID/引用/Unit 语义、Bridge 必需端点驱动、动态 ID 历史、未知原字节保存、Core IR/hash 和显式复制转换仍待实现。GUI/C++ 读取器继续只读 Schema 1；蓝图、Plugin API、包版本、NodeDefinition 与 workspace manifest 分别管理。
+2. **最小插件注册与 Qt 编辑接入**：先支持可信插件定义的节点、属性与端口，提供缺失插件占位和禁止生成的诊断；不预建通用调度框架。优先评估 TS/Node；Cordis/本地 Sidecar 须先证明结果一致、取消、异常及权限边界，P0.1 不实现宿主或 Registry。
 3. **Qt Target 适配器**：优先复用已验证 Qt IR、候选和 Runtime v2 路径。v2 → LegacyQt 转接只接收现有线性流程、直接前驱同名同类型等可表示语义；拒绝其他语义，不猜边、不转换类型、不破坏原图。Legacy v1 字节产物、v2 固定 factory 和旧清单保持兼容。
 4. **首个 Embedded Target 的真实交叉编译**：选择一套明确支持的芯片/SDK/工具链，验证完整目标工程和可审查产物。用户驱动 Snapshot 方案拟复用当前导入器的复制及哈希机制，Reference 模式需另行设计；AI 只接收接口摘要。烧录、硬件运行及广泛芯片支持不作为毕业条件。
 5. **多 Build Unit 与 Bridge/Channel**：再验证一图混合插件、独立工程和独立构建；Unit ID 不是 plugin ID。跨 Unit 普通边默认禁止，先定义端点、wire Schema、Bridge 版本、驱动与配置契约，再单独规划通信实现和目标验证。本次没有物理通信实现。

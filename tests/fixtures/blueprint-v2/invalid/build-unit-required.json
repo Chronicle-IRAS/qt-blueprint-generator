@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "projectId": "contract-demo",
+  "projectName": "Contract Demo",
+  "pluginLocks": [],
+  "units": [
+    {
+      "id": "desktop-main",
+      "targetId": "org.blueprint.qt/widgets",
+      "pluginId": "org.blueprint.qt"
+    }
+  ],
+  "nodes": [],
+  "edges": [],
+  "channels": [],
+  "driverBindings": []
+}

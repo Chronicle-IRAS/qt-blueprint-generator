@@ -1,6 +1,6 @@
 # 蓝图 Schema v2 设计（Draft）
 
-状态：Draft，2026-10-12。字段与示例用于讨论和未来契约测试，尚无正式 JSON Schema 文件或已实现的 v2 读取器。
+状态：Draft，2026-10-12。P0.1 已增加唯一权威结构定义 [JSON Schema](../../schemas/blueprint-v2.schema.json)（Draft 2020-12）、[离线 fixtures](../../tests/fixtures/blueprint-v2/README.md) 与独立 TS/Ajv/Vitest 工具；运行见 [schemas/README](../../schemas/README.md)。尚无应用 v2 读取器，协议未冻结。
 本页 JSON 示例符合本页描述的提案，不是当前程序可加载的文件，也不是已冻结协议。
 总览见[插件平台架构](plugin-platform.md)，节点定义与目标编译边界见[Plugin API v1](plugin-api-v1.md)。
 
@@ -40,6 +40,9 @@ PluginLock 字段为 `pluginId`、`package`、`version`、`sha256`、`pluginApiV
 `version` pin 插件包版本，不代表节点定义、API 或目标 IR 版本。
 Node 的 `nodeDefinitionVersion` 单独标记定义语义；API 使用 Draft `1.0-draft`，蓝图使用整数 2。
 workspaceManifestVersion 与这些版本独立，当前 generation manifest 的 `version: 1/2` 仍按旧契约解析。
+
+机器 Schema 要求上述顶层字段（仅 extensions 可选）；所有数组可空，ID/版本非空，projectName/Port.name 允许空显示名。typeId/targetId 检查 `pluginId/localType` 命名空间并允许类型的 `@version` 后缀，不枚举 Qt/GPIO 业务节点或当前九种 Qt 类型。数组为空或结构通过不代表可生成。
+所有记录允许未知额外字段，已知字段仍须符合 required/type 等约束。properties/settings/configuration/interfaceContract/wireSchema.schema 是任意 Json（含 null、标量、数组），Core 通常使用 `{}`；插件与未来 wire checker 才负责各自 payload 的含义和子 Schema 合法性。
 
 ## Unit、节点和端口
 
@@ -180,7 +183,8 @@ wireSchema 是传输数据契约，不是 Qt/C++ 内存类型；Bridge 缺失、
 }
 ```
 
-DriverBinding 拟含 `id/unitId/mode/interfaceContract/files`，files 记录受控路径与 sha256；Reference 还需受控来源定位与可移植导出策略。
+DriverBinding 的 P0.1 结构为 `id/unitId/mode/interfaceContract/files`，mode 拼写为 `Snapshot/Reference`，files 是 `{path, sha256}` 记录数组，可空；此数组与现有 importer 的 fileMap 格式不同，不宣称导入清单兼容。Schema 仅检查路径字符串和摘要格式，不访问或验证物理来源。
+Reference 的来源定位、controlled root 与可移植导出策略尚未确定，不发明必需 sourceRoot/absolutePath/locator；未知扩展可携带定位数据，但当前工具不读取它。
 Snapshot 拟复用当前 [ExternalCodeImporter](../../src/workspace/external_code_importer.h) 的显式选择、复制与复验；现有五字段 import manifest 不加字段。
 Reference 是未来方案。当前 Importer 不是插件驱动绑定系统，Runtime Phase 1 不执行 ExternalCode。
 AI 只接收 interfaceContract，不接收用户驱动源码；驱动变化使生成/Accept 上下文失效。
@@ -224,4 +228,8 @@ Qt 类型注册必须显式映射到当前允许的九种类型；QVariant 也�
 - 显式复制保留原图/layout/opaque；LegacyQt 适配对不可表示语义诊断并零生成、零覆盖。
 - 新元数据与严格六字段旧清单分开验证，legacy 字节产物及 Runtime v2 固定 factory 回归保持。
 
-这些是后续实现验收条件，本次没有新增协议 fixture、正式 Schema 文件、读取器或生产测试。
+P0.1 已实现结构 Schema 与离线测试，校验 required、known-field type、direction/kind/mode enum、命名空间、摘要格式、端点 shape，以及每侧 binding ID 数组的重复项。工具以 unknown 输入直接同步编译机器 Schema，strict/allErrors 开启，不做类型转换、默认值、剥离或输入改写；不另建 TS/Zod 蓝图模型，也不拉取远端 Schema。
+
+上述未来条件仍需要语义层或生命周期实现：对象数组 ID 唯一/引用存在、Unit 归属与同 Unit 普通边、方向/kind/type/基数、注册类型/目标支持、锁与版本兼容、实际字节 hash、wire 映射/逐侧必需驱动、动态 ID 历史与迁移、unknown raw 保存、IR hash 与生成 context。特别是两个相同 Qt target 的不同 Unit 仍须拒绝普通边，锁定 Bridge 要求某侧驱动而字段缺失时仍须失败关闭。
+
+`semantic-only` fixtures 的 schemaPass 只证明结构层未覆盖这些规则，没有语义 checker 或执行承诺；非 mutation 测试仅验证解析后的值和数组保持，不等于 opaque 原字节保存已实现。当前 GUI/C++ Schema 1、旧清单/协议、生产测试均未接入 v2。

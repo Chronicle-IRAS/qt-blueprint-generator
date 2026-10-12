@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "projectId": "contract-demo",
+  "projectName": "Contract Demo",
+  "pluginLocks": [],
+  "units": [],
+  "nodes": [],
+  "edges": [
+    {
+      "id": "edge",
+      "kind": "data",
+      "source": {
+        "nodeId": "sender"
+      },
+      "target": {
+        "nodeId": "receiver",
+        "portId": "in"
+      }
+    }
+  ],
+  "channels": [],
+  "driverBindings": []
+}

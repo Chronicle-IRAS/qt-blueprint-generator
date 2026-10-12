@@ -1,0 +1,11 @@
+# Blueprint v2 offline fixtures
+
+These files exercise the P0.1 Draft [machine schema](../../../schemas/blueprint-v2.schema.json). They are not loaded by the current Qt application. Run them with the local commands in [schemas/README](../../../schemas/README.md).
+
+- `valid/` contains structural positives: a full single-Qt Start → Logic → Page → End graph; custom non-Qt nodes from multiple plugins with multiple Units; a complete driver-free Bridge; a Bridge with independent source/target bindings using Snapshot and Reference; opaque/unknown values; and an empty structural document. IDs in complete graph examples are hand-matched. Package/file hashes are placeholders and no plugins are installed. “Valid” means structural acceptance, not executable or plugin-semantic validity.
+- `invalid/` contains self-contained negative documents. Tests enumerate every file and require its intended Ajv keyword and instancePath, covering each required record/container shape, missing fields, types, enums, digest syntax, namespaces and duplicate per-side binding IDs. Unrelated missing root fields cannot make a fixture pass its negative test.
+- `semantic-only/` must pass this structural schema. These are future rejection cases and must not be treated as valid executable blueprints: an ordinary edge crosses two Units with the same Qt target; an endpoint dangles; node IDs repeat; a Bridge lacks required drivers; or the source driver belongs to the target Unit. No semantic checker is implemented.
+
+For `required-driver-missing.json`, the future test scenario assumes the locked example Bridge contract explicitly requires a driver on each side. The policy must come from that locked contract, never from the plugin name. The fixture and current schema neither implement nor infer the policy. `driver-wrong-endpoint-unit.json` deliberately supplies an existing binding on the wrong side.
+
+`Reference` locator metadata and unknown fields are opaque examples, not evidence of filesystem access, source authorization or portable export. Opaque JSON values and remote-looking `$ref` data are preserved as parsed values during validation, not compiled as plugin schemas. Dynamic port history, raw payload byte preservation and IR hashes need separate future tests and implementations. Original `login-demo` and `runtime-linear` Qt fixtures are unchanged.
