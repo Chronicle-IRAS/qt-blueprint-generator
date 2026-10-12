@@ -1,5 +1,25 @@
 # 多语言混合开发后续规划
 
+## 当前方向（2026-10-12，Draft）
+
+当前已验证后端仍使用 C++/Qt；长期方向调整为[通用插件平台](architecture/plugin-platform.md)，不把 Python 工作进程作为必选组件。Qt Desktop Editor 继续满足毕业设计的 Qt GUI 要求，Qt Target Plugin 独立负责 Qt 工程生成；实现语言与目标工程语言是两个选择，Embedded Target 也不要求宿主使用嵌入式开发语言。
+
+插件边界先定义节点、propertiesSchema、稳定强类型端口、连线校验、目标 IR 和候选代码生成。蓝图 Schema v2、Plugin API v1、capability manifest 和跨语言 RPC 全部是 Draft，当前程序不能加载这些提案。实现按[路线](project-roadmap.md)先验证契约、最小注册和 Qt 适配，再进入首个 Embedded 目标真实交叉编译；不提前迁移现有模块或冻结协议。
+
+| 宿主候选 | 价值与代价 | 当前选择 |
+| --- | --- | --- |
+| C++/Qt 进程内插件 | 便于复用已验证后端；需处理 ABI、崩溃和包兼容 | 保留现有后端，插件机制待验证 |
+| TypeScript/Cordis 本地 Sidecar | 可评估插件依赖/生命周期生态；增加打包、协议及取消成本 | 可选，先做离线最小证明，尚未选为宿主 |
+| Python 或混合进程 | 适合特定工具链适配；多运行时增大维护成本 | 按具体收益评估，不强制两进程结构 |
+
+Sidecar 可用 `QProcess` 与 stdio JSON-RPC 2.0 作为协议候选；单行或长度前缀 framing 是应用选择，不是 JSON-RPC 2.0 的要求。若采用该方式，stdout 留给协议、日志进入 stderr，方法名不使用保留的 `rpc.*`。握手、消息大小、超时、取消与上下文校验须先通过契约测试，具体提案见[Plugin API v1](architecture/plugin-api-v1.md)。不为此新增网络服务器。
+
+插件能力声明与 OS 隔离分开：初期只加载可信插件，拒绝隔离未经验证的不可信插件。无论实现语言如何，可信服务管理 Candidate 写入、Accept、scaffold、构建授权和文件边界；仅启动一个 Sidecar 无法强制其文件访问权限。生成上下文须绑定项目/文档/Unit/插件版本/驱动与受保护文件哈希，取消或变化后不能接受旧结果。用户驱动给 AI 的内容仍限于接口，构建工具不是代码沙箱。
+
+下方保留的 Qt/Python 方案是早期候选，包含当时的推荐、拟议目录和拟议 RPC 示例，不是已实施架构，也不是当前 Python 必选决策。其中“冻结边界”“稳定接口”“两个本地进程”等措辞仅描述旧提案意图；当前新协议仍需 Draft 验证，当前主线没有因此替换 C++/Qt 后端。原 MVP 实施计划与历史验收不改写。
+
+## 早期 Qt/Python 提案（归档）
+
 > 文档定位：本文是 MVP 完成后的演进规划，不属于当前 MVP 的实施范围。当前 Task 1 至 Task 10 的实现文件、技术路线和验收标准均以 `doc/mvp-implementation-plan.md` 为准，不因本文而调整。
 
 ## 1. 决策
