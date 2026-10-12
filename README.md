@@ -1,8 +1,10 @@
 # Qt Blueprint Generator
 
-Qt Blueprint Generator 是一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统负责校验蓝图、编译中间表示和 AI 提示词，并管理生成工程、候选代码、构建与导出。
+Qt Blueprint Generator 当前是一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统负责校验蓝图、编译中间表示和 AI 提示词，并管理生成工程、候选代码、构建与导出。
 
-项目的最终目标是生成可以构建、运行的 Qt 应用原型，并通过行级代码评审驱动 AI 返工；工作区以生成和评审为核心。蓝图持久化已实现，Runtime Assembly Phase 1 已接入线性启动流程并完成离线构建与端到端验证；行级评论与返工闭环的后续安排见[项目路线](doc/project-roadmap.md)。
+长期方向是通用、插件优先的蓝图平台：插件定义节点、属性 Schema、稳定的强类型端口、连线校验、目标 IR 和代码生成。Qt Desktop Editor 是毕业设计要求的 Qt 图形界面；Qt Target Plugin 则负责生成 Qt 工程，两者职责独立。未来 Embedded Target Plugin 将通过受支持的芯片、SDK 和工具链适配器生成可真实交叉编译的目标工程，毕业验收不要求烧录或硬件运行。混合插件蓝图、独立 Build Unit 与显式 Bridge/Channel 的设计见 [Draft 架构](doc/architecture/plugin-platform.md)，本次仅增加设计文档，尚未实现插件注册、嵌入式生成或通信。
+
+当前 Qt 能力已实现蓝图持久化、线性 Runtime Assembly Phase 1，以及真实模型生成后构建、执行、传值、页面显示和 Export 独立重建运行的有限样例验收。行级代码评审和 AI 返工仍在后续路线；工作区以生成和评审为核心，不以完整 IDE 为目标。阶段与事实边界见[项目路线](doc/project-roadmap.md)和[最新实现进度](doc/implementation-progress.md)。
 
 蓝图是项目结构和模块契约的主数据源。AI 返回的代码不会直接覆盖工程文件，而是先进入候选区，经过预览和人工确认后再写入。
 
@@ -36,11 +38,15 @@ Qt Blueprint Generator 是一个面向 Qt 6 Widgets 项目的可视化蓝图编�
 
 运行时 Phase 1 不支持 Decision、External Code、带标签连线、分支、合流、环、并行、多页面或非末端页面、页面输出、Start/End 端口、外部初始输入、自定义端口类型或隐式转换。六类节点及其编辑功能仍保留。受保护的主入口、控制器、CMake 和契约由系统生成；AI 只实现当前节点的实现与测试，并定义契约中指定的 `createModule_HASH` factory。候选接受或 `scaffold_smoke` 成功不等于完整应用构建成功；缺少 factory 会使 `generated_app` 链接失败。当前没有 GUI Run 入口，需构建后从配置了匹配 Qt `bin` 路径的终端运行；完整步骤和支持类型见[使用指南](doc/project-usage-guide.md#82-从窗口生成与审核代码)。
 
-原有模块工程使用 v1，核心 `create()` / `start()` 接口与原字节产物保留，旧工作区不会自动迁移。AI 菜单和节点右键菜单提供明确的 `Generate module only (legacy v1) / 仅生成模块（旧版 v1）`，用于 Logic Module、UI Page 或 Decision 的旧版模块生成及已有 v1 工作区的继续生成；它不装配运行流程，入口仍为占位窗口。默认工具栏动作仍是运行时生成，失败不会自动回退到 v1。两种动作均拒绝复用另一版本的工作区；旧 v1 工程可继续 Build / Export，新运行时请使用新的空工作区。原 MVP 的简单 Logic Module 真实 DeepSeek 验收与离线登录示例属于 legacy v1，不代表 v2 factory 已完成真实模型验收；新运行时使用离线 fixture 验证实际应用启动、传值和页面显示。
+原有模块工程使用 v1，核心 `create()` / `start()` 接口与原字节产物保留，旧工作区不会自动迁移。AI 菜单和节点右键菜单提供明确的 `Generate module only (legacy v1) / 仅生成模块（旧版 v1）`，用于 Logic Module、UI Page 或 Decision 的旧版模块生成及已有 v1 工作区的继续生成；它不装配运行流程，入口仍为占位窗口。默认工具栏动作仍是运行时生成，失败不会自动回退到 v1。两种动作均拒绝复用另一版本的工作区；旧 v1 工程可继续 Build / Export，新运行时请使用新的空工作区。原 MVP 的简单 Logic Module 真实 DeepSeek 验收与离线登录示例属于 legacy v1。另一次 Runtime v2 验收已于 2026-10-12 完成：一个 Logic Module 和一个末端 UI Page 的两次真实请求均成功，原始 C++ 未修改即被接受并首次完整构建通过，原工程与独立导出工程均实际执行、传值、显示 QLabel 并正常退出。这是有限线性样例，不保证任意蓝图或每次生成正确；详情见[最新实现进度](doc/implementation-progress.md)。
+
+当前蓝图读取器仍只接受 `schemaVersion: 1` 和固定六类 NodeType，布局另存于 `layout.json`，IR 只包含语义。生成工作区的 `generation-manifest.json` 版本 1/2 与蓝图 Schema 版本是不同概念；该 manifest 严格保持 `version`、`blueprintSha256`、`modules`、`protectedFiles`、`files`、`batches` 六字段。[蓝图 Schema v2](doc/architecture/blueprint-schema-v2.md)、[Plugin API v1](doc/architecture/plugin-api-v1.md) 和多 Unit 元数据均为 Draft，当前程序不能加载这些示例，不会自动转换或以旧版格式保存它们。
+
+[使用指南](doc/project-usage-guide.md)中“等待 PR / 未做 v2 真实模型验收”的状态文字是 Phase 1 首次交付快照；PR #50 已于 2026-10-11 合入 `main`（`843138c`），当前验收状态以[最新实现进度](doc/implementation-progress.md)为准。指南中的操作与 Phase 1 使用边界仍供当前 Qt 路径参考。
 
 从 `File / 文件` 菜单管理蓝图工程，保存后重新打开可恢复节点、连线、属性和位置。蓝图工程目录与生成工作区分开使用；切换蓝图会清理旧的生成请求和候选审核上下文。选中 External Code 节点，在属性面板应用接口契约后管理外部代码；导入文件保存在生成工作区中，AI 只接收契约、不接收源码。重新导入需要明确确认，只能替换原清单中的同一组文件，不会删除文件或接管未知内容。已经持久化的候选和工程文件会保留在工作目录中，但当前窗口不支持跨重启重新打开历史候选批次。
 
-项目目前生成 C++17、Qt 6 Widgets 和 CMake 工程。Python 等其他实现语言属于后续演进范围。
+项目目前生成 C++17、Qt 6 Widgets 和 CMake 工程。插件宿主语言尚未选定；继续维护已验证的 C++/Qt 后端，Python 或 TypeScript/Cordis 本地 Sidecar 只作为需先验证契约的可选方案，见[多语言设计的当前方向](doc/multilanguage-development-design.md)。
 
 ## 技术栈
 
@@ -76,7 +82,7 @@ project/
 
 在构建面板填写或浏览选择已存在的绝对工作目录，首次生成建议使用空目录。完成符合 Phase 1 范围的线性蓝图并选中一个 Logic Module 或末端 UI Page 后，可通过默认工具栏或 AI 菜单发起运行时生成；Decision 仅通过明确的旧版模块生成动作生成代码，不执行分支。修改蓝图结构、节点属性或工作目录会使旧请求和审核上下文失效；初始化失败会显示具体原因，已有工程与新蓝图或选定模式不匹配时，请使用新的工作目录，不会自动改选模式或覆盖工程。详细操作见[使用指南](doc/project-usage-guide.md#8-ai-设置与人工真实集成)。
 
-也可使用显式启用的命令行验收工具，默认构建不会产生该程序：
+也可使用显式启用的 legacy v1 命令行验收工具 `manual_ai_integration`，默认构建不会产生该程序；它不使用 Runtime v2 factory，不是上述 v2 真实验收的入口：
 
 ```powershell
 $qtRoot = 'C:\path\to\Qt\6.x\mingw_64' # 按本机安装位置修改
@@ -100,12 +106,15 @@ try {
 
 - [项目说明与使用指南](doc/project-usage-guide.md)
 - [项目方向与后续路线](doc/project-roadmap.md)
+- [插件平台架构（Draft）](doc/architecture/plugin-platform.md)
+- [蓝图 Schema v2（Draft）](doc/architecture/blueprint-schema-v2.md)
+- [Plugin API v1（Draft）](doc/architecture/plugin-api-v1.md)
 - [界面样式与缩放验收指南](doc/visual-style-verification.md)
 - [MVP 实施计划](doc/mvp-implementation-plan.md)
 - [MVP 验收报告](doc/mvp-acceptance-report.md)
 - [实现进度](doc/implementation-progress.md)
 - [中英文界面切换计划](doc/plans/2026-09-09-bilingual-ui.md)
-- [C++/Python 混合开发后续规划](doc/multilanguage-development-design.md)
+- [多语言设计：当前宿主选项与早期 Qt/Python 提案](doc/multilanguage-development-design.md)
 
 ## 许可
 

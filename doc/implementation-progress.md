@@ -1,9 +1,14 @@
 # 实现进度
 
-更新时间：2026-10-11（Asia/Shanghai）
+更新时间：2026-10-12（Asia/Shanghai）
 
 ## 当前状态
 
+- 2026-10-12（当前基线确认）：Runtime Assembly Phase 1 的 PR #50 已于 2026-10-11 合入 `main`，合并提交为 `843138c0a5f295eefaf1799a4a8e92656275f301`。下方“等待 PR / 未调用真实付费 AI”等记录及使用指南对应文字保留为首次交付时的历史快照；当前状态以本组新增记录为准。legacy v1 `create()` / `start()` 原字节产物、Runtime v2 `createRuntime()` / `startRuntime()` 固定 factory、六字段 generation manifest 和候选/ExternalCode 导入协议均未改变。
+- 2026-10-12（Runtime v2 真实验收完成）：在上述 main 基线上，`Start → 一个 LogicModule → 一个末端 UiPage → End` 通过生产客户端向 DeepSeek `deepseek-flash` 发出 2 次真实请求，均 HTTP 200；总 Token 14,260 = 输入 2,687 + 输出 11,573（已含推理 10,733，不能重复累计）。两个原始 implementation `.cpp` 经 Candidate Review 原样 Accept，无手改、重试或重新生成；首次完整 `generated_app` 构建通过。原工程真实执行 `execute()`、传递 QString、用可见 QLabel 显示收到的数据并正常退出 0；生产 Export 后独立完整重建、真实执行/传值/显示与正常退出 0 同样通过。
+- 生成工程测试边界：原工程和独立 Export 各自仅有 `scaffold_smoke` 1/1，通过不代表有 AI 模块专用单元测试。首次 main 完整 CTest 32/32（627.74 秒），QtTest 汇总 993 pass / 0 fail / 1 个既有 Windows case-alias picker skip。2026-10-12 完整复核命令因显式停止被取消（退出 1），不记为全套通过；取消前 3 项已完成通过，余下 29 项单独补跑全部通过（254.19 秒），核对 3 + 29 个名称恰好覆盖全部 32 项，汇总仍为 993 pass / 0 fail / 1 skip。
+- 中断与适用范围：一次 Export 运行已显示正确数据，但用户 Esc 停止桌面自动化后测试工具超时强制结束；该记录保留，不计为生命周期通过，也不归为产品缺陷。续验仅重启相同原始二进制并正常关闭。证据在本地验收报告中核对，本仓库仅记录摘要，不提交原始响应、凭据或本地证据链接。本次只覆盖一个 LogicModule 和一个 UiPage 的线性样例，不扩大为任意蓝图可靠性、嵌入式或插件实现的证明；未修改生产代码或版本发布。
+- 2026-10-12（插件平台设计，Draft）：新增平台架构、蓝图 Schema v2 和 Plugin API v1 文档，明确 Qt Desktop Editor 与 Qt Target Plugin、独立 Build Unit、显式 typed Bridge/Channel、包/定义/API/蓝图/工作区版本及兼容与信任边界。长期路线包含首个 Embedded 目标真实交叉编译，毕业范围不要求烧录或硬件运行；TypeScript/Cordis Sidecar 仅为可选且需先验证的方案。此轮仅改 7 个文档文件，没有实现插件 registry、v2 读取器、多 Unit、嵌入式适配或通信，也未冻结新协议。多语言文档的早期 Qt/Python 方案保留为归档提案。
 - 2026-10-11（PR #50 兼容性 Review 修复，等待人工复审）：恢复 AI 菜单及节点右键菜单的明确 legacy v1 模块生成动作，默认工具栏仍为 runtime v2；运行时仅对 LogicModule / UiPage 可用，旧版还支持 Decision，两者共享单选、生成中及审核中的门禁。每个 QAction 显式选定模式，不按工作区版本或校验失败自动回退，不改变 Runtime Assembly、manifest、Candidate 或文件保护。新建及已有 v1/v2 工程均经 GUI 生成和真实 Candidate Accept 验证；已有工程先真实接受 prior candidate，再新增候选，原文件和 accepted manifest/batch 记录保持不变。双向版本拒绝及运行时拓扑拒绝均验证零 provider 调用、零磁盘写入。独立规格审查及质量/安全终审均通过，Ready、无未解决 Critical / Important / Minor；本轮在既有 PR #50 追加普通 fix 提交并等待人工复审，不合并、不重写历史；下面 Phase 1 记录保留为首次交付时的证据。
 - 本次修复先以可编译回归复现：workflow 4 pass / 10 fail、菜单 2 pass / 1 fail、语言 2 pass / 2 fail，均明确检出缺失旧版动作或错误 Decision 启用。最小修复后完整构建成功，专项 CTest 6/6（53.91 秒）、完整 CTest 32/32（258.75 秒）通过；32 份 XML 完整可解析，共 993 pass / 0 fail / 1 个既有 Windows 大小写别名 fixture skip。生成与导出运行时工程仍各自 CTest 4/4 并实际启动；250 条译文与源码匹配，无缺失、重复或未完成项。未调用付费 AI、未读取密钥，MVP Tag 未变，原工作区未提交内容未动。
 - 2026-10-11（Runtime Assembly Phase 1 完成验证，等待 PR 审核）：基于 `main` 的 `bb7fc4bb5e6e691e007f1bfea25445faa4ae29fc` 在独立 `feature/runtime-assembly-phase-1` 工作树实现线性运行时。GUI Generate 使用新增 `startRuntime()` / `createRuntime()` 创建 v2 工程；原 `start()` / `create()` 继续生成 module-only v1 原字节产物，旧工作区不自动迁移，旧工程可继续 Build / Export。manifest 严格保持原六字段，仅接受版本 1 / 2；主入口、控制器、CMake 和契约仍受保护，AI 只能提供当前节点实现和测试，并定义固定 factory。独立规格审查、代码质量与安全复审无未解决 Critical / Important；本阶段仅交付指向 main 的 PR，不自动合并，也不启动后续阶段。
