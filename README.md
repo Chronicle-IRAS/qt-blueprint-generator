@@ -2,7 +2,7 @@
 
 Qt Blueprint Generator 当前是一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统负责校验蓝图、编译中间表示和 AI 提示词，并管理生成工程、候选代码、构建与导出。
 
-长期方向是通用、插件优先的蓝图平台：插件定义节点、属性 Schema、稳定的强类型端口、连线校验、目标 IR 和代码生成。Qt Desktop Editor 是毕业设计要求的 Qt 图形界面；Qt Target Plugin 则负责生成 Qt 工程，两者职责独立。未来 Embedded Target Plugin 将通过受支持的芯片、SDK 和工具链适配器生成可真实交叉编译的目标工程，毕业验收不要求烧录或硬件运行。混合插件蓝图、独立 Build Unit 与显式 Bridge/Channel 的设计见 [Draft 架构](doc/architecture/plugin-platform.md)。P0.1 已实现 Blueprint v2 结构 Schema、离线 fixtures 和独立契约工具，尚未实现插件注册、应用 v2 读取器、嵌入式生成或通信。
+长期方向是通用、插件优先的蓝图平台：插件定义节点、属性 Schema、稳定的强类型端口、连线校验、目标 IR 和代码生成。Qt Desktop Editor 是毕业设计要求的 Qt 图形界面；Qt Target Plugin 则负责生成 Qt 工程，两者职责独立。未来 Embedded Target Plugin 将通过受支持的芯片、SDK 和工具链适配器生成可真实交叉编译的目标工程，毕业验收不要求烧录或硬件运行。混合插件蓝图、独立 Build Unit 与显式 Bridge/Channel 的设计见 [Draft 架构](doc/architecture/plugin-platform.md)。P0.1 已实现 Blueprint v2 结构 Schema、离线 fixtures 和独立契约工具；P0.2 增加基于可信纯数据上下文的[独立只读 TS 语义校验](tools/schema-contracts/README.md)，尚未实现插件注册、应用 v2 读取器、嵌入式生成或通信。
 
 当前 Qt 能力已实现蓝图持久化、线性 Runtime Assembly Phase 1，以及真实模型生成后构建、执行、传值、页面显示和 Export 独立重建运行的有限样例验收。行级代码评审和 AI 返工仍在后续路线；工作区以生成和评审为核心，不以完整 IDE 为目标。阶段与事实边界见[项目路线](doc/project-roadmap.md)和[最新实现进度](doc/implementation-progress.md)。
 
@@ -48,7 +48,7 @@ Qt Blueprint Generator 当前是一个面向 Qt 6 Widgets 项目的可视化蓝�
 
 项目目前生成 C++17、Qt 6 Widgets 和 CMake 工程。新核心服务、protocol、NodeRegistry、IRCompiler 和 AIProvider 优先评估 TypeScript/Node；继续维护已验证的 C++/Qt 后端，不迁移现有模块。Cordis 仍是候选，尚未成为宿主；Python 仅在具体 SDK/tool 需求成立时评估，不预设 Worker，见[多语言设计的当前方向](doc/multilanguage-development-design.md)。
 
-Blueprint v2 的唯一机器结构定义采用 JSON Schema Draft 2020-12。使用 Node 24.18.1 / npm 11.16.0，从仓库根执行 `npm ci --prefix tools/schema-contracts --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org`、`npm test --prefix tools/schema-contracts` 和 `npm run typecheck --prefix tools/schema-contracts`。安装后验证离线运行，版本、缓存离线重装及结构/未来语义边界见 [schemas/README](schemas/README.md)。结构通过不等于可生成；当前 GUI/C++ 仍不读取 v2，Plugin API/Core IR 和动态 ID 保存等仍为后续 Draft。
+Blueprint v2 的唯一机器结构定义采用 JSON Schema Draft 2020-12。使用 Node 24.18.1 / npm 11.16.0，从仓库根执行 `npm ci --prefix tools/schema-contracts --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org`、`npm test --prefix tools/schema-contracts` 和 `npm run typecheck --prefix tools/schema-contracts`。安装后验证离线运行，版本、缓存离线重装及结构/语义边界见 [schemas/README](schemas/README.md)。结构和通用语义通过均不等于可生成；当前 GUI/C++ 仍不读取 v2，Plugin API/Core IR 和动态 ID 保存等仍为后续 Draft。P0.2 不施加 Start/End、环或分支规则，允许多 Unit 与任意领域节点；锁摘要仅与可信 metadata 比较，不复验包或驱动文件字节。
 
 ## 技术栈
 

@@ -1,6 +1,6 @@
 # 项目方向与后续路线
 
-长期目标是通用、插件优先的蓝图平台。插件提供节点定义、属性 Schema、稳定的强类型端口、连线校验、目标 IR 与代码生成；同一蓝图可以容纳多个插件，各节点明确归属独立 Build Unit。跨 Unit 或跨 Target 只能经过显式 Bridge/Channel，即便两端都是 Qt，也不能用普通边隐式连接。该方向是 Architecture B 的 Draft，尚未实现插件注册、多 Unit 或通信。
+长期目标是通用、插件优先的蓝图平台。插件提供节点定义、属性 Schema、稳定的强类型端口、连线校验、目标 IR 与代码生成；同一蓝图可以容纳多个插件，各节点明确归属独立 Build Unit。跨 Unit 或跨 Target 只能经过显式 Bridge/Channel，即便两端都是 Qt，也不能用普通边隐式连接。该方向是 Architecture B 的 Draft；P0.2 已独立校验通用多 Unit 语义，尚未实现插件注册、多 Unit 生成或通信。
 
 Qt Desktop Editor 承担毕业设计要求的 Qt 图形界面、画布和本地工程交互；Qt Target Plugin 承担 Qt 目标工程生成。未来 Embedded Target Plugin 采用受支持的芯片、SDK 和工具链适配器，允许用户驱动作为黑盒接口绑定。毕业范围要求真实交叉编译有效的目标工程，不要求烧录或硬件运行。工作区继续服务于生成、人工评审和返工，不扩展为完整 IDE。
 
@@ -24,12 +24,12 @@ Phase 1 不支持 Decision、ExternalCode 运行时、连线标签、分支、�
 
 以下阶段是顺序收敛的 Draft 计划，各阶段需独立实现、验证和审核。参考[平台架构](architecture/plugin-platform.md)、[蓝图 Schema v2](architecture/blueprint-schema-v2.md)和[Plugin API v1](architecture/plugin-api-v1.md)。新核心服务、protocol、NodeRegistry、IRCompiler、AIProvider 优先评估 TS/Node；现有 C++/Qt 保留不迁移，Cordis 仍是候选，Python 仅按具体 SDK/tool 需求评估，不预设 Worker。新协议仍未冻结。
 
-1. **Draft 协议与兼容验证**：P0.1 已实现唯一机器 Blueprint v2 JSON Schema（Draft 2020-12）、离线 fixtures 和独立 TS/Ajv/Vitest 工具，运行见 [schemas/README](../schemas/README.md)。仅覆盖结构；对象 ID/引用/Unit 语义、Bridge 必需端点驱动、动态 ID 历史、未知原字节保存、Core IR/hash 和显式复制转换仍待实现。GUI/C++ 读取器继续只读 Schema 1；蓝图、Plugin API、包版本、NodeDefinition 与 workspace manifest 分别管理。
-2. **最小插件注册与 Qt 编辑接入**：先支持可信插件定义的节点、属性与端口，提供缺失插件占位和禁止生成的诊断；不预建通用调度框架。优先评估 TS/Node；Cordis/本地 Sidecar 须先证明结果一致、取消、异常及权限边界，P0.1 不实现宿主或 Registry。
-3. **Qt Target 适配器**：优先复用已验证 Qt IR、候选和 Runtime v2 路径。v2 → LegacyQt 转接只接收现有线性流程、直接前驱同名同类型等可表示语义；拒绝其他语义，不猜边、不转换类型、不破坏原图。Legacy v1 字节产物、v2 固定 factory 和旧清单保持兼容。
-4. **首个 Embedded Target 的真实交叉编译**：选择一套明确支持的芯片/SDK/工具链，验证完整目标工程和可审查产物。用户驱动 Snapshot 方案拟复用当前导入器的复制及哈希机制，Reference 模式需另行设计；AI 只接收接口摘要。烧录、硬件运行及广泛芯片支持不作为毕业条件。
-5. **多 Build Unit 与 Bridge/Channel**：再验证一图混合插件、独立工程和独立构建；Unit ID 不是 plugin ID。跨 Unit 普通边默认禁止，先定义端点、wire Schema、Bridge 版本、驱动与配置契约，再单独规划通信实现和目标验证。本次没有物理通信实现。
-6. **AI Review 与返工**：源码行或行范围评论、意见汇总与差异驱动新 Candidate，人工 Accept/Reject 后再 Build/Export。复用现有 hash、冲突和文件保护机制；生成结果不得直接覆盖正式工程。
+1. **P0 契约基础**：P0.1 已完成唯一机器 Blueprint v2 JSON Schema（Draft 2020-12）、离线 fixtures 和独立工具；P0.2 本轮增加只读 TS 语义校验，覆盖 ID/引用/Unit、端口、锁、定义/目标与 Bridge 策略，见[API 与诊断](../tools/schema-contracts/README.md)。可信纯数据上下文不是 Registry/PluginHost。P0.3 后续再收敛最小 manifest、NodeDefinition、type/version 描述契约；动态 ID 历史、未知原字节保存、Core IR/hash 和显式复制转换仍待实现。GUI/C++ 读取器继续只读 Schema 1，各版本分别管理，协议仍 Draft。
+2. **P1 最小插件注册与 Qt GUI 接入**：支持可信插件定义的节点、属性与端口，提供缺失插件占位和诊断；具体 Qt 按钮/交互另行设计。Cordis/本地 Sidecar 仍为候选，须先证明结果一致、取消、异常及权限边界，不预建通用调度框架。
+3. **P2 Qt Target 适配器**：优先复用已验证 Qt IR、候选和 Runtime v2 路径。v2 → LegacyQt 转接只接收现有线性流程、直接前驱同名同类型等可表示语义；拒绝其他语义，不猜边、不转换类型、不破坏原图。Legacy v1 字节产物、v2 固定 factory 和旧清单保持兼容。
+4. **P3 首个 Embedded Target**：后续选择一套明确支持的芯片/SDK/工具链和首批节点，验证完整目标工程及可审查产物，目前不预定具体选型。用户驱动 Snapshot 拟复用当前导入器的复制及哈希机制，Reference 模式需另行设计；AI 只接收接口摘要。
+5. **P4 实际演示与产品验收**：在同一个 Qt 桌面编辑器选择 Qt 或 Embedded target，每份毕业演示蓝图执行一个 Build Unit，同 Unit 可包含多个与目标兼容的插件。分别实际验证 Qt 工程和首个 Embedded 完整工程的交叉编译；烧录、硬件运行及广泛芯片支持不作为毕业条件。P0.2 的 API/可读诊断只证明独立校验实现，不等于这些产品路径已验收。
+6. **后续多 Unit 生成/通信与 AI Review**：Core 长期保持多 Unit 和显式 Channel 合法；未来 generation capability 对尚不支持的 multi-Unit/channel 明确拒绝，该限制不放进当前 Core validator。独立工程、构建和物理通信另行实现与验收。行级评论、意见汇总与差异驱动新 Candidate 亦为后续范围，复用人工 Accept/Reject、hash、冲突与文件保护机制，具体交互尚未确定。
 
 毕业范围优先收敛为 Qt GUI、可复用插件边界、Qt 目标适配和首个 Embedded 目标真实交叉编译。多 Unit 通信与完整 AI Review/返工属于后续增量，不提前承诺全部交付。已完成的 Candidate Accept/工作区集成不再按旧 Issue #32 作为待补工作；后续评审功能应建立新的明确范围。
 

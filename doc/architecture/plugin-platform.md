@@ -3,7 +3,7 @@
 状态：Draft，2026-10-12。本文描述长期 Architecture B，不是已实现功能清单。
 蓝图 Schema v2、Plugin API v1、插件 manifest、RPC 和多 Unit 产物元数据均未冻结；当前程序不能加载这些提案。
 字段约定见[蓝图 Schema v2](blueprint-schema-v2.md)，插件边界见[Plugin API v1](plugin-api-v1.md)。
-P0.1 已增加 [Blueprint v2 机器结构 Schema、离线 fixtures 和 TS/Ajv/Vitest 工具](../../schemas/README.md)。它们只验证文档结构；Registry、应用 v2 读取器、新 Core IR/语义层均未实现，当前 GUI/C++ 仍读 Schema 1。
+P0.1 已增加 [Blueprint v2 机器结构 Schema、离线 fixtures 和 TS/Ajv/Vitest 工具](../../schemas/README.md)。P0.2 增加独立只读 TS 语义校验，基于可信纯数据上下文检查通用引用、Unit、端口、锁与 Bridge 策略，见[实际 API](../../tools/schema-contracts/README.md)。它不是 Registry 或 PluginHost；应用 v2 读取器与新 Core IR 仍未实现，当前 GUI/C++ 仍读 Schema 1。
 
 ## 目标与当前基线
 
@@ -89,7 +89,7 @@ Bridge 是将两端目标表示映射到 wireSchema 的能力，不能成为绕�
 | 方案 | 收益 | 代价及进入条件 |
 | --- | --- | --- |
 | C++/Qt 现有后端 | 复用已验证编译、候选和 UI 路径 | 继续维护，不迁移现有模块 |
-| TypeScript/Node 新核心 | 优先评估核心服务、protocol、NodeRegistry、IRCompiler、AIProvider | P0.1 仅采用其测试工具；服务及进程边界尚未实现 |
+| TypeScript/Node 新核心 | 优先评估核心服务、protocol、NodeRegistry、IRCompiler、AIProvider | P0.1 结构工具及 P0.2 独立语义校验已采用；服务及进程边界尚未实现 |
 | Cordis | 可评估依赖、扩展与生命周期生态 | 仍是候选，未成为宿主；需先验证 API、部署、取消和异常处理 |
 | 按具体 SDK/tool 混合语言 | 需求成立时可评估 Python 等 | 不预设 Python Worker，不新增无具体收益的运行时 |
 
@@ -156,7 +156,7 @@ v2 → LegacyQt 只接受现有线性流程和直接前驱同名同声明类型�
 
 ## 分阶段收敛与完成依据
 
-1. Draft 契约：P0.1 已实现机器结构 Schema 与离线 fixtures；引用/Unit/插件语义、动态 ID/未知原字节保存、IR/迁移诊断仍需后续实现，不冻结未经验证的协议。
+1. Draft 契约：P0.1 已实现机器结构 Schema 与离线 fixtures；P0.2 实现通用只读语义校验，P0.3 再收敛最小 manifest/NodeDefinition/type/version 描述契约。动态 ID/未知原字节保存、IR/迁移仍待实现，不冻结未经验证的协议。
 2. 最小 Registry：可信节点可编辑、依赖可解析、缺失插件可占位且不能生成，不预建大型框架。
 3. Qt Target：通过严格适配复用当前 Qt 后端，保留 legacy 与 Runtime v2 回归证据。
 4. Embedded Target：首个受支持适配器真实交叉编译完整工程；Qt GUI 仍是产品主体。

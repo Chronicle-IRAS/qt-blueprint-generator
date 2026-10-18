@@ -1,6 +1,6 @@
 # 蓝图 Schema v2 设计（Draft）
 
-状态：Draft，2026-10-12。P0.1 已增加唯一权威结构定义 [JSON Schema](../../schemas/blueprint-v2.schema.json)（Draft 2020-12）、[离线 fixtures](../../tests/fixtures/blueprint-v2/README.md) 与独立 TS/Ajv/Vitest 工具；运行见 [schemas/README](../../schemas/README.md)。尚无应用 v2 读取器，协议未冻结。
+状态：Draft，2026-10-16。P0.1 已增加唯一权威结构定义 [JSON Schema](../../schemas/blueprint-v2.schema.json)（Draft 2020-12）、[离线 fixtures](../../tests/fixtures/blueprint-v2/README.md) 与独立 TS/Ajv/Vitest 工具；P0.2 增加[独立只读语义校验](../../tools/schema-contracts/README.md)。运行见 [schemas/README](../../schemas/README.md)。尚无应用 v2 读取器，协议未冻结。
 本页 JSON 示例符合本页描述的提案，不是当前程序可加载的文件，也不是已冻结协议。
 总览见[插件平台架构](plugin-platform.md)，节点定义与目标编译边界见[Plugin API v1](plugin-api-v1.md)。
 
@@ -230,6 +230,8 @@ Qt 类型注册必须显式映射到当前允许的九种类型；QVariant 也�
 
 P0.1 已实现结构 Schema 与离线测试，校验 required、known-field type、direction/kind/mode enum、命名空间、摘要格式、端点 shape，以及每侧 binding ID 数组的重复项。工具以 unknown 输入直接同步编译机器 Schema，strict/allErrors 开启，不做类型转换、默认值、剥离或输入改写；不另建 TS/Zod 蓝图模型，也不拉取远端 Schema。
 
-上述未来条件仍需要语义层或生命周期实现：对象数组 ID 唯一/引用存在、Unit 归属与同 Unit 普通边、方向/kind/type/基数、注册类型/目标支持、锁与版本兼容、实际字节 hash、wire 映射/逐侧必需驱动、动态 ID 历史与迁移、unknown raw 保存、IR hash 与生成 context。特别是两个相同 Qt target 的不同 Unit 仍须拒绝普通边，锁定 Bridge 要求某侧驱动而字段缺失时仍须失败关闭。
+P0.2 已覆盖对象数组 ID 唯一/引用存在、Unit 归属与同 Unit 普通边、方向/kind/type/声明基数、注册类型/目标支持、精确锁 metadata 与定义版本、Bridge wire 映射及逐侧必需驱动的数量和归属。两个相同 Qt target 的不同 Unit 仍拒绝普通边，锁定 Bridge 要求某侧驱动而字段缺失时仍失败关闭。可信上下文是纯数据，不是插件注册或加载；包版本、节点定义版本与 Bridge 适配器版本独立比较。Core 允许多 Unit 与任意领域节点，不增加 Start/End、环、分支或单 Unit 的目标限制。
 
-`semantic-only` fixtures 的 schemaPass 只证明结构层未覆盖这些规则，没有语义 checker 或执行承诺；非 mutation 测试仅验证解析后的值和数组保持，不等于 opaque 原字节保存已实现。当前 GUI/C++ Schema 1、旧清单/协议、生产测试均未接入 v2。
+实际包/文件字节 hash、完整 driver interface 兼容、插件属性 Schema/target 业务规则、动态 ID 历史与迁移、unknown raw 保存、IR hash 与生成 context 仍待实现。P0.2 的 digest 比较仅核对可信 metadata，不能替代字节复验；语义通过也不代表生成能力支持。
+
+`semantic-only` fixtures 的 schemaPass 仍只证明结构层未覆盖这些规则；P0.2 在独立语义测试中配合明确的可信上下文验证拒绝。原 59 份 fixture JSON 和 75 项结构测试保持不变；非 mutation 测试仅验证解析后的值与上下文保持，不等于 opaque 原字节保存已实现。当前 GUI/C++ Schema 1、旧清单/协议、生产测试均未接入 v2。

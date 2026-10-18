@@ -2,7 +2,7 @@
 
 状态：Draft，2026-10-12。本文是语言无关的边界提案，API、manifest、RPC 与类型约定均未冻结。
 示例不是现有可安装插件或当前程序可加载文件；TypeScript 记法用于说明类型。新核心服务、protocol、NodeRegistry、IRCompiler、AIProvider 优先评估 TypeScript/Node，Cordis 尚未成为宿主，现有 C++/Qt 后端保留。
-P0.1 仅实现 [Blueprint v2 机器结构 Schema 与离线工具](../../schemas/README.md)，不实现本文 API、Core IR、Registry 或 RPC。Python 只在具体 SDK/tool 需求成立时评估，不预设 Worker。
+P0.1 实现 [Blueprint v2 机器结构 Schema 与离线工具](../../schemas/README.md)，P0.2 增加[独立语义校验 API](../../tools/schema-contracts/README.md)，其可信上下文仅为纯数据，不实现本文插件 API、Core IR、Registry 或 RPC。Python 只在具体 SDK/tool 需求成立时评估，不预设 Worker。
 共享字段与完整蓝图示例见[蓝图 Schema v2](blueprint-schema-v2.md)，信任与阶段范围见[平台架构](plugin-platform.md)。
 
 ## 插件身份与能力声明
@@ -229,4 +229,4 @@ Unit/pluginLocks/产物索引只能进入独立 Draft `unit-artifacts.draft.json
 - 跨 Unit 普通边即使同目标仍被拒绝；Channel/Bridge 只在显式类型和版本完整时可规划，通信另行验收。
 - 无驱动 Bridge 允许省略/空端点依赖；必需依赖缺失、错误侧 Unit、接口/哈希错误失败关闭，两端依赖独立校验。
 
-本文 API 边界仍为 Draft；P0.1 已增加 Blueprint 结构 Schema/fixtures 和 TS/Ajv/Vitest 测试，但没有实现宿主、RPC、插件 Registry、适配器或驱动绑定行为。结构测试不验证本页的生命周期、语义、动态 ID、IR 或权限条件，当前 GUI/C++ Schema 1 与旧协议保持原有路径。
+本文 API 边界仍为 Draft；P0.1 的结构工具与 P0.2 的独立语义校验没有实现宿主、RPC、插件 Registry、可执行适配器或驱动导入。P0.2 只比对可信 metadata 的锁、定义/适配器版本、类型/目标支持及 Bridge 映射和逐侧驱动归属/数量；摘要比较不复验实际包或文件字节，完整 driver interface、属性 Schema 和 target 业务规则仍未覆盖。生命周期、动态 ID、IR 与权限条件仍待实现，当前 GUI/C++ Schema 1 与旧协议保持原有路径。
