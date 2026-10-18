@@ -4,6 +4,7 @@
 
 ## 当前状态
 
+- 2026-10-18（PR #54 空插件产品规则）：允许 `assembleTrustedContext([], [])` 返回空可信上下文，结构合法且无插件依赖的空蓝图通过完整验证；只移除描述集合非空限制，不增加空集合短路。缺失插件锁、Target、节点定义和 Bridge 等引用仍有明确诊断，独立锁不能代替缺失描述，传入的解析后图数据及扩展保持不变。新增 7 项回归并移除旧空集合拒绝项，先观察 7 fail / 62 pass，再确认专项 69/69、完整 219/219 和 typecheck 退出 0；独立增量 Review 通过。原 P0.1/P0.2 实现、Schema、C++/Qt 和生成协议未改；本轮不运行 CMake/CTest。
 - 2026-10-18（P0.3 声明契约与装配）：新增 Draft 2020-12 Plugin Descriptor Schema、独立描述及蓝图示例，提供 `assembleTrustedContext` 与 `validateBlueprintWithDescriptors`。以独立可信锁校验精确包/API/蓝图版本、依赖缺失/冲突/循环、命名空间所有权、类型/Target/Bridge 引用及节点与 Target 双方支持；完整入口新增静态端口/属性及基数、蓝图依赖锁闭包检查。描述和锁的 metadata 匹配不证明来源或字节完整性，调用方必须先验证可信来源；capabilities 不授予权限。动态端口、Host/Registry、Graph IR、GUI 和实际工程生成未实现，原 Blueprint/Qt/生成协议保持原路径。
 - P0.3 本轮验证：原 P0.1/P0.2 的 150 项加新增 63 项，合计 213/213 Vitest 通过，typecheck 退出 0；已观察缺失 Manifest 的真实 RED，并为异步属性 Schema 和非安全整数边界先补失败测试再修复。独立 Review 发现无终止条件的属性 Schema 自引用会抛出异常，已先以两种自引用重现失败，再转换为 NODE_PROPERTIES_EVALUATION 诊断，同时保留正常结构递归；原审查者收敛复核通过，无剩余阻塞发现。JSON、文档链接、范围与历史记录检查通过；最终交付见 PR，等待人工审核。历史 CTest 不作为本轮运行结果；本轮仅运行 TS/JSON 工具，无 CMake/CTest、生成或付费 AI 调用。
 - 2026-10-18（P0.2 验证记录）：Node 24.18.1 / npm 11.16.0 下亲自重跑原 P0.1 结构契约与新增语义测试，共 150/150 通过，TypeScript typecheck 退出 0。原五个 semantic-only Fixture 仍通过结构层，并由独立可信描述下的语义层报告相应错误；合法多 Unit/多插件、环与分支、单向类型兼容、基数、Bridge 两侧驱动依赖、冻结输入及诊断稳定性均有覆盖。首次测试记录保留了缺少语义实现时的 5 项预期失败。本轮 C++/CMake 无变更，没有运行工程生成、构建或 CTest，不引用历史构建结果作为当前通过证明。

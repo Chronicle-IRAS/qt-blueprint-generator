@@ -32,7 +32,7 @@ const descriptorSchema: AnySchemaObject = JSON.parse(readFileSync(new URL("../..
 const ajv = new Ajv2020(options);
 ajv.addSchema(blueprintSchema, "blueprint-v2.schema.json");
 ajv.addSchema(descriptorSchema, "plugin-descriptor-v1.schema.json");
-const validateDescriptors = ajv.compile<readonly Descriptor[]>({ type: "array", minItems: 1, items: { $ref: "plugin-descriptor-v1.schema.json" } });
+const validateDescriptors = ajv.compile<readonly Descriptor[]>({ type: "array", items: { $ref: "plugin-descriptor-v1.schema.json" } });
 const validateLocks = ajv.compile<readonly PluginLock[]>({ type: "array", items: { $ref: "blueprint-v2.schema.json#/$defs/PluginLock" } });
 const { validateBlueprint } = createContracts();
 const diagnostic = (code: string, message: string, path: string, location: Partial<Diagnostic> = {}): Diagnostic => ({ code, severity: "error", message, path, ...location });

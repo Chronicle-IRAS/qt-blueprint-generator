@@ -94,4 +94,6 @@ const diagnostics = validateBlueprintWithDescriptors(blueprint, descriptors, ind
 
 Arguments are parsed JSON values. The caller must independently vet locks and the source of descriptions; matching metadata is not artifact verification. Capabilities grant no permissions. Successful context assembly feeds the existing P0.2 API; the wrapper additionally enforces properties, static port snapshots/cardinality and Blueprint dependency-lock closure. Inputs stay unchanged. Dynamic port resolution is not implemented.
 
+No installed plugins is a valid initial state: `assembleTrustedContext([], [])` succeeds with an empty context. A structurally valid empty Blueprint (all six record arrays empty) passes the wrapper with empty descriptors and locks. Structure and reference checks still run: locks, Units, nodes or Bridges referring to unavailable plugins produce explicit diagnostics, even if independent trust pins exist. No graph or extension data is removed.
+
 The [offline fixture](../../tests/fixtures/plugin-descriptors/README.md) and plugin-descriptors.test.ts provide complete examples with independent literal pins. Existing npm test discovers the suite without new dependencies or commands. Exact versions have no range resolution or automatic upgrade. All contracts remain Draft.

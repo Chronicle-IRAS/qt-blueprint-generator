@@ -29,6 +29,47 @@ it("assembles two independent providers into the unchanged P0.2 validator", () =
   expect(validate()).toEqual([]);
 });
 
+const emptyBlueprint = () => ({
+  schemaVersion: 2, projectId: "empty-project", projectName: "Empty project",
+  pluginLocks: [], units: [], nodes: [], edges: [], channels: [], driverBindings: [],
+  extensions: { "org.future.editor": { label: "保留原始数据" } },
+});
+it("assembles an empty trusted context when no plugins are installed", () => {
+  expect(assembleTrustedContext([], [])).toEqual({ diagnostics: [], context: {
+    pluginLocks: [], nodeDefinitions: [], targets: [], portTypes: [], compatibility: [], bridges: [], portCardinality: [],
+  } });
+});
+it("validates an empty Blueprint v2 without plugins and preserves extension data", () => {
+  const doc = freeze(emptyBlueprint()), before = JSON.stringify(doc);
+  expect(validateBlueprintWithDescriptors(doc, [], [])).toEqual([]);
+  expect(JSON.stringify(doc)).toBe(before);
+});
+it("still validates Blueprint structure when the installed plugin set is empty", () => {
+  expect(validateBlueprintWithDescriptors({ schemaVersion: 2 }, [], [])).toContainEqual(expect.objectContaining({ code: "STRUCTURE_INVALID" }));
+});
+it("rejects a lock for an unavailable plugin even in a node-free blueprint", () => {
+  const doc = freeze({ ...emptyBlueprint(), pluginLocks: [trustedLocks[0]] });
+  expect(validateBlueprintWithDescriptors(doc, [], [])).toContainEqual(expect.objectContaining({ code: "PLUGIN_UNTRUSTED", pluginId: "org.example.pipeline", path: "/pluginLocks/0" }));
+});
+it.each([{ name: "no pins", pins: [] }, { name: "independent pins only", pins: trustedLocks }])("reports unavailable plugin descriptors without discarding graph data: $name", ({ pins }) => {
+  const doc = freeze(load("blueprint")), before = JSON.stringify(doc);
+  const result = validateBlueprintWithDescriptors(doc, [], pins);
+  expect(result).toEqual(expect.arrayContaining([
+    expect.objectContaining({ code: "PLUGIN_UNTRUSTED", pluginId: "org.example.pipeline", path: "/pluginLocks/0" }),
+    expect.objectContaining({ code: "TARGET_UNKNOWN", unitId: "main" }),
+    expect.objectContaining({ code: "NODE_DEFINITION_UNKNOWN", nodeId: "source" }),
+    expect.objectContaining({ code: "BRIDGE_UNKNOWN", channelId: "archive-value" }),
+  ]));
+  expect(JSON.stringify(doc)).toBe(before);
+});
+it("rejects plugin-dependent Units without declared locks when no plugins are installed", () => {
+  const doc = freeze({ ...emptyBlueprint(), units: [load("blueprint").units[0]] });
+  expect(validateBlueprintWithDescriptors(doc, [], [])).toEqual(expect.arrayContaining([
+    expect.objectContaining({ code: "PLUGIN_LOCK_MISSING", pluginId: "org.example.pipeline", unitId: "main" }),
+    expect.objectContaining({ code: "PLUGIN_UNTRUSTED", pluginId: "org.example.pipeline", unitId: "main" }),
+  ]));
+});
+
 it.each([
   ["missing dependency", "DEPENDENCY_MISSING", (d: any) => { d[0].manifest.dependencies[0].pluginId = "org.missing"; }],
   ["dependency version", "DEPENDENCY_VERSION", (d: any) => { d[0].manifest.dependencies[0].version = "^2.0"; }],
@@ -68,7 +109,7 @@ it.each([
   expect(result.context).toBeUndefined();
 });
 
-it.each([null, {}, [null], []])("rejects malformed or empty descriptor collection %j", input => {
+it.each([null, {}, [null]])("rejects malformed descriptor collection %j", input => {
   expect(assembleCodes(input)).toContain("DESCRIPTOR_STRUCTURE");
 });
 it.each([null, [{}], [{ ...trustedLocks[0], sha256: "bad" }]])("validates the independent trusted lock container %j", locks => {

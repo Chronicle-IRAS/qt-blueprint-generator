@@ -60,6 +60,8 @@ validateBlueprintWithDescriptors(blueprint: unknown, descriptors: unknown, trust
 
 AssemblyResult 总有 diagnostics，仅全部通过时提供 context，错误时不发布部分上下文。成功 context 为独立快照，描述集合重新排序不改变其内容。输入、锁与蓝图只读。
 
+未安装插件是合法初始状态：`assembleTrustedContext([], [])` 成功返回各集合均为空的可信上下文。`validateBlueprintWithDescriptors(blueprint, [], [])` 允许结构合法且无插件依赖的空蓝图（pluginLocks、units、nodes、edges、channels、driverBindings 均为空）。它仍执行完整结构与语义校验，不因描述为空而直接跳过校验。若蓝图保留了缺失插件的锁、Unit、节点或 Bridge 引用，仍报告 PLUGIN_UNTRUSTED、PLUGIN_LOCK_MISSING、TARGET_UNKNOWN、NODE_DEFINITION_UNKNOWN、BRIDGE_UNKNOWN 等适用诊断；独立锁 metadata 不能替代缺失的 Descriptor，原图及未知扩展数据保持不变。
+
 context 可直接交给原 P0.2 validateBlueprintSemantics；完整声明校验应使用 validateBlueprintWithDescriptors，该入口额外检查静态端口、属性、实例基数及蓝图锁依赖闭包。原 P0.2 API 保持原行为。
 
 Diagnostics 沿用 code/severity/message/path 和相关 ID。结构错误使用 DESCRIPTOR_STRUCTURE、TRUSTED_LOCK_STRUCTURE；身份/信任/版本使用 DESCRIPTOR_*、TRUSTED_LOCK_DUPLICATE、MANIFEST_DECLARATIONS；依赖使用 DEPENDENCY_*；引用、支持、属性 Schema 使用 DESCRIPTOR_REFERENCE、TARGET_SUPPORT_MISMATCH、PORT_LIMITS、PROPERTY_SCHEMA_INVALID；节点实例使用 NODE_PORT_*、NODE_PROPERTIES 和 NODE_PROPERTIES_EVALUATION。源码和测试列出精确错误码。

@@ -1,6 +1,6 @@
 # Qt Blueprint Generator
 
-平台的 [Plugin Descriptor Contracts（Draft）](doc/architecture/plugin-descriptor-contracts.md) 描述声明式 Manifest、节点/静态端口、类型及 Target/Bridge Policy，可装配为可信语义上下文。独立 TypeScript 工具支持精确依赖、版本、声明和节点实例校验，运行方式见 [工具说明](tools/schema-contracts/README.md)；插件装载与 GUI 接入尚未实现。
+平台的 [Plugin Descriptor Contracts（Draft）](doc/architecture/plugin-descriptor-contracts.md) 描述声明式 Manifest、节点/静态端口、类型及 Target/Bridge Policy，可装配为可信语义上下文。独立 TypeScript 工具支持精确依赖、版本、声明和节点实例校验；未安装插件时允许合法空蓝图，引用缺失插件时仍明确报错且不丢弃数据。运行方式见 [工具说明](tools/schema-contracts/README.md)；插件装载与 GUI 接入尚未实现。
 
 Qt Blueprint Generator 当前是一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统负责校验蓝图、编译中间表示和 AI 提示词，并管理生成工程、候选代码、构建与导出。
 
