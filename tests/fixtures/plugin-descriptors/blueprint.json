@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2, "projectId": "descriptor-demo", "projectName": "Reading pipeline",
+  "pluginLocks": [
+    {"pluginId": "org.example.pipeline", "package": "pipeline-plugin", "version": "1.2.0", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "pluginApiVersion": "1.0-draft"},
+    {"pluginId": "org.example.math", "package": "math-plugin", "version": "2.0.0", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "pluginApiVersion": "1.0-draft"}
+  ],
+  "units": [
+    {"id": "main", "targetId": "org.example.pipeline/application", "pluginId": "org.example.pipeline", "settings": {}},
+    {"id": "archive", "targetId": "org.example.pipeline/application", "pluginId": "org.example.pipeline", "settings": {}}
+  ],
+  "nodes": [
+    {"id": "source", "unitId": "main", "typeId": "org.example.pipeline/source", "nodeDefinitionVersion": "3.0.0", "properties": {"label": "温度"}, "ports": [{"id": "out", "name": "可编辑显示名", "direction": "out", "kind": "data", "typeId": "org.example.pipeline/Reading@1"}]},
+    {"id": "consumer", "unitId": "main", "typeId": "org.example.math/consumer", "nodeDefinitionVersion": "4.0.0", "properties": {}, "ports": [{"id": "in", "name": "Value", "direction": "in", "kind": "data", "typeId": "org.example.math/Value@1"}]},
+    {"id": "archive-consumer", "unitId": "archive", "typeId": "org.example.math/consumer", "nodeDefinitionVersion": "4.0.0", "properties": {}, "ports": [{"id": "in", "name": "Value", "direction": "in", "kind": "data", "typeId": "org.example.math/Value@1"}]}
+  ],
+  "edges": [{"id": "value", "kind": "data", "source": {"nodeId": "source", "portId": "out"}, "target": {"nodeId": "consumer", "portId": "in"}}],
+  "channels": [{"id": "archive-value", "source": {"unitId": "main", "nodeId": "source", "portId": "out"}, "target": {"unitId": "archive", "nodeId": "archive-consumer", "portId": "in"}, "wireSchema": {"typeId": "org.example.math/Value@1", "schema": true}, "bridge": {"pluginId": "org.example.pipeline", "version": "adapter-7", "configuration": {}, "endpointDriverBindingIds": {"target": ["archive-input"]}}}],
+  "driverBindings": [{"id": "archive-input", "unitId": "archive", "mode": "Snapshot", "interfaceContract": {"interfaceId": "example/input"}, "files": []}]
+}

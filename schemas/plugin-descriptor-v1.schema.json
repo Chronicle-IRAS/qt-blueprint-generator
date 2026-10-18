@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Plugin Descriptor Contracts (P0.3 Draft 1.0-draft)",
+  "$comment": "Declarative data only; no activation, permissions, package verification or executable callbacks.",
+  "type": "object",
+  "required": ["descriptorVersion", "manifest", "nodeDefinitions", "types", "targets", "bridges"],
+  "properties": {
+    "descriptorVersion": {"const": "1.0-draft", "type": "string"},
+    "manifest": {"$ref": "#/$defs/Manifest"},
+    "nodeDefinitions": {"type": "array", "items": {"$ref": "#/$defs/NodeDefinition"}},
+    "types": {"type": "array", "items": {"$ref": "#/$defs/TypeDefinition"}},
+    "targets": {"type": "array", "items": {"$ref": "#/$defs/TargetPolicy"}},
+    "bridges": {"type": "array", "items": {"$ref": "#/$defs/BridgePolicy"}}
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "Text": {"$ref": "blueprint-v2.schema.json#/$defs/NonEmptyString"},
+    "TypeId": {"$ref": "blueprint-v2.schema.json#/$defs/NamespacedId"},
+    "PluginId": {"type": "string", "minLength": 1, "pattern": "^[^/\\s@]+$"},
+    "TypeIds": {"type": "array", "items": {"$ref": "#/$defs/TypeId"}, "uniqueItems": true},
+    "Manifest": {
+      "type": "object",
+      "required": ["manifestVersion", "pluginId", "package", "version", "pluginApiVersion", "supportedBlueprintSchemas", "nodeTypes", "targets", "capabilities", "dependencies"],
+      "properties": {
+        "manifestVersion": {"const": "1.0-draft", "type": "string"},
+        "pluginId": {"$ref": "#/$defs/PluginId"},
+        "package": {"$ref": "#/$defs/Text"},
+        "version": {"$ref": "#/$defs/Text"},
+        "pluginApiVersion": {"$ref": "#/$defs/Text"},
+        "supportedBlueprintSchemas": {"type": "array", "items": {"type": "integer", "minimum": 1}, "uniqueItems": true},
+        "nodeTypes": {"$ref": "#/$defs/TypeIds"},
+        "targets": {"$ref": "#/$defs/TypeIds"},
+        "capabilities": {"type": "array", "items": {"$ref": "#/$defs/Text"}, "uniqueItems": true},
+        "dependencies": {"type": "array", "items": {"$ref": "#/$defs/Dependency"}}
+      },
+      "additionalProperties": true
+    },
+    "Dependency": {
+      "type": "object", "required": ["pluginId", "version"],
+      "properties": {"pluginId": {"$ref": "#/$defs/PluginId"}, "version": {"$ref": "#/$defs/Text"}},
+      "additionalProperties": true
+    },
+    "DefinitionRef": {
+      "type": "object", "required": ["typeId", "nodeDefinitionVersion"],
+      "properties": {"typeId": {"$ref": "#/$defs/TypeId"}, "nodeDefinitionVersion": {"$ref": "#/$defs/Text"}},
+      "additionalProperties": true
+    },
+    "NodeDefinition": {
+      "type": "object",
+      "required": ["typeId", "nodeDefinitionVersion", "title", "supportedTargets", "propertiesSchema", "portMode", "ports"],
+      "properties": {
+        "typeId": {"$ref": "#/$defs/TypeId"},
+        "nodeDefinitionVersion": {"$ref": "#/$defs/Text"},
+        "title": {"type": "string"},
+        "supportedTargets": {"$ref": "#/$defs/TypeIds"},
+        "propertiesSchema": {"anyOf": [{"type": "object"}, {"type": "boolean"}]},
+        "portMode": {"type": "string", "const": "static"},
+        "ports": {"type": "array", "items": {"$ref": "#/$defs/StaticPort"}}
+      },
+      "additionalProperties": true
+    },
+    "StaticPort": {
+      "type": "object", "allOf": [{"$ref": "blueprint-v2.schema.json#/$defs/Port"}],
+      "properties": {"minConnections": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}, "maxConnections": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}},
+      "additionalProperties": true
+    },
+    "TypeDefinition": {
+      "type": "object", "required": ["typeId", "compatibleTo"],
+      "properties": {"typeId": {"$ref": "#/$defs/TypeId"}, "compatibleTo": {"$ref": "#/$defs/TypeIds"}},
+      "additionalProperties": true
+    },
+    "TargetPolicy": {
+      "type": "object", "required": ["targetId", "supportedNodeDefinitions"],
+      "properties": {"targetId": {"$ref": "#/$defs/TypeId"}, "supportedNodeDefinitions": {"type": "array", "items": {"$ref": "#/$defs/DefinitionRef"}}},
+      "additionalProperties": true
+    },
+    "BridgeMapping": {
+      "type": "object", "required": ["sourceTargetId", "targetTargetId", "sourceTypeId", "targetTypeId", "wireTypeId"],
+      "properties": {
+        "sourceTargetId": {"$ref": "#/$defs/TypeId"}, "targetTargetId": {"$ref": "#/$defs/TypeId"},
+        "sourceTypeId": {"$ref": "#/$defs/TypeId"}, "targetTypeId": {"$ref": "#/$defs/TypeId"}, "wireTypeId": {"$ref": "#/$defs/TypeId"}
+      },
+      "additionalProperties": true
+    },
+    "BridgePolicy": {
+      "type": "object", "required": ["version", "mappings", "requiredDriverCount"],
+      "properties": {
+        "version": {"$ref": "#/$defs/Text"},
+        "mappings": {"type": "array", "items": {"$ref": "#/$defs/BridgeMapping"}},
+        "requiredDriverCount": {
+          "type": "object", "required": ["source", "target"],
+          "properties": {"source": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}, "target": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}},
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

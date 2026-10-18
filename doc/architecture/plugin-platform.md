@@ -1,5 +1,7 @@
 # 通用插件蓝图平台架构（Draft）
 
+P0.3 当前实现见 [Plugin Descriptor Contracts](plugin-descriptor-contracts.md)：纯数据声明、独立可信锁、依赖/版本/所有权/双向目标支持校验及 P0.2 上下文装配。新增入口检查静态端口与属性；没有插件激活、Registry/Host、Graph IR 或 GUI 接入。
+
 状态：Draft，2026-10-12。本文描述长期 Architecture B，不是已实现功能清单。
 蓝图 Schema v2、Plugin API v1、插件 manifest、RPC 和多 Unit 产物元数据均未冻结；当前程序不能加载这些提案。
 字段约定见[蓝图 Schema v2](blueprint-schema-v2.md)，插件边界见[Plugin API v1](plugin-api-v1.md)。

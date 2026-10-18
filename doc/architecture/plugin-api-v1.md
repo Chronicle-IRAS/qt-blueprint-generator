@@ -1,5 +1,7 @@
 # Plugin API v1 设计（Draft）
 
+P0.3 已实现的声明式子集见 [Plugin Descriptor Contracts](plugin-descriptor-contracts.md)，包括可信上下文装配及静态节点/类型/Target/Bridge 声明。本文其余含 getPorts/activate/lower 的接口仍为未来提案；本轮没有执行插件回调或实现 Plugin Host。
+
 状态：Draft，2026-10-12。本文是语言无关的边界提案，API、manifest、RPC 与类型约定均未冻结。
 示例不是现有可安装插件或当前程序可加载文件；TypeScript 记法用于说明类型。新核心服务、protocol、NodeRegistry、IRCompiler、AIProvider 优先评估 TypeScript/Node，Cordis 尚未成为宿主，现有 C++/Qt 后端保留。
 P0.1 实现 [Blueprint v2 机器结构 Schema 与离线工具](../../schemas/README.md)，P0.2 增加[独立语义校验 API](../../tools/schema-contracts/README.md)，其可信上下文仅为纯数据，不实现本文插件 API、Core IR、Registry 或 RPC。Python 只在具体 SDK/tool 需求成立时评估，不预设 Worker。
@@ -51,13 +53,14 @@ capabilities 是宿主可审核的声明，不是 OS sandbox；在 Sidecar 中�
 
 下面是完整蓝图示例中 logic-module 的示意定义：name/description 可编辑，输出固定为 message:QString。
 它只展示一版最小定义，不代表完整 Qt 插件已经实现，也不限制未来定义通过 getPorts(properties, previousPorts, context) 提供动态端口。
-propertiesSchema 以 JSON Schema 风格表达；插件属性契约的 dialect 与校验仍需后续验证。P0.1 Blueprint 容器使用 Draft 2020-12，但不编译 properties/configuration/wireSchema.schema 等任意 Json payload，也不替插件声明其子 Schema 有效。
+propertiesSchema 在 P0.3 静态子集中使用同步 strict Draft 2020-12；不支持的 Schema 明确诊断，详见 Descriptor 协议。P0.1 Blueprint 容器仍不编译 properties/configuration/wireSchema.schema 等任意 Json payload；属性验证只由新的 descriptor-aware 入口执行。
 
 ```json
 {
   "typeId": "org.blueprint.qt/logic-module",
   "nodeDefinitionVersion": "1.0.0-draft.1",
   "title": "Logic Module",
+  "portMode": "static",
   "supportedTargets": ["org.blueprint.qt/widgets"],
   "propertiesSchema": {
     "type": "object", "required": ["name", "description"],

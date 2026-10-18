@@ -1,0 +1,43 @@
+[
+  {
+    "descriptorVersion": "1.0-draft",
+    "manifest": {
+      "manifestVersion": "1.0-draft", "pluginId": "org.example.pipeline", "package": "pipeline-plugin",
+      "version": "1.2.0", "pluginApiVersion": "1.0-draft", "supportedBlueprintSchemas": [2],
+      "nodeTypes": ["org.example.pipeline/source"], "targets": ["org.example.pipeline/application"],
+      "capabilities": ["nodes.define", "types.define", "target.lower"],
+      "dependencies": [{"pluginId": "org.example.math", "version": "2.0.0"}]
+    },
+    "nodeDefinitions": [{
+      "typeId": "org.example.pipeline/source", "nodeDefinitionVersion": "3.0.0", "title": "Reading source",
+      "supportedTargets": ["org.example.pipeline/application"],
+      "propertiesSchema": {"type": "object", "required": ["label"], "properties": {"label": {"type": "string"}}},
+      "portMode": "static",
+      "ports": [{"id": "out", "name": "Reading", "direction": "out", "kind": "data", "typeId": "org.example.pipeline/Reading@1", "maxConnections": 2}]
+    }],
+    "types": [{"typeId": "org.example.pipeline/Reading@1", "compatibleTo": ["org.example.math/Value@1"]}],
+    "targets": [{"targetId": "org.example.pipeline/application", "supportedNodeDefinitions": [
+      {"typeId": "org.example.pipeline/source", "nodeDefinitionVersion": "3.0.0"},
+      {"typeId": "org.example.math/consumer", "nodeDefinitionVersion": "4.0.0"}
+    ]}],
+    "bridges": [{"version": "adapter-7", "requiredDriverCount": {"source": 0, "target": 1}, "mappings": [{
+      "sourceTargetId": "org.example.pipeline/application", "targetTargetId": "org.example.pipeline/application",
+      "sourceTypeId": "org.example.pipeline/Reading@1", "targetTypeId": "org.example.math/Value@1", "wireTypeId": "org.example.math/Value@1"
+    }]}],
+    "extensions": {"org.example.pipeline": {"note": "Declaration only; no compiler is installed."}}
+  },
+  {
+    "descriptorVersion": "1.0-draft",
+    "manifest": {
+      "manifestVersion": "1.0-draft", "pluginId": "org.example.math", "package": "math-plugin",
+      "version": "2.0.0", "pluginApiVersion": "1.0-draft", "supportedBlueprintSchemas": [2],
+      "nodeTypes": ["org.example.math/consumer"], "targets": [], "capabilities": ["nodes.define", "types.define"], "dependencies": []
+    },
+    "nodeDefinitions": [{
+      "typeId": "org.example.math/consumer", "nodeDefinitionVersion": "4.0.0", "title": "Value consumer",
+      "supportedTargets": ["org.example.pipeline/application"], "propertiesSchema": true, "portMode": "static",
+      "ports": [{"id": "in", "name": "Value", "direction": "in", "kind": "data", "typeId": "org.example.math/Value@1", "minConnections": 1, "maxConnections": 1}]
+    }],
+    "types": [{"typeId": "org.example.math/Value@1", "compatibleTo": []}], "targets": [], "bridges": []
+  }
+]
