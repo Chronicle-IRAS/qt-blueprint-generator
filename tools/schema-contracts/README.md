@@ -1,4 +1,4 @@
-# Blueprint v2 contracts — P0.2 Draft
+# Blueprint and Plugin Descriptor contracts — P0.3 Draft
 
 This private, standalone TypeScript package validates Blueprint v2 offline. [The machine JSON Schema](../../schemas/blueprint-v2.schema.json) remains the sole structural authority. The current Qt application still reads Schema 1; this tool is not integrated into the GUI, CMake, generation or Runtime paths. Setup and existing test/typecheck commands are in [schemas/README](../../schemas/README.md).
 
@@ -78,4 +78,20 @@ Multiple Units, multiple compatible node providers in one Unit and arbitrary dom
 
 The original 59 fixture JSON files and 75 structure tests remain unchanged. Separate semantic tests apply trusted descriptions to the five original `semantic-only` cases and cover additional semantic behaviors. Existing `valid/` means structurally valid, not automatically valid against every trusted context. API examples and diagnostics are implementation evidence, not Qt/Embedded product acceptance.
 
-Package digest checking compares metadata only; no actual package or driver bytes are hashed. The tool does not check full driver-interface compatibility, plugin property schemas, wire schema payload validity or target business rules. It does not import drivers, allocate/migrate dynamic IDs, save unknown raw bytes, compile IR, generate/build/export, execute plugins or contact AI/network services. Plugin API v1 and the broader platform contracts remain Draft.
+Package digest checking compares metadata only; no actual package or driver bytes are hashed. The P0.2 API does not check full driver-interface compatibility, plugin property schemas, wire schema payload validity or target business rules. It does not import drivers, allocate/migrate dynamic IDs, save unknown raw bytes, compile IR, generate/build/export, execute plugins or contact AI/network services. Plugin API v1 and the broader platform contracts remain Draft.
+
+## Plugin Descriptor assembly
+
+P0.3 adds [a declarative Descriptor Schema](../../schemas/plugin-descriptor-v1.schema.json) and [plugin-descriptors.ts](plugin-descriptors.ts). The [Draft protocol](../../doc/architecture/plugin-descriptor-contracts.md) defines versions, dependencies, ownership, static ports, properties and Target/Bridge policy.
+
+```typescript
+import { assembleTrustedContext, validateBlueprintWithDescriptors } from "./plugin-descriptors.js";
+
+const assembled = assembleTrustedContext(descriptors, independentTrustedLocks);
+// assembled.context exists only when assembled.diagnostics is empty.
+const diagnostics = validateBlueprintWithDescriptors(blueprint, descriptors, independentTrustedLocks);
+```
+
+Arguments are parsed JSON values. The caller must independently vet locks and the source of descriptions; matching metadata is not artifact verification. Capabilities grant no permissions. Successful context assembly feeds the existing P0.2 API; the wrapper additionally enforces properties, static port snapshots/cardinality and Blueprint dependency-lock closure. Inputs stay unchanged. Dynamic port resolution is not implemented.
+
+The [offline fixture](../../tests/fixtures/plugin-descriptors/README.md) and plugin-descriptors.test.ts provide complete examples with independent literal pins. Existing npm test discovers the suite without new dependencies or commands. Exact versions have no range resolution or automatic upgrade. All contracts remain Draft.

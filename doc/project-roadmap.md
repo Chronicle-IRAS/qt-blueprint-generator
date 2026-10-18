@@ -24,7 +24,7 @@ Phase 1 不支持 Decision、ExternalCode 运行时、连线标签、分支、�
 
 以下阶段是顺序收敛的 Draft 计划，各阶段需独立实现、验证和审核。参考[平台架构](architecture/plugin-platform.md)、[蓝图 Schema v2](architecture/blueprint-schema-v2.md)和[Plugin API v1](architecture/plugin-api-v1.md)。新核心服务、protocol、NodeRegistry、IRCompiler、AIProvider 优先评估 TS/Node；现有 C++/Qt 保留不迁移，Cordis 仍是候选，Python 仅按具体 SDK/tool 需求评估，不预设 Worker。新协议仍未冻结。
 
-1. **P0 契约基础**：P0.1 已完成唯一机器 Blueprint v2 JSON Schema（Draft 2020-12）、离线 fixtures 和独立工具；P0.2 本轮增加只读 TS 语义校验，覆盖 ID/引用/Unit、端口、锁、定义/目标与 Bridge 策略，见[API 与诊断](../tools/schema-contracts/README.md)。可信纯数据上下文不是 Registry/PluginHost。P0.3 后续再收敛最小 manifest、NodeDefinition、type/version 描述契约；动态 ID 历史、未知原字节保存、Core IR/hash 和显式复制转换仍待实现。GUI/C++ 读取器继续只读 Schema 1，各版本分别管理，协议仍 Draft。
+1. **P0 契约基础**：P0.1 已完成 Blueprint v2 结构 Schema，P0.2 已完成独立只读语义校验。P0.3 增加 [Plugin Descriptor Contracts](architecture/plugin-descriptor-contracts.md) 与可信上下文装配，校验声明式 Manifest、精确依赖/版本、所有权、静态节点/属性/端口、类型、节点与 Target 双方支持及 Bridge 映射，见[API](../tools/schema-contracts/README.md)。协议仍 Draft；Registry/Host、动态 ID 历史、未知原字节保存、Core IR/hash 与显式复制转换仍未实现。GUI/C++ 继续只读 Schema 1，不因此进入 P1。
 2. **P1 最小插件注册与 Qt GUI 接入**：支持可信插件定义的节点、属性与端口，提供缺失插件占位和诊断；具体 Qt 按钮/交互另行设计。Cordis/本地 Sidecar 仍为候选，须先证明结果一致、取消、异常及权限边界，不预建通用调度框架。
 3. **P2 Qt Target 适配器**：优先复用已验证 Qt IR、候选和 Runtime v2 路径。v2 → LegacyQt 转接只接收现有线性流程、直接前驱同名同类型等可表示语义；拒绝其他语义，不猜边、不转换类型、不破坏原图。Legacy v1 字节产物、v2 固定 factory 和旧清单保持兼容。
 4. **P3 首个 Embedded Target**：后续选择一套明确支持的芯片/SDK/工具链和首批节点，验证完整目标工程及可审查产物，目前不预定具体选型。用户驱动 Snapshot 拟复用当前导入器的复制及哈希机制，Reference 模式需另行设计；AI 只接收接口摘要。

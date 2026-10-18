@@ -1,5 +1,7 @@
 # Qt Blueprint Generator
 
+平台的 [Plugin Descriptor Contracts（Draft）](doc/architecture/plugin-descriptor-contracts.md) 描述声明式 Manifest、节点/静态端口、类型及 Target/Bridge Policy，可装配为可信语义上下文。独立 TypeScript 工具支持精确依赖、版本、声明和节点实例校验，运行方式见 [工具说明](tools/schema-contracts/README.md)；插件装载与 GUI 接入尚未实现。
+
 Qt Blueprint Generator 当前是一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统负责校验蓝图、编译中间表示和 AI 提示词，并管理生成工程、候选代码、构建与导出。
 
 长期方向是通用、插件优先的蓝图平台：插件定义节点、属性 Schema、稳定的强类型端口、连线校验、目标 IR 和代码生成。Qt Desktop Editor 是毕业设计要求的 Qt 图形界面；Qt Target Plugin 则负责生成 Qt 工程，两者职责独立。未来 Embedded Target Plugin 将通过受支持的芯片、SDK 和工具链适配器生成可真实交叉编译的目标工程，毕业验收不要求烧录或硬件运行。混合插件蓝图、独立 Build Unit 与显式 Bridge/Channel 的设计见 [Draft 架构](doc/architecture/plugin-platform.md)。P0.1 已实现 Blueprint v2 结构 Schema、离线 fixtures 和独立契约工具；P0.2 增加基于可信纯数据上下文的[独立只读 TS 语义校验](tools/schema-contracts/README.md)，尚未实现插件注册、应用 v2 读取器、嵌入式生成或通信。

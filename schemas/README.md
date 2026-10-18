@@ -1,5 +1,7 @@
 # Blueprint v2 structural contract (P0.1 Draft)
 
+P0.3 additionally defines [Plugin Descriptor Contracts](plugin-descriptor-v1.schema.json), also Draft 2020-12, with local relative references to blueprint-v2.schema.json. [Protocol and trust boundaries](../doc/architecture/plugin-descriptor-contracts.md) describe descriptor assembly and descriptor-aware validation. Existing setup/test/typecheck commands run all P0 suites; original Blueprint v2 structure and P0.2 APIs are unchanged.
+
 `blueprint-v2.schema.json` is the sole language-neutral structural definition. Its dialect is JSON Schema Draft 2020-12 and every `$ref` in the file resolves to local `$defs`. The current C++/Qt application still reads Blueprint Schema 1 only. This contract is not an application reader, a frozen plugin protocol, or a generation manifest schema.
 
 From the repository root, using Node 24.18.1 and npm 11.16.0:
