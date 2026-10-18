@@ -1,9 +1,12 @@
 # 实现进度
 
-更新时间：2026-10-12（Asia/Shanghai）
+更新时间：2026-10-18（Asia/Shanghai）
 
 ## 当前状态
 
+- 2026-10-18（P0.2 验证记录）：Node 24.18.1 / npm 11.16.0 下亲自重跑原 P0.1 结构契约与新增语义测试，共 150/150 通过，TypeScript typecheck 退出 0。原五个 semantic-only Fixture 仍通过结构层，并由独立可信描述下的语义层报告相应错误；合法多 Unit/多插件、环与分支、单向类型兼容、基数、Bridge 两侧驱动依赖、冻结输入及诊断稳定性均有覆盖。首次测试记录保留了缺少语义实现时的 5 项预期失败。本轮 C++/CMake 无变更，没有运行工程生成、构建或 CTest，不引用历史构建结果作为当前通过证明。
+- 2026-10-16（P0.2 实现边界）：新增独立只读 TypeScript 语义校验，以原机器 JSON Schema 作结构门控，再检查通用 ID/引用、Unit、端口方向/kind/type/声明基数、可信插件锁 metadata、NodeDefinition/目标支持及 Bridge 映射和逐侧必需驱动归属/数量。上下文仅为可信纯数据，不是 Registry/PluginHost；Core 允许多 Unit 与任意领域节点，不增加 Start/End、环或分支业务规则。API 和可读诊断见 `tools/schema-contracts/README.md`。包 digest 仅比较 metadata，不读取或复验包/驱动文件字节；完整 driver interface、属性 Schema、target 业务规则、动态 ID/迁移/保存、IR 与生成能力均未实现。
+- 本轮范围与产品验收分开：原 Schema JSON、59 份 fixture JSON、75 项结构测试、C++/Qt、Schema 1、Runtime、旧 manifest 均保持原有路径；没有 Qt 接入、生成/构建或付费 AI 调用。本轮不执行 CMake/CTest，下方 2026-10-12 的构建及 32/32 CTest 是历史证据，不作为 P0.2 本轮运行结果。毕业路线收敛为同一个 Qt 桌面选择 Qt/Embedded target、每份演示蓝图一个 Build Unit、Unit 内多个兼容插件；长期 Core 多 Unit 合法，未来生成能力自行拒绝不支持的 multi-Unit/channel。P0.3 最小描述契约、P1 GUI、P2 Qt、P3 Embedded 与 P4 实际演示仍为后续阶段。
 - 2026-10-12（P0.1 验证记录）：Node 24.18.1 / npm 11.16.0 下缓存离线 `npm ci`、`npm test`（75/75）及 TypeScript typecheck 均通过；6 个结构有效 Fixture、48 个结构无效 Fixture、5 个未来语义反例全部按预期验证。语义反例仅结构通过，不能据此生成或执行。Qt 6.9.3 / MinGW GCC 13.1.0 工程完整构建 191 steps 通过，最终增量构建无待构建项；focused CTest 5/5、最终完整 CTest 32/32（340.08 秒，0 failed）。一项既有 Windows picker case-alias 内部 QtTest skip 保持，不声明该平台分支覆盖。新工具未接入 CMake 或 GUI，本轮未读取 AI 凭据、调用付费 AI 或更改生产路径、历史验收及 MVP Tag。
 - 2026-10-12（P0.1 Blueprint v2 结构契约实现）：增加 `schemas/blueprint-v2.schema.json`（唯一机器结构定义、Draft 2020-12、本地 $defs）、独立 `tools/schema-contracts` TS/Ajv/Vitest 包和 `tests/fixtures/blueprint-v2` 离线数据。只验证 required/type/enum/摘要语法/命名空间/端点结构与每侧 binding ID 重复；语义 checker、应用 v2 读取器、PluginHost/Registry/Core IR、动态 ID 保存、opaque 原字节保存、驱动与通信未实现，协议仍 Draft。当前 GUI/C++ Schema 1、Qt fixtures、六字段 generation manifest、Candidate/import 协议和生产构建路径未改。新核心服务/protocol/NodeRegistry/IRCompiler/AIProvider 优先评估 TS/Node；C++/Qt 保留，Cordis 仍为候选，Python 仅按具体 SDK/tool 需求评估、不预设 Worker。此记录不替代后续独立 review 与最终验收记录，原验收历史保留。
 - 2026-10-12（当前基线确认）：Runtime Assembly Phase 1 的 PR #50 已于 2026-10-11 合入 `main`，合并提交为 `843138c0a5f295eefaf1799a4a8e92656275f301`。下方“等待 PR / 未调用真实付费 AI”等记录及使用指南对应文字保留为首次交付时的历史快照；当前状态以本组新增记录为准。legacy v1 `create()` / `start()` 原字节产物、Runtime v2 `createRuntime()` / `startRuntime()` 固定 factory、六字段 generation manifest 和候选/ExternalCode 导入协议均未改变。
