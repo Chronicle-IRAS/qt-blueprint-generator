@@ -69,10 +69,10 @@
 - [x] **Step 7 — Document actual behavior.** 更新 API 示例、结构/语义状态区别、UnknownNode 含义、原文与解析值的保留边界、无保存和无生成；路线图区分独立 TS 读取与尚未实现的 Qt GUI/持久化。进度仅记录亲跑结果。
 - [x] **Step 8 — Verify.** 运行全部 `npm test --prefix tools/schema-contracts`、`npm run typecheck --prefix tools/schema-contracts`、`git diff --check`。检查无依赖/锁文件、机器 Schema、既有 fixtures 或 Qt 路径变更；报告实际总数，不预先承诺数量。
 - [x] **Step 9 — Independent review.** 单独只读审查者检查数据保留、版本拒绝、Registry 复用、展示投影与诊断、信任边界和兼容性。按需先回归再修复；主 Agent 复核并重跑最终检查。
-- [ ] **Step 10 — Deliver.** fetch 核对最新 main；若已更新则正常同步并复验。提交本功能及文档，常规 push 本分支，创建 base 为 main 的独立 PR 并附实际测试与限制。禁止自动 merge、force push、覆盖 Tag 或进入下一阶段。
+- [x] **Step 10 — Deliver.** fetch 核对最新 main；若已更新则正常同步并复验。提交本功能及文档，常规 push 本分支，创建 base 为 main 的独立 PR 并附实际测试与限制。禁止自动 merge、force push、覆盖 Tag 或进入下一阶段。
 
 ## Approval and current state
 
-用户已批准直接执行步骤 1–10，并补充 KnownNode 的精确可信锁门禁和逐项 sourceIndex 要求；两项已实现并覆盖回归。步骤 1–9 完成，待推送并创建 PR。
+用户已批准直接执行步骤 1–10，并补充 KnownNode 的精确可信锁门禁和逐项 sourceIndex 要求；两项已实现并覆盖回归。步骤 1–10 已完成，功能分支已推送并创建 [PR #58](https://github.com/Chronicle-IRAS/qt-blueprint-generator/pull/58)，base 为 main，等待人工审核，未自动合并。
 
 最终亲跑验证：5 个测试文件、303/303 Vitest（原 265 项 + 新增 38 项）、TypeScript typecheck、diff 与本地文件链接检查通过。独立规格/质量审查发现合法深层扩展会使递归冻结栈溢出；先以 10,000 层数组观察失败，再改为迭代冻结。同一审查者复核修复提交 `4a8eb01` 后给出 Ready，无未解决发现。本轮未运行 CMake/CTest 或付费 AI，未修改 Qt、现有 Schema、Registry 或生成协议。
