@@ -34,9 +34,13 @@ const diagnostic = (code: string, message: string, path = ""): Diagnostic => ({ 
 const lockTrustCodes = new Set(["PLUGIN_LOCK_MISSING", "PLUGIN_UNTRUSTED", "PLUGIN_LOCK_MISMATCH", "DUPLICATE_PLUGIN_LOCK"]);
 
 function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.values(value).forEach(freeze);
-    Object.freeze(value);
+  const pending: unknown[] = [value];
+  while (pending.length) {
+    const current = pending.pop();
+    if (current && typeof current === "object" && !Object.isFrozen(current)) {
+      Object.freeze(current);
+      for (const child of Object.values(current)) pending.push(child);
+    }
   }
   return value;
 }

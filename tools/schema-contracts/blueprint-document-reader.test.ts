@@ -236,6 +236,33 @@ it("preserves source spelling separately from parsed numeric values and duplicat
   expect(result.status === "read" && result.document).toMatchObject({ numeric: 1, duplicate: 2 });
 });
 
+it("reads and deeply freezes opaque extensions with 10000 nested arrays", () => {
+  const sourceText = JSON.stringify(empty()).slice(0, -1) + ',"extensions":{"deep":' +
+    "[".repeat(10000) + '{"value":"original","__proto__":{"kept":true}}' + "]".repeat(10000) + "}}";
+  const registry = new PluginRegistry(), snapshot = registry.snapshot();
+  expect(registry.validate(JSON.parse(sourceText))).toEqual([]);
+  let result!: ReturnType<typeof readBlueprintDocument>;
+  expect(() => { result = readBlueprintDocument(sourceText, registry); }).not.toThrow();
+  expect(result.status).toBe("read");
+  if (result.status !== "read") throw new Error("Expected readable deep extension");
+  expect(result.sourceText).toBe(sourceText);
+  expect(result.semanticValid).toBe(true);
+  expect(result.canGenerate).toBe(false);
+  expect(registry.snapshot()).toBe(snapshot);
+  let nested: any = (result.document.extensions as any).deep;
+  for (let depth = 0; depth < 10000; depth++) {
+    expect(Array.isArray(nested)).toBe(true);
+    expect(Object.isFrozen(nested)).toBe(true);
+    nested = nested[0];
+  }
+  expect(nested).toEqual(JSON.parse('{"value":"original","__proto__":{"kept":true}}'));
+  expect(Object.isFrozen(nested)).toBe(true);
+  expect(Object.isFrozen(nested.__proto__)).toBe(true);
+  expect(Object.hasOwn(nested, "__proto__")).toBe(true);
+  expect(() => { nested.value = "changed"; }).toThrow(TypeError);
+  expect(() => { nested.__proto__.kept = false; }).toThrow(TypeError);
+});
+
 it("reads an empty blueprint without plugins", () => {
   const result = readBlueprintDocument(JSON.stringify(empty()), new PluginRegistry());
   expect(result.status).toBe("read");
