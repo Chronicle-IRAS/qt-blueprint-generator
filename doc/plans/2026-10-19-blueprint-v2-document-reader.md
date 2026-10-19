@@ -60,17 +60,19 @@
 - 文档、节点视图、嵌套数据和诊断在发布前递归冻结；旧结果不持有 Registry 的可变状态。保留解析后值不等于原始数字字面量、重复键或 opaque 片段的字节往返；原文单独保留。
 - 严格 JSON.parse，不去 BOM、不接受注释/尾逗号、不改写 Unicode；语法诊断不回显整个输入或依赖引擎的错误文案。
 
-- [ ] **Step 1 — RED: format gate.** 先写 `reads a valid v2 document`、`reads an empty blueprint without plugins`、`rejects unsupported or invalid input without repair`。使用现有 Descriptor/Blueprint fixtures 与真实 Registry，空图使用完整六个空数组；不改旧 fixture。
-- [ ] **Step 2 — Observe RED.** 运行 `npm test --prefix tools/schema-contracts -- blueprint-document-reader.test.ts`，记录新增行为缺失的失败。若需要接口占位以收集测试，先写测试，确认最终观察到行为断言失败，不把导入拼写错误当 RED 证据。
-- [ ] **Step 3 — GREEN: format result.** 实现最小文本解析与结构门禁、拒绝结果及原文保留；复用机器 Schema，不复制 required/type 枚举。运行专项测试。
-- [ ] **Step 4 — RED: plugin-aware views.** 增加 `retains nodes when their plugin is missing`、`does not substitute a different definition version`、锁的 version/package/sha256/pluginApiVersion 参数化不匹配（同名精确定义仍存在时也必须 UnknownNode）、缺失和重复锁、`forwards descriptor property and static-port diagnostics while retaining KnownNode` 及合法多 Unit 读取测试。确认预期错误码和保留记录，先观察失败。
-- [ ] **Step 5 — GREEN: semantic result.** 使用现有 Registry 验证与精确描述生成 KnownNode/UnknownNode；完整保留文档与原诊断顺序；无条件关闭生成。运行专项测试。
-- [ ] **Step 6 — RED/GREEN: preservation boundary.** 实现并验证 Review Focus 的五组测试，补充重复读取结果一致、结果嵌套修改失败、Registry 状态不变、注销后旧结果不变、重新读取反映新 Registry 状态。重复 nodeId 的两项须各有独立 `sourceIndex`、data，保持顺序且能精确关联路径；不允许 Map 按 nodeId 覆盖视图。断言不得由被测实现计算预期值，不使用 Fake Registry 替代真实路径。
-- [ ] **Step 7 — Document actual behavior.** 更新 API 示例、结构/语义状态区别、UnknownNode 含义、原文与解析值的保留边界、无保存和无生成；路线图区分独立 TS 读取与尚未实现的 Qt GUI/持久化。进度仅记录亲跑结果。
-- [ ] **Step 8 — Verify.** 运行全部 `npm test --prefix tools/schema-contracts`、`npm run typecheck --prefix tools/schema-contracts`、`git diff --check`。检查无依赖/锁文件、机器 Schema、既有 fixtures 或 Qt 路径变更；报告实际总数，不预先承诺数量。
-- [ ] **Step 9 — Independent review.** 单独只读审查者检查数据保留、版本拒绝、Registry 复用、展示投影与诊断、信任边界和兼容性。按需先回归再修复；主 Agent 复核并重跑最终检查。
+- [x] **Step 1 — RED: format gate.** 先写 `reads a valid v2 document`、`reads an empty blueprint without plugins`、`rejects unsupported or invalid input without repair`。使用现有 Descriptor/Blueprint fixtures 与真实 Registry，空图使用完整六个空数组；不改旧 fixture。
+- [x] **Step 2 — Observe RED.** 运行 `npm test --prefix tools/schema-contracts -- blueprint-document-reader.test.ts`，记录新增行为缺失的失败。若需要接口占位以收集测试，先写测试，确认最终观察到行为断言失败，不把导入拼写错误当 RED 证据。
+- [x] **Step 3 — GREEN: format result.** 实现最小文本解析与结构门禁、拒绝结果及原文保留；复用机器 Schema，不复制 required/type 枚举。运行专项测试。
+- [x] **Step 4 — RED: plugin-aware views.** 增加 `retains nodes when their plugin is missing`、`does not substitute a different definition version`、锁的 version/package/sha256/pluginApiVersion 参数化不匹配（同名精确定义仍存在时也必须 UnknownNode）、缺失和重复锁、`forwards descriptor property and static-port diagnostics while retaining KnownNode` 及合法多 Unit 读取测试。确认预期错误码和保留记录，先观察失败。
+- [x] **Step 5 — GREEN: semantic result.** 使用现有 Registry 验证与精确描述生成 KnownNode/UnknownNode；完整保留文档与原诊断顺序；无条件关闭生成。运行专项测试。
+- [x] **Step 6 — RED/GREEN: preservation boundary.** 实现并验证 Review Focus 的五组测试，补充重复读取结果一致、结果嵌套修改失败、Registry 状态不变、注销后旧结果不变、重新读取反映新 Registry 状态。重复 nodeId 的两项须各有独立 `sourceIndex`、data，保持顺序且能精确关联路径；不允许 Map 按 nodeId 覆盖视图。断言不得由被测实现计算预期值，不使用 Fake Registry 替代真实路径。
+- [x] **Step 7 — Document actual behavior.** 更新 API 示例、结构/语义状态区别、UnknownNode 含义、原文与解析值的保留边界、无保存和无生成；路线图区分独立 TS 读取与尚未实现的 Qt GUI/持久化。进度仅记录亲跑结果。
+- [x] **Step 8 — Verify.** 运行全部 `npm test --prefix tools/schema-contracts`、`npm run typecheck --prefix tools/schema-contracts`、`git diff --check`。检查无依赖/锁文件、机器 Schema、既有 fixtures 或 Qt 路径变更；报告实际总数，不预先承诺数量。
+- [x] **Step 9 — Independent review.** 单独只读审查者检查数据保留、版本拒绝、Registry 复用、展示投影与诊断、信任边界和兼容性。按需先回归再修复；主 Agent 复核并重跑最终检查。
 - [ ] **Step 10 — Deliver.** fetch 核对最新 main；若已更新则正常同步并复验。提交本功能及文档，常规 push 本分支，创建 base 为 main 的独立 PR 并附实际测试与限制。禁止自动 merge、force push、覆盖 Tag 或进入下一阶段。
 
 ## Approval and current state
 
-用户已批准直接执行步骤 1–10，并补充 KnownNode 的精确可信锁门禁和逐项 sourceIndex 要求；两项已纳入 Task 1。当前开始执行，最终测试、独立审查和 PR 结果完成后更新核对项，不提前记录通过。
+用户已批准直接执行步骤 1–10，并补充 KnownNode 的精确可信锁门禁和逐项 sourceIndex 要求；两项已实现并覆盖回归。步骤 1–9 完成，待推送并创建 PR。
+
+最终亲跑验证：5 个测试文件、303/303 Vitest（原 265 项 + 新增 38 项）、TypeScript typecheck、diff 与本地文件链接检查通过。独立规格/质量审查发现合法深层扩展会使递归冻结栈溢出；先以 10,000 层数组观察失败，再改为迭代冻结。同一审查者复核修复提交 `4a8eb01` 后给出 Ready，无未解决发现。本轮未运行 CMake/CTest 或付费 AI，未修改 Qt、现有 Schema、Registry 或生成协议。
