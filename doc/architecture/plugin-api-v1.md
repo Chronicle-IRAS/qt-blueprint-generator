@@ -2,6 +2,8 @@
 
 P0.3 已实现的声明式子集见 [Plugin Descriptor Contracts](plugin-descriptor-contracts.md)，包括可信上下文装配及静态节点/类型/Target/Bridge 声明。本文其余含 getPorts/activate/lower 的接口仍为未来提案；本轮没有执行插件回调或实现 Plugin Host。
 
+P1.1 的[最小 Registry](../../tools/schema-contracts/README.md#minimal-plugin-registry) 仅登记已验证的描述 JSON，提供原子批量变更、冻结快照和精确查询；它复用 P0.3 的完整集合复验，不实现下文的 activate/deactivate、RPC 或动态插件执行。调用方仍负责独立锁和描述来源的信任。
+
 状态：Draft，2026-10-12。本文是语言无关的边界提案，API、manifest、RPC 与类型约定均未冻结。
 示例不是现有可安装插件或当前程序可加载文件；TypeScript 记法用于说明类型。新核心服务、protocol、NodeRegistry、IRCompiler、AIProvider 优先评估 TypeScript/Node，Cordis 尚未成为宿主，现有 C++/Qt 后端保留。
 P0.1 实现 [Blueprint v2 机器结构 Schema 与离线工具](../../schemas/README.md)，P0.2 增加[独立语义校验 API](../../tools/schema-contracts/README.md)，其可信上下文仅为纯数据，不实现本文插件 API、Core IR、Registry 或 RPC。Python 只在具体 SDK/tool 需求成立时评估，不预设 Worker。

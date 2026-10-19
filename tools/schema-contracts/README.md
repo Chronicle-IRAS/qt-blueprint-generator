@@ -1,4 +1,4 @@
-# Blueprint and Plugin Descriptor contracts — P0.3 Draft
+# Blueprint contracts and minimal Plugin Registry — P1.1 Draft
 
 This private, standalone TypeScript package validates Blueprint v2 offline. [The machine JSON Schema](../../schemas/blueprint-v2.schema.json) remains the sole structural authority. The current Qt application still reads Schema 1; this tool is not integrated into the GUI, CMake, generation or Runtime paths. Setup and existing test/typecheck commands are in [schemas/README](../../schemas/README.md).
 
@@ -97,3 +97,61 @@ Arguments are parsed JSON values. The caller must independently vet locks and th
 No installed plugins is a valid initial state: `assembleTrustedContext([], [])` succeeds with an empty context. A structurally valid empty Blueprint (all six record arrays empty) passes the wrapper with empty descriptors and locks. Structure and reference checks still run: locks, Units, nodes or Bridges referring to unavailable plugins produce explicit diagnostics, even if independent trust pins exist. No graph or extension data is removed.
 
 The [offline fixture](../../tests/fixtures/plugin-descriptors/README.md) and plugin-descriptors.test.ts provide complete examples with independent literal pins. Existing npm test discovers the suite without new dependencies or commands. Exact versions have no range resolution or automatic upgrade. All contracts remain Draft.
+
+## Minimal Plugin Registry
+
+[plugin-registry.ts](plugin-registry.ts) adds a synchronous, in-memory registry of caller-vetted declarative metadata. It does not install packages, execute plugins, grant capabilities, or integrate with Qt. It reuses P0.3 assembly/validation; the machine schemas and original P0 APIs keep their behavior.
+
+| API | Behavior |
+| --- | --- |
+| `new PluginRegistry()` | Empty, valid initial snapshot; no plugins required |
+| `register(descriptors: unknown, trustedLocks: unknown): RegistryResult` | Add a whole bundle atomically; pass arrays of new descriptors and their independent locks, not copies of already registered pins |
+| `unregister(pluginIds: readonly string[]): RegistryResult` | Explicit batch removal, no cascade; unknown IDs fail; repeated IDs name the same removal |
+| `snapshot(): RegistrySnapshot` | Unified discovery: `plugins/nodes/types/targets/bridges/context`, sorted by provider and declaration identity/version |
+| `getPlugin(pluginId)` | Descriptor and its independent lock, or `undefined` |
+| `getNode(typeId, nodeDefinitionVersion)` | Exact node definition with owner and full static port/property metadata |
+| `getType(typeId)`, `getTarget(targetId)` | Exact registered declarations with owner |
+| `getBridge(pluginId, adapterVersion)` | Exact Bridge declaration; adapter and package versions are distinct |
+| `getDependents(pluginId)` | Sorted direct manifest dependents; prerequisites are in `getPlugin(id).descriptor.manifest.dependencies` |
+| `validate(blueprint: unknown): Diagnostic[]` | Full descriptor-aware validation against the current installed metadata; never filters or edits the graph |
+
+`RegistryResult` always contains `diagnostics`; an empty array means the mutation succeeded. Registration copies parsed JSON, validates the complete candidate set and publishes only after preparing a fully frozen snapshot. Failures leave the same previous snapshot and all queries intact. Duplicate providers never replace existing registrations or trust pins. Locks with no corresponding descriptor are not retained or used by future registrations. A valid multi-provider bundle may need to arrive together: a node's Target advertisement is not a reverse manifest dependency, but its reference still must resolve.
+
+Unregistration revalidates the entire remainder, including declaration references, not just manifest dependencies. Even a provider with no declared dependents can be required by another node's Target advertisement. Remove an explicitly chosen complete bundle if necessary; the Registry never deletes dependents or changes documents for the caller.
+
+Snapshots, lookup results, context and nested metadata are recursively frozen and detached from registration inputs; unknown JSON extensions survive. Old snapshots remain immutable point-in-time values, not live views or revocable permissions. Use `registry.validate()` for the current Registry; `snapshot().context` is directly consumable by P0.2 but, as before, does not itself enforce P0.3 properties/static-port/instance-cardinality checks. No raw-byte persistence or GUI placeholder is implemented.
+
+Inputs must be parsed JSON data. Cycles, accessors, sparse arrays (including out-of-range numeric properties), non-finite numbers and non-JSON JavaScript values are rejected with `REGISTRY_INPUT_INVALID`; snapshot preparation failures yield `REGISTRY_PREPARATION_FAILED` without publication. `REGISTRY_NOT_FOUND` identifies unknown removal IDs at `/pluginIds/i`. Other codes come from P0.3; mutation paths refer to the complete candidate set, including existing descriptors. Copying and freezing do not establish provenance, verify package bytes, sandbox hostile schemas/proxies, or authorize execution.
+
+### Offline lifecycle example
+
+Inside this package's TypeScript/Vitest environment, the existing fixtures demonstrate the lifecycle below. The literal pins are test metadata, not verified package digests or production trust establishment. [plugin-registry.test.ts](plugin-registry.test.ts) runs these behaviors against the real implementation.
+
+```typescript
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { PluginRegistry } from "./plugin-registry.js";
+
+const fixture = (name: string): unknown => JSON.parse(readFileSync(new URL(
+  `../../tests/fixtures/plugin-descriptors/${name}.json`, import.meta.url,
+), "utf8"));
+const descriptors = fixture("descriptors"), blueprint = fixture("blueprint");
+const independentPins = [
+  { pluginId: "org.example.pipeline", package: "pipeline-plugin", version: "1.2.0",
+    sha256: "a".repeat(64), pluginApiVersion: "1.0-draft" },
+  { pluginId: "org.example.math", package: "math-plugin", version: "2.0.0",
+    sha256: "b".repeat(64), pluginApiVersion: "1.0-draft" },
+];
+const registry = new PluginRegistry();
+assert(registry.validate(blueprint).some(d => d.code === "PLUGIN_UNTRUSTED"));
+assert.deepEqual(registry.register(descriptors, independentPins).diagnostics, []);
+assert.equal(registry.getNode("org.example.pipeline/source", "3.0.0")?.declaration.title, "Reading source");
+assert.deepEqual(registry.getDependents("org.example.math"), ["org.example.pipeline"]);
+assert.deepEqual(registry.validate(blueprint), []);
+assert(registry.unregister(["org.example.math"]).diagnostics.some(d => d.code === "DEPENDENCY_MISSING"));
+assert.deepEqual(registry.validate(blueprint), []); // failed removal changed nothing
+assert.deepEqual(registry.unregister(["org.example.pipeline", "org.example.math"]).diagnostics, []);
+assert(registry.validate(blueprint).some(d => d.code === "PLUGIN_UNTRUSTED")); // document retained
+```
+
+Run `npm test -- --run plugin-registry.test.ts` for Registry regressions, `npm test` for all P0/P1.1 suites, and `npm run typecheck`. No new dependency, CMake integration or generated project is required. P1.2 and executable plugin lifecycle remain out of scope.

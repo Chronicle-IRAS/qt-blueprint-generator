@@ -1,6 +1,6 @@
 # 通用插件蓝图平台架构（Draft）
 
-P0.3 当前实现见 [Plugin Descriptor Contracts](plugin-descriptor-contracts.md)：纯数据声明、独立可信锁、依赖/版本/所有权/双向目标支持校验及 P0.2 上下文装配。新增入口检查静态端口与属性；没有插件激活、Registry/Host、Graph IR 或 GUI 接入。
+P0.3 当前实现见 [Plugin Descriptor Contracts](plugin-descriptor-contracts.md)：纯数据声明、独立可信锁、依赖/版本/所有权/双向目标支持校验及 P0.2 上下文装配。P1.1 增加[最小内存 Registry](../../tools/schema-contracts/README.md#minimal-plugin-registry)，复用 P0.3 原子登记/注销可信声明、发现/查询及验证；不执行插件，不实现 Host、Graph IR 或 GUI 接入。
 
 状态：Draft，2026-10-12。本文描述长期 Architecture B，不是已实现功能清单。
 蓝图 Schema v2、Plugin API v1、插件 manifest、RPC 和多 Unit 产物元数据均未冻结；当前程序不能加载这些提案。
@@ -54,7 +54,7 @@ Qt Unit 独立工程         Embedded Unit 独立工程
        +----- 显式 typed Channel / Bridge（仅设计） -----+
 ```
 
-图中的 Registry、v2 读取器、插件宿主和 Embedded 路径均未实现。
+图中的 Registry 目前仅实现独立 TS 的声明数据管理；可编辑节点、v2 读取器、插件宿主和 Embedded 路径仍未实现。
 插件输出诊断、IR 或候选计划，可信服务复验后执行允许的文件事务。
 平台层校验身份、引用、Unit 边界和类型；插件只补充其节点与目标的语义约束。
 目标插件不能放宽宿主的路径、受保护文件、版本或人工确认规则。
@@ -158,8 +158,8 @@ v2 → LegacyQt 只接受现有线性流程和直接前驱同名同声明类型�
 
 ## 分阶段收敛与完成依据
 
-1. Draft 契约：P0.1 已实现机器结构 Schema 与离线 fixtures；P0.2 实现通用只读语义校验，P0.3 再收敛最小 manifest/NodeDefinition/type/version 描述契约。动态 ID/未知原字节保存、IR/迁移仍待实现，不冻结未经验证的协议。
-2. 最小 Registry：可信节点可编辑、依赖可解析、缺失插件可占位且不能生成，不预建大型框架。
+1. Draft 契约：P0.1 已实现机器结构 Schema 与离线 fixtures；P0.2 实现通用只读语义校验，P0.3 实现最小 manifest/NodeDefinition/type/version 描述契约。动态 ID/未知原字节保存、IR/迁移仍待实现，不冻结未经验证的协议。
+2. 最小 Registry：P1.1 已实现纯数据的原子注册/注销、精确查询、依赖复验、零插件启动及缺失插件诊断；不修改输入蓝图。后续的可信节点编辑、GUI 缺失插件占位和持久化须单独实现，不预建大型框架。
 3. Qt Target：通过严格适配复用当前 Qt 后端，保留 legacy 与 Runtime v2 回归证据。
 4. Embedded Target：首个受支持适配器真实交叉编译完整工程；Qt GUI 仍是产品主体。
 5. 多 Unit：独立生成/构建/导出；Channel 先验证契约，通信另立实现与验收范围。

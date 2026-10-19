@@ -2,13 +2,15 @@
 
 状态：Draft，2026-10-18。[JSON Schema](../../schemas/plugin-descriptor-v1.schema.json) 是机器结构的权威定义，采用 Draft 2020-12，并用本地相对引用复用 Blueprint v2 的 ID、Port、PluginLock 定义。本轮只交付离线声明和验证，不冻结完整 Plugin API。
 
+P1.1 在上述不变契约上新增[最小内存 Registry](../../tools/schema-contracts/README.md#minimal-plugin-registry)：批量登记与注销先复验整个候选集合，再发布隔离、冻结的查询快照。它不是包安装器或 Plugin Host；以下 P0.3 API 的输入、结构及行为保持兼容。
+
 ## 数据与信任
 
 每个 Descriptor 包含 `descriptorVersion: "1.0-draft"`、`manifest`、`nodeDefinitions`、`types`、`targets`、`bridges`。后四项为数组。所有记录允许附加字段，验证不剥离或改写数据；未知字段不增加行为或权限。
 
 调用方必须独立提供可信的五字段 PluginLock：`pluginId/package/version/sha256/pluginApiVersion`，并在调用前保证描述确实来自对应包。装配器比对身份和版本，使用调用方提供的摘要；两份 metadata 相等不能证明来源或字节完整性。本轮不下载包、不建立信任、不复验实际包/描述/驱动字节。manifest 无须自报包摘要，自报的附加 sha256 不会替代可信锁。
 
-capabilities 只是一组字符串声明，不授予文件、命令、网络或构建权限。没有插件激活、动态装载、Registry、Host 或 Cordis。
+capabilities 只是一组字符串声明，不授予文件、命令、网络或构建权限。P0.3 装配器本身不管理 Registry；P1.1 仅增加声明数据管理，没有插件激活、动态装载、Host 或 Cordis。
 
 ## Manifest
 
@@ -72,4 +74,4 @@ Diagnostics 沿用 code/severity/message/path 和相关 ID。结构错误使用 
 
 [示例](../../tests/fixtures/plugin-descriptors/README.md) 包含两个非 Qt 领域插件、两个 Unit、单向兼容、双向支持和 Bridge 驱动需求。测试将命名空间替换为全新领域，无须修改通用代码。
 
-运行现有 npm test/typecheck 即可。原 P0.1/P0.2 测试、Blueprint Schema、C++/Qt、旧 manifest 和生成协议均未改变。语义通过不代表可生成、构建或运行；Host/Registry、Graph IR、GUI、动态端口和工程生成后续单独实施，本轮不进入 P1。
+运行现有 npm test/typecheck 即可。原 P0.1/P0.2 测试、Blueprint Schema、C++/Qt、旧 manifest 和生成协议均未改变。语义通过不代表可生成、构建或运行；声明 Registry 在 P1.1 实现，Host、Graph IR、GUI、动态端口和工程生成仍须后续单独实施，不因此进入 P1.2。

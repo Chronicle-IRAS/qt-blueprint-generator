@@ -26,6 +26,8 @@ AI 不会未经确认直接覆盖正式代码。公共契约、入口、构建�
 
 节点编辑能力不等同于运行时执行能力：分支、循环、并行、多页面及 External Code 的运行时装配尚不支持。AI 生成结果仍需审核和实际构建验证，不保证任意蓝图都可执行。
 
+独立的 TypeScript / Node.js 工具已实现 P1.1 [内存 Plugin Registry](tools/schema-contracts/README.md#minimal-plugin-registry)，仅提供可信声明的登记与注销、查询与发现、冻结快照及蓝图验证。支持零插件启动；缺失插件会明确诊断，不改写或丢弃传入的解析后蓝图数据。它不涉及插件安装、插件代码动态执行或 Qt GUI 集成。
+
 长期方向是通用、插件优先的蓝图平台。Qt Desktop Editor 与 Qt Target Plugin 分别承担编辑与目标生成职责；独立的 TypeScript / Node.js 工具提供 Blueprint v2 和插件声明契约验证。新协议仍为 Draft，尚未接入 Qt GUI；嵌入式目标生成和跨目标通信属于后续扩展。
 
 ## 技术栈
