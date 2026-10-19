@@ -1,10 +1,10 @@
 # Qt Blueprint Generator
 
-平台的 [Plugin Descriptor Contracts（Draft）](doc/architecture/plugin-descriptor-contracts.md) 描述声明式 Manifest、节点/静态端口、类型及 Target/Bridge Policy，可装配为可信语义上下文。独立 TypeScript 工具支持精确依赖、版本、声明和节点实例校验；未安装插件时允许合法空蓝图，引用缺失插件时仍明确报错且不丢弃数据。运行方式见 [工具说明](tools/schema-contracts/README.md)；插件装载与 GUI 接入尚未实现。
+平台的 [Plugin Descriptor Contracts（Draft）](doc/architecture/plugin-descriptor-contracts.md) 描述声明式 Manifest、节点/静态端口、类型及 Target/Bridge Policy，可装配为可信语义上下文。独立 TypeScript 工具提供内存 Plugin Registry：原子登记与注销可信声明、统一发现与精确查询、冻结快照及蓝图验证；未安装插件时允许合法空蓝图，引用缺失插件时仍明确报错且不丢弃解析后数据。运行方式与离线示例见 [工具说明](tools/schema-contracts/README.md)；插件安装、动态执行与 GUI 接入尚未实现。
 
 Qt Blueprint Generator 当前是一个面向 Qt 6 Widgets 项目的可视化蓝图编辑器。用户通过节点、端口和有向连线描述应用结构，系统负责校验蓝图、编译中间表示和 AI 提示词，并管理生成工程、候选代码、构建与导出。
 
-长期方向是通用、插件优先的蓝图平台：插件定义节点、属性 Schema、稳定的强类型端口、连线校验、目标 IR 和代码生成。Qt Desktop Editor 是毕业设计要求的 Qt 图形界面；Qt Target Plugin 则负责生成 Qt 工程，两者职责独立。未来 Embedded Target Plugin 将通过受支持的芯片、SDK 和工具链适配器生成可真实交叉编译的目标工程，毕业验收不要求烧录或硬件运行。混合插件蓝图、独立 Build Unit 与显式 Bridge/Channel 的设计见 [Draft 架构](doc/architecture/plugin-platform.md)。P0.1 已实现 Blueprint v2 结构 Schema、离线 fixtures 和独立契约工具；P0.2 增加基于可信纯数据上下文的[独立只读 TS 语义校验](tools/schema-contracts/README.md)，尚未实现插件注册、应用 v2 读取器、嵌入式生成或通信。
+长期方向是通用、插件优先的蓝图平台：插件定义节点、属性 Schema、稳定的强类型端口、连线校验、目标 IR 和代码生成。Qt Desktop Editor 是毕业设计要求的 Qt 图形界面；Qt Target Plugin 则负责生成 Qt 工程，两者职责独立。未来 Embedded Target Plugin 将通过受支持的芯片、SDK 和工具链适配器生成可真实交叉编译的目标工程，毕业验收不要求烧录或硬件运行。混合插件蓝图、独立 Build Unit 与显式 Bridge/Channel 的设计见 [Draft 架构](doc/architecture/plugin-platform.md)。P0.1 已实现 Blueprint v2 结构 Schema、离线 fixtures 和独立契约工具；P0.2 增加基于可信纯数据上下文的[独立只读 TS 语义校验](tools/schema-contracts/README.md)。新 Registry 仅管理声明数据，尚无应用 v2 读取器、嵌入式生成或通信。
 
 当前 Qt 能力已实现蓝图持久化、线性 Runtime Assembly Phase 1，以及真实模型生成后构建、执行、传值、页面显示和 Export 独立重建运行的有限样例验收。行级代码评审和 AI 返工仍在后续路线；工作区以生成和评审为核心，不以完整 IDE 为目标。阶段与事实边界见[项目路线](doc/project-roadmap.md)和[最新实现进度](doc/implementation-progress.md)。
 

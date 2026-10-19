@@ -9,19 +9,23 @@ export interface AssemblyResult {
 }
 
 // Read-only views after the JSON Schema gate; there is no second structural validator.
-type StaticPort = Readonly<{ id: string; direction: string; kind: string; typeId: string; minConnections?: number; maxConnections?: number }>;
-type Definition = Readonly<{ typeId: string; nodeDefinitionVersion: string; supportedTargets: readonly string[]; propertiesSchema: AnySchema; ports: readonly StaticPort[] }>;
+type StaticPort = Readonly<{ id: string; name: string; direction: string; kind: string; typeId: string; minConnections?: number; maxConnections?: number }>;
+type Definition = Readonly<{ typeId: string; nodeDefinitionVersion: string; title: string; portMode: "static"; supportedTargets: readonly string[]; propertiesSchema: AnySchema; ports: readonly StaticPort[] }>;
 type DefinitionRef = Readonly<{ typeId: string; nodeDefinitionVersion: string }>;
 type Target = Readonly<{ targetId: string; supportedNodeDefinitions: readonly DefinitionRef[] }>;
 type TypeDefinition = Readonly<{ typeId: string; compatibleTo: readonly string[] }>;
 type Bridge = Omit<TrustedSemanticContext["bridges"][number], "pluginId">;
 type Descriptor = Readonly<{
+  descriptorVersion: "1.0-draft";
   manifest: Readonly<Omit<PluginLock, "sha256"> & {
+    manifestVersion: "1.0-draft"; capabilities: readonly string[];
     supportedBlueprintSchemas: readonly number[]; nodeTypes: readonly string[]; targets: readonly string[];
     dependencies: readonly Readonly<{ pluginId: string; version: string }>[];
   }>;
   nodeDefinitions: readonly Definition[]; types: readonly TypeDefinition[]; targets: readonly Target[]; bridges: readonly Bridge[];
 }>;
+export type { Descriptor as PluginDescriptor, Definition as NodeDefinitionDescriptor, TypeDefinition as PortTypeDescriptor,
+  Target as TargetPolicyDescriptor, Bridge as BridgePolicyDescriptor };
 type Entry<T> = Readonly<{ value: T; owner: Descriptor; path: string }>;
 type Prepared = AssemblyResult & { definitions?: Map<string, Entry<Definition>>; properties?: Map<string, ValidateFunction>; descriptors?: readonly Descriptor[] };
 const tuple = (...parts: string[]) => JSON.stringify(parts);
