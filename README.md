@@ -20,13 +20,29 @@
 
 AI 不会未经确认直接覆盖正式代码。公共契约、入口、构建配置等受保护内容由确定性系统维护；构建需要显式触发，生成失败不会自动覆盖或清空旧工程。
 
+## 界面预览
+
+以下截图来自旧版模块工程的演示，展示候选审核与构建导出的交互，不代表 Runtime v2 的运行结果。图片可点击查看原图。
+
+### 候选代码审核
+
+对照当前文件与候选代码，查看差异，并逐文件选择接受、编辑后接受或拒绝。
+
+[![候选审核窗口：左侧为当前文件，右侧为候选代码，底部提供接受、拒绝与草稿操作](doc/screenshots/candidate-review.png)](doc/screenshots/candidate-review.png)
+
+### 构建与导出
+
+在独立工作区中显式触发构建和导出，查看 CMake 配置、编译及导出结果。
+
+[![构建与导出面板：工作区、构建和导出目录，以及 CMake 编译与导出成功日志](doc/screenshots/build-export.png)](doc/screenshots/build-export.png)
+
 ## 当前支持范围
 
 当前桌面应用主要面向 C++17 / Qt 6 Widgets / CMake 工程。线性运行时支持 `Start → 零个或多个 Logic Module → 可选的唯一末端 UI Page → End`，可执行模块逻辑、传递结果并显示页面。
 
 节点编辑能力不等同于运行时执行能力：分支、循环、并行、多页面及 External Code 的运行时装配尚不支持。AI 生成结果仍需审核和实际构建验证，不保证任意蓝图都可执行。
 
-独立的 TypeScript / Node.js 工具已实现 P1.1 [内存 Plugin Registry](tools/schema-contracts/README.md#minimal-plugin-registry)，仅提供可信声明的登记与注销、查询与发现、冻结快照及蓝图验证。支持零插件启动；缺失插件会明确诊断，不改写或丢弃传入的解析后蓝图数据。它不涉及插件安装、插件代码动态执行或 Qt GUI 集成。
+独立的 TypeScript / Node.js 工具提供[内存 Plugin Registry](tools/schema-contracts/README.md#minimal-plugin-registry)，仅提供可信声明的登记与注销、查询与发现、冻结快照及蓝图验证。支持零插件启动；缺失插件会明确诊断，不改写或丢弃传入的解析后蓝图数据。它不涉及插件安装、插件代码动态执行或 Qt GUI 集成。
 
 长期方向是通用、插件优先的蓝图平台。Qt Desktop Editor 与 Qt Target Plugin 分别承担编辑与目标生成职责；独立的 TypeScript / Node.js 工具提供 Blueprint v2 和插件声明契约验证。新协议仍为 Draft，尚未接入 Qt GUI；嵌入式目标生成和跨目标通信属于后续扩展。
 
