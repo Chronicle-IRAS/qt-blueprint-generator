@@ -1,9 +1,11 @@
 # 实现进度
 
-更新时间：2026-10-18（Asia/Shanghai）
+更新时间：2026-10-19（Asia/Shanghai）
 
 ## 当前状态
 
+- 2026-10-19（P1.1 最小 Plugin Registry）：从 PR #54 已合并的 `56d9183` 创建独立分支，新增同步内存 Registry，复用 P0.3 校验整个候选集合后原子发布；支持批量登记/注销、依赖与引用复验、统一发现、精确版本查询、冻结隔离快照及 P0.2 context/完整蓝图验证。零插件空蓝图合法，移除再恢复插件不改变传入图或未知 JSON 数据；不提供原始字节保存、GUI 占位、包安装、插件执行、Host、Graph IR 或生成。
+- P1.1 本轮测试：原 219 项加新增 46 项，共 265/265 Vitest 通过，typecheck 退出 0；首次快照/登记 2 项真实断言失败、注销新增 9 fail / 24 pass、验证入口新增 8 fail / 35 pass 均先观察 RED 后实现 GREEN。独立规格/质量 Review 发现稀疏数组带越界数字键可误报操作成功，已以 3 项失败回归重现，再补索引上界检查，专项 46/46、同一审查者收敛复核 Ready，无剩余发现。范围、链接、历史记录与 MVP Tag 检查通过。P0.3 文件仅补充并导出只读类型视图，擦除类型后的 JavaScript 与 main 基线逐字节一致；机器 Schema、原测试/fixtures、依赖锁文件和 C++/Qt 生产路径不变。本轮不运行 CMake/CTest 或付费 AI；最终提交/PR 以交付记录为准，等待人工审核，不自动合并。
 - 2026-10-18（PR #54 空插件产品规则）：允许 `assembleTrustedContext([], [])` 返回空可信上下文，结构合法且无插件依赖的空蓝图通过完整验证；只移除描述集合非空限制，不增加空集合短路。缺失插件锁、Target、节点定义和 Bridge 等引用仍有明确诊断，独立锁不能代替缺失描述，传入的解析后图数据及扩展保持不变。新增 7 项回归并移除旧空集合拒绝项，先观察 7 fail / 62 pass，再确认专项 69/69、完整 219/219 和 typecheck 退出 0；独立增量 Review 通过。原 P0.1/P0.2 实现、Schema、C++/Qt 和生成协议未改；本轮不运行 CMake/CTest。
 - 2026-10-18（P0.3 声明契约与装配）：新增 Draft 2020-12 Plugin Descriptor Schema、独立描述及蓝图示例，提供 `assembleTrustedContext` 与 `validateBlueprintWithDescriptors`。以独立可信锁校验精确包/API/蓝图版本、依赖缺失/冲突/循环、命名空间所有权、类型/Target/Bridge 引用及节点与 Target 双方支持；完整入口新增静态端口/属性及基数、蓝图依赖锁闭包检查。描述和锁的 metadata 匹配不证明来源或字节完整性，调用方必须先验证可信来源；capabilities 不授予权限。动态端口、Host/Registry、Graph IR、GUI 和实际工程生成未实现，原 Blueprint/Qt/生成协议保持原路径。
 - P0.3 本轮验证：原 P0.1/P0.2 的 150 项加新增 63 项，合计 213/213 Vitest 通过，typecheck 退出 0；已观察缺失 Manifest 的真实 RED，并为异步属性 Schema 和非安全整数边界先补失败测试再修复。独立 Review 发现无终止条件的属性 Schema 自引用会抛出异常，已先以两种自引用重现失败，再转换为 NODE_PROPERTIES_EVALUATION 诊断，同时保留正常结构递归；原审查者收敛复核通过，无剩余阻塞发现。JSON、文档链接、范围与历史记录检查通过；最终交付见 PR，等待人工审核。历史 CTest 不作为本轮运行结果；本轮仅运行 TS/JSON 工具，无 CMake/CTest、生成或付费 AI 调用。
