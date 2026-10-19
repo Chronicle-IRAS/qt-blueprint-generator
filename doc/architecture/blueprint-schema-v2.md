@@ -2,9 +2,11 @@
 
 P0.3 的 [Descriptor 协议](plugin-descriptor-contracts.md) 定义可信描述装配与静态节点声明检查。它复用本页机器 Schema，不改变原 Blueprint v2、Schema 1 或 P0.2 API；完整声明校验由新的 descriptor-aware 入口提供。
 
-状态：Draft，2026-10-16。P0.1 已增加唯一权威结构定义 [JSON Schema](../../schemas/blueprint-v2.schema.json)（Draft 2020-12）、[离线 fixtures](../../tests/fixtures/blueprint-v2/README.md) 与独立 TS/Ajv/Vitest 工具；P0.2 增加[独立只读语义校验](../../tools/schema-contracts/README.md)。运行见 [schemas/README](../../schemas/README.md)。尚无应用 v2 读取器，协议未冻结。
+状态：Draft，2026-10-16。P0.1 已增加唯一权威结构定义 [JSON Schema](../../schemas/blueprint-v2.schema.json)（Draft 2020-12）、[离线 fixtures](../../tests/fixtures/blueprint-v2/README.md) 与独立 TS/Ajv/Vitest 工具；P0.2 增加[独立只读语义校验](../../tools/schema-contracts/README.md)。运行见 [schemas/README](../../schemas/README.md)。Qt 应用尚无 v2 读取器，协议未冻结。
 本页 JSON 示例符合本页描述的提案，不是当前程序可加载的文件，也不是已冻结协议。
 总览见[插件平台架构](plugin-platform.md)，节点定义与目标编译边界见[Plugin API v1](plugin-api-v1.md)。
+
+P1.2A 补充独立的 [TS 只读文档读取 API](../../tools/schema-contracts/README.md#read-only-blueprint-document-reader)：读取 v2 JSON 文本，保留原文和完整解析数据，复用 Registry 校验并返回带 sourceIndex 的 KnownNode/UnknownNode 展示信息。精确定义与可信精确锁缺一不可；普通属性或端口语义错误不自动使定义变成未知。所有结果均禁止生成。它尚未接入 Qt 应用，不提供保存、布局恢复或 opaque payload 原始字节往返；下文相关保存要求仍是未来 Draft，不代表本轮已实现，也不改变机器 Schema。
 
 ## 与现有版本的边界
 

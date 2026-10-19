@@ -1,4 +1,4 @@
-# Blueprint contracts and minimal Plugin Registry — P1.1 Draft
+# Blueprint contracts, Plugin Registry and read-only documents — Draft
 
 This private, standalone TypeScript package validates Blueprint v2 offline. [The machine JSON Schema](../../schemas/blueprint-v2.schema.json) remains the sole structural authority. The current Qt application still reads Schema 1; this tool is not integrated into the GUI, CMake, generation or Runtime paths. Setup and existing test/typecheck commands are in [schemas/README](../../schemas/README.md).
 
@@ -154,4 +154,67 @@ assert.deepEqual(registry.unregister(["org.example.pipeline", "org.example.math"
 assert(registry.validate(blueprint).some(d => d.code === "PLUGIN_UNTRUSTED")); // document retained
 ```
 
-Run `npm test -- --run plugin-registry.test.ts` for Registry regressions, `npm test` for all P0/P1.1 suites, and `npm run typecheck`. No new dependency, CMake integration or generated project is required. P1.2 and executable plugin lifecycle remain out of scope.
+Run `npm test -- --run plugin-registry.test.ts` for Registry regressions, `npm test` for all suites, and `npm run typecheck`. No new dependency, CMake integration or generated project is required. Executable plugin lifecycle remains out of scope.
+
+## Read-only Blueprint document reader
+
+P1.2A adds [blueprint-document-reader.ts](blueprint-document-reader.ts):
+
+```typescript
+readBlueprintDocument(sourceText: string, registry: PluginRegistry): BlueprintDocumentReadResult
+```
+
+The caller supplies JSON text already decoded as UTF-8 and an existing, independently populated Registry. This synchronous API does not open files, register plugins, repair input, save documents or authorize generation. It reuses the authoritative Blueprint Schema and the Registry's full P0.2/P0.3 descriptor-aware validation. There is no second set of graph, port, lock or plugin compatibility rules.
+
+| Result | Meaning |
+| --- | --- |
+| `status: "rejected"` | Invalid JSON, unsupported Schema version or structural error; no usable `document` or node views |
+| `status: "read"` | Structurally valid v2 document; complete parsed `document` and ordered `nodes` remain available even when semantic diagnostics exist |
+| `sourceText` | Exact original string in either result, including whitespace, escapes and Unicode; never reconstructed with JSON.stringify |
+| `diagnostics` | Existing structured codes, severity, paths and related IDs; predictable validation order |
+| `semanticValid` | On a read result, whether Registry validation returned no diagnostics; not a generation-capability check |
+| `canGenerate: false` | Always false, including valid empty documents and graphs with all plugins available |
+
+### KnownNode and UnknownNode
+
+Each node view contains `sourceIndex`, `nodeId`, `unitId`, `typeId`, `nodeDefinitionVersion` and the complete read-only `data` record. `sourceIndex` is the original zero-based `nodes` array index, associated with `/nodes/{sourceIndex}` diagnostics. Duplicate node IDs remain separate records in source order; the reader does not select a winner, deduplicate nodes or remove edges.
+
+`kind: "known"` requires both an exact `getNode(typeId, nodeDefinitionVersion)` match and the node provider's unique document lock matching its registered trusted lock. It exposes the definition's display `title`. Missing plugins/definitions and absent, ambiguous or mismatched locks instead yield `kind: "unknown"` with `reasonCodes`, while retaining the original node's properties, ports and unknown fields. The reader consumes existing lock diagnostics; it does not independently compare another copy of the five-field lock contract or substitute a nearby definition version.
+
+Recognition is separate from validity: ordinary property, static-port, connection or Unit semantic errors do not by themselves make a trusted exact definition unknown. The view stays KnownNode and the read result reports `semanticValid: false` with the original diagnostics. A KnownNode is neither an executable plugin instance nor evidence that the whole graph is valid.
+
+### Preservation and rejection boundary
+
+Published results, documents, node views and diagnostics are recursively frozen. Nested unknown JSON values and ordinary keys such as `__proto__` remain inert data. The result's top-level generation flag cannot be enabled by a similarly named extension. Reading does not mutate Registry state, and later registration/unregistration does not rewrite an earlier result; call the reader again to obtain current availability.
+
+Malformed JSON returns `JSON_PARSE_ERROR` without echoing the input or engine-specific exception text. Numeric Schema versions other than 2 return `SCHEMA_VERSION_UNSUPPORTED`; missing/incorrectly typed versions and other shape errors use `STRUCTURE_INVALID`. JSON parsing is strict: BOM, comments and trailing commas are rejected rather than removed. Version 1 and future versions are not migrated or downgraded.
+
+The preserved text is a decoded string, not an arbitrary input-byte container. Parsed values follow JSON.parse semantics (including number representation and duplicate-key handling). No save API, opaque-payload byte slicing/roundtrip, layout reader, dynamic port migration, GUI integration, RPC, Core IR or generation is implemented. The Qt/C++ Schema 1 reader and existing generation protocols are unchanged. Matching trusted lock metadata still does not verify package or driver bytes.
+
+### Offline read example
+
+Inside this package's TypeScript/Vitest environment:
+
+```typescript
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { PluginRegistry } from "./plugin-registry.js";
+import { readBlueprintDocument } from "./blueprint-document-reader.js";
+
+const sourceText = readFileSync(new URL(
+  "../../tests/fixtures/plugin-descriptors/blueprint.json", import.meta.url,
+), "utf8");
+const registry = new PluginRegistry();
+const result = readBlueprintDocument(sourceText, registry);
+assert.equal(result.sourceText, sourceText);
+assert.equal(result.canGenerate, false);
+assert.equal(result.status, "read");
+if (result.status === "read") {
+  assert.equal(result.semanticValid, false); // no fixture plugins registered
+  assert.equal(result.nodes[0].sourceIndex, 0);
+  assert.equal(result.nodes[0].kind, "unknown");
+  assert.equal(result.nodes[0].nodeId, "source"); // original node is still present
+}
+```
+
+Registering the independently vetted fixture descriptors and pins as in the Registry example allows exact known definitions to be displayed. It does not enable generation. The empty structural fixture reads successfully with an empty Registry and no semantic diagnostics. Run `npm test --prefix tools/schema-contracts -- blueprint-document-reader.test.ts` from the repository root for reader regressions, then the existing complete test and typecheck commands.
