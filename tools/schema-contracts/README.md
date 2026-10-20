@@ -1,4 +1,4 @@
-# Blueprint contracts, Plugin Registry and read-only documents — Draft
+# Blueprint contracts, Plugin Registry and preserving documents — Draft
 
 This private, standalone TypeScript package validates Blueprint v2 offline. [The machine JSON Schema](../../schemas/blueprint-v2.schema.json) remains the sole structural authority. The current Qt application still reads Schema 1; this tool is not integrated into the GUI, CMake, generation or Runtime paths. Setup and existing test/typecheck commands are in [schemas/README](../../schemas/README.md).
 
@@ -218,3 +218,67 @@ if (result.status === "read") {
 ```
 
 Registering the independently vetted fixture descriptors and pins as in the Registry example allows exact known definitions to be displayed. It does not enable generation. The empty structural fixture reads successfully with an empty Registry and no semantic diagnostics. Run `npm test --prefix tools/schema-contracts -- blueprint-document-reader.test.ts` from the repository root for reader regressions, then the existing complete test and typecheck commands.
+
+## Preserving Blueprint document store
+
+P1.2B1 adds a separate asynchronous Node store around the Reader. Its scope is an **unchanged source text**, stored as UTF-8 in `blueprint.json` and read back for verification. It never rebuilds JSON with `JSON.stringify(document)`. Whitespace, CRLF, Chinese text, Unicode escape spelling, unknown fields/nodes, locks, ports, edges, channels and driver bindings remain in the original text. Invalid UTF-8 files and text that cannot roundtrip through UTF-8 are refused rather than silently replaced. This does not implement editing or preservation of opaque byte slices after an edit; that belongs to P1.2B2.
+
+The existing Reader remains the only JSON/Schema gate. Structure errors reject a load/save; semantic errors are returned with the complete read result and **allow preserving saves**. Missing plugins, untrusted locks and duplicate IDs do not cause records to be removed. Every operation result keeps `canGenerate: false`.
+
+### Store API
+
+```typescript
+loadBlueprintDocument(directory: string, registry: PluginRegistry): Promise<BlueprintDocumentLoadResult>
+saveBlueprintDocument(request: BlueprintDocumentSaveRequest, registry: PluginRegistry): Promise<BlueprintDocumentSaveResult>
+```
+
+`BlueprintDocumentSaveRequest` contains `directory`, `sourceText` and explicit `mode: "create" | "save-as" | "overwrite"`. Overwrite additionally requires `expectedSha256`; use the exact-byte hash returned by a prior load/save, not a hash of reserialized JSON. Create/save-as never authorize replacement of an existing target.
+
+Successful load/save results use `status: "loaded"` / `"saved"`, `readResult` (the Reader's full `status: "read"` result) and `sha256`. A successful save has `writeState: "verified"`. Failures use `status: "failed"`, stable `code`, a safe message and, when available, `readResult` with Reader diagnostics. Saving distinguishes `writeState: "not-written"` from `"committed-unverified"`; the latter requires inspecting/reloading the destination before another save. If safe temp cleanup fails, `cleanupFailed` and `retainedTempPath` report it. Do not retry by deleting files or discarding the expected hash.
+
+Example in this package's TypeScript environment, using caller-selected existing empty directories:
+
+```typescript
+import { PluginRegistry } from "./plugin-registry.js";
+import { loadBlueprintDocument, saveBlueprintDocument } from "./blueprint-document-store.js";
+
+const registry = new PluginRegistry();
+const created = await saveBlueprintDocument({ directory, sourceText, mode: "create" }, registry);
+if (created.status === "failed") throw new Error(created.code);
+const loaded = await loadBlueprintDocument(directory, registry);
+if (loaded.status === "failed") throw new Error(loaded.code);
+const unchangedSave = await saveBlueprintDocument({
+  directory, sourceText: loaded.readResult.sourceText,
+  mode: "overwrite", expectedSha256: loaded.sha256,
+}, registry);
+if (unchangedSave.status === "failed") throw new Error(unchangedSave.code);
+const copy = await saveBlueprintDocument({
+  directory: anotherEmptyDirectory, sourceText: loaded.readResult.sourceText, mode: "save-as",
+}, registry);
+if (copy.status === "failed") throw new Error(copy.code);
+// Neither saved result permits generation.
+```
+
+This is a text storage boundary, not an edit API. It does not merge documents, modify individual properties or automatically update locks. Source bytes are validated again on saving; callers cannot authorize a save by fabricating a successful Reader result.
+
+### Destination policy
+
+The caller explicitly selects an existing absolute standalone project directory; the target name is always `blueprint.json`. The store does not create directories or derive paths from JSON fields. Creation and explicit save-as require an empty directory. Overwrite requires an existing structurally valid v2 file and its expected SHA-256; unrelated directory entries are refused, not removed. Layout files are not managed in this stage.
+
+Directory ancestors and file types are checked. Generated-workspace manifests, exported scaffold markers and enclosing blueprint projects prevent writes into protected projects. Schema 1 and unsupported/invalid existing files cannot be overwritten. Links, junctions, reparse points, hard-linked targets, filename case aliases, dot traversal, device/UNC/drive-relative paths, alternate data streams and Windows reserved/trailing-dot or trailing-space names are refused. Chinese paths and ordinary spaces are supported.
+
+On Windows, the built-in Windows PowerShell executable performs a fixed, noninteractive native attribute probe with paths passed as data. It checks the [ReparsePoint attribute](https://learn.microsoft.com/en-us/dotnet/api/system.io.fileattributes); an unavailable/failed probe refuses the operation. No npm dependency, native addon, plugin execution or RPC service is added. The PowerShell process is hidden and does not run document-supplied code. On other platforms the Node filesystem checks apply; Windows-specific validation must be reported separately from tests run elsewhere.
+
+### Actual write guarantees
+
+| Situation | Guarantee and limit |
+| --- | --- |
+| Before publication | Original target is never opened for truncation. An exclusive same-directory temporary file receives complete bytes, is flushed and verified first. A write/sync/pre-commit failure leaves the original target intact. |
+| Creation / save-as | Publishes the completed temp through a no-clobber link operation, then removes the owned temp. A target created concurrently is not overwritten. Filesystems without this operation fail; there is no overwrite fallback. |
+| Controlled overwrite | Compares actual disk SHA-256 to the caller's baseline initially and immediately before same-directory rename replacement. A detected change/missing file prevents publication. |
+| Cleanup | Removes only this operation's temporary file when its identity/path remains safe. Unknown files and stale temps are never automatically deleted. Cleanup failure must identify retained temporary state. |
+| After publication | Reopens the file, checks bytes and parses through the Reader. Verification failure is explicitly distinguished from a pre-commit failure; the new file may already be present. No blind rollback may overwrite another writer's data. |
+| Concurrency | In-process overlapping loads/saves using the same normalized absolute path are guarded (case-folded on Windows); this is not a universal filesystem-alias lock. Hash/identity checks are not an OS compare-and-swap: another process can change a file or replace a path after the final check. Node path APIs do not eliminate this race. Use trusted local directories without concurrent external writers. |
+| Process/system crash | A crash may leave a temp or interrupt post-commit verification. File flush and single-file publication are not a guarantee of directory-entry durability on every filesystem. There is no cross-file/crash transaction, automatic recovery or stale-file deletion. |
+
+The API does not preserve filesystem metadata such as ACLs, ownership or timestamps as a document-format contract. The byte-preservation claim concerns the valid original UTF-8 JSON text. Neither generation workspaces nor the Qt/C++ ProjectStore participate in this store.

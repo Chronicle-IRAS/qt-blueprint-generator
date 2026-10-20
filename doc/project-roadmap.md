@@ -24,7 +24,7 @@ Phase 1 不支持 Decision、ExternalCode 运行时、连线标签、分支、�
 
 以下阶段是顺序收敛的 Draft 计划，各阶段需独立实现、验证和审核。参考[平台架构](architecture/plugin-platform.md)、[蓝图 Schema v2](architecture/blueprint-schema-v2.md)和[Plugin API v1](architecture/plugin-api-v1.md)。新核心服务、protocol、NodeRegistry、IRCompiler、AIProvider 优先评估 TS/Node；现有 C++/Qt 保留不迁移，Cordis 仍是候选，Python 仅按具体 SDK/tool 需求评估，不预设 Worker。新协议仍未冻结。
 
-1. **P0 契约基础**：P0.1 已完成 Blueprint v2 结构 Schema，P0.2 已完成独立只读语义校验。P0.3 增加 [Plugin Descriptor Contracts](architecture/plugin-descriptor-contracts.md) 与可信上下文装配，校验声明式 Manifest、精确依赖/版本、所有权、静态节点/属性/端口、类型、节点与 Target 双方支持及 Bridge 映射，见[API](../tools/schema-contracts/README.md)。协议仍 Draft；Host、动态 ID 历史、未知原字节保存、Core IR/hash 与显式复制转换仍未实现。GUI/C++ 继续只读 Schema 1。
+1. **P0 契约基础**：P0.1 已完成 Blueprint v2 结构 Schema，P0.2 已完成独立只读语义校验。P0.3 增加 [Plugin Descriptor Contracts](architecture/plugin-descriptor-contracts.md) 与可信上下文装配，校验声明式 Manifest、精确依赖/版本、所有权、静态节点/属性/端口、类型、节点与 Target 双方支持及 Bridge 映射，见[API](../tools/schema-contracts/README.md)。协议仍 Draft；Host、动态 ID 历史、编辑后未知片段原字节保存、Core IR/hash 与显式复制转换仍未实现。GUI/C++ 继续只读 Schema 1。
 2. **P1 最小插件注册与 Qt GUI 接入**：P1.1 已实现[独立 TS Registry](../tools/schema-contracts/README.md#minimal-plugin-registry)，复用 P0.3 做原子批量登记/注销、依赖与引用复验、节点/类型/Target/Bridge 发现与精确查询，提供不可变快照、零插件与只读图验证。P1.2A 新增[独立 v2 JSON 文本读取 API](../tools/schema-contracts/README.md#read-only-blueprint-document-reader)，复用现有结构/语义/声明校验，返回原文、不可变解析数据及带 sourceIndex 的 KnownNode/UnknownNode 展示信息。缺插件、缺定义或锁不可信时保留节点；普通属性/端口语义错误不等于定义未知。所有读取结果均关闭生成。Qt GUI 节点编辑、实际占位显示/保存、动态执行及具体交互仍未实现；本轮不接入 GUI 或继续后续子阶段。Cordis/本地 Sidecar 仍为候选，须先验证进程与权限边界，不预建通用调度框架。
 3. **P2 Qt Target 适配器**：优先复用已验证 Qt IR、候选和 Runtime v2 路径。v2 → LegacyQt 转接只接收现有线性流程、直接前驱同名同类型等可表示语义；拒绝其他语义，不猜边、不转换类型、不破坏原图。Legacy v1 字节产物、v2 固定 factory 和旧清单保持兼容。
 4. **P3 首个 Embedded Target**：后续选择一套明确支持的芯片/SDK/工具链和首批节点，验证完整目标工程及可审查产物，目前不预定具体选型。用户驱动 Snapshot 拟复用当前导入器的复制及哈希机制，Reference 模式需另行设计；AI 只接收接口摘要。
@@ -33,9 +33,11 @@ Phase 1 不支持 Decision、ExternalCode 运行时、连线标签、分支、�
 
 毕业范围优先收敛为 Qt GUI、可复用插件边界、Qt 目标适配和首个 Embedded 目标真实交叉编译。多 Unit 通信与完整 AI Review/返工属于后续增量，不提前承诺全部交付。已完成的 Candidate Accept/工作区集成不再按旧 Issue #32 作为待补工作；后续评审功能应建立新的明确范围。
 
+P1.2B1 补充独立的 [v2 保留式文档存储](../tools/schema-contracts/README.md#preserving-blueprint-document-store)：原始 JSON 文本按 UTF-8 创建、显式另存为或经 SHA-256 冲突检查覆盖，随后重读复验。缺失插件、未知定义及其他语义问题不会导致数据被删除或阻止保留式保存；结构非法仍拒绝，生成始终关闭。安全范围是独立目录中的单个 `blueprint.json`，不包含布局、GUI、局部属性编辑或旧工程迁移。P1.2B2 的编辑后 opaque payload 保留须另行设计，本轮不进入该阶段。
+
 ## 迁移与信任约束
 
-现有 `blueprint.json` / `layout.json` 不做自动升级或降级；未来转换必须显式复制到新工程，给出诊断并保留原文件、布局、未知字段与 opaque 插件 payload 原始字节，不要求新 JSON 文件整体字节一致。旧读取器拒绝未知版本。P1.2A 的独立 TS 读取器仅保留传入文本和解析后的未知字段，提供只读占位数据，不提供保存或 opaque payload 原始字节往返保证。未来的 GUI 占位、布局及保留式保存仍需独立设计和验收；不能把它们描述成当前 v1 能力。
+现有 `blueprint.json` / `layout.json` 不做自动升级或降级；未来转换必须显式复制到新工程，给出诊断并保留原文件、布局、未知字段与 opaque 插件 payload 原始字节，不要求新 JSON 文件整体字节一致。旧读取器拒绝未知版本。P1.2A 提供独立 TS 文本解析和只读占位数据；P1.2B1 仅将未修改文本完整保存并重读，不保证编辑后 opaque payload 原始字节往返。未来的 GUI 占位、布局及编辑后保留式保存仍需独立设计和验收；不能把它们描述成当前 v1 能力。文件路径检查和提交前摘要复验不能彻底消除恶意并发路径替换，不宣称跨文件或系统崩溃原子性。
 
 多 Unit 产物索引采用独立 Draft 元数据，不能向严格六字段的旧 generation manifest 添加字段。插件 capability manifest 只是能力声明，不是 OS 沙箱；初期只加载可信插件，未经验证隔离的不可信插件被拒绝。可信服务拥有 Candidate 写入、Accept、scaffold 和 Build 授权；Sidecar 进程本身不能证明文件权限隔离，构建执行也不是代码沙箱。生成/接受上下文最终应绑定项目、文档、Unit、插件版本及驱动/受保护文件哈希，变化或取消后拒绝旧结果。
 

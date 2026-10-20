@@ -44,6 +44,8 @@ AI 不会未经确认直接覆盖正式代码。公共契约、入口、构建�
 
 独立的 TypeScript / Node.js 工具提供[内存 Plugin Registry](tools/schema-contracts/README.md#minimal-plugin-registry)，仅提供可信声明的登记与注销、查询与发现、冻结快照及蓝图验证。支持零插件启动；缺失插件会明确诊断，不改写或丢弃传入的解析后蓝图数据。它不涉及插件安装、插件代码动态执行或 Qt GUI 集成。
 
+独立工具还支持 Blueprint v2 [只读解析](tools/schema-contracts/README.md#read-only-blueprint-document-reader)及[未修改原文的保留式保存](tools/schema-contracts/README.md#preserving-blueprint-document-store)。未知插件和语义错误会保留数据并返回诊断；覆盖文件前核对 SHA-256，保存后重新读取验证。此能力尚未接入桌面界面，不包含局部编辑、布局保存或 v2 工程生成。
+
 长期方向是通用、插件优先的蓝图平台。Qt Desktop Editor 与 Qt Target Plugin 分别承担编辑与目标生成职责；独立的 TypeScript / Node.js 工具提供 Blueprint v2 和插件声明契约验证。新协议仍为 Draft，尚未接入 Qt GUI；嵌入式目标生成和跨目标通信属于后续扩展。
 
 ## 技术栈
