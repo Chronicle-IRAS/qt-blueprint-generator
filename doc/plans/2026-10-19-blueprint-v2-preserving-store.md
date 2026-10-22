@@ -47,7 +47,9 @@
 - [x] Step 5: Run full Vitest, typecheck, diff check; report exact passed/skipped totals and observed RED evidence. Do not claim CTest was run.
 - [x] Step 6: Update actual API and safety guarantees, explicitly distinguish ordinary failure, concurrent modification and system crash, and defer edited opaque preservation to P1.2B2.
 - [x] Step 7: Independent read-only spec/security/quality review, fix confirmed findings with regression tests, rerun affected checks and obtain focused re-review.
-- [ ] Step 8: Fetch latest main, normal commit/push, independent PR base main; verify clean status and matching remote HEAD. No automatic merge, tag changes or next-stage work.
+- [x] Step 8: Fetch latest main, normal commit/push, independent PR base main; verify clean status and matching remote HEAD. No automatic merge, tag changes or next-stage work.
+
+Delivered as [PR #59](https://github.com/Chronicle-IRAS/qt-blueprint-generator/pull/59), base `main`, with 373/373 Vitest tests and independent review Ready. Request-snapshot regression fix: `9a614038bb1a3e2761a4c94d32fe8d2979e9a569`. Awaiting human review; P1.2B2 is not started.
 
 ## Plan review
 
