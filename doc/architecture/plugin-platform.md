@@ -2,6 +2,8 @@
 
 P0.3 当前实现见 [Plugin Descriptor Contracts](plugin-descriptor-contracts.md)：纯数据声明、独立可信锁、依赖/版本/所有权/双向目标支持校验及 P0.2 上下文装配。P1.1 增加[最小内存 Registry](../../tools/schema-contracts/README.md#minimal-plugin-registry)，复用 P0.3 原子登记/注销可信声明、发现/查询及验证；不执行插件，不实现 Host、Graph IR 或 GUI 接入。
 
+P1.2A/P1.2B1 已分别提供独立 TS 的 [v2 只读解析](../../tools/schema-contracts/README.md#read-only-blueprint-document-reader)与[未修改原文的保留式存储](../../tools/schema-contracts/README.md#preserving-blueprint-document-store)。它们尚未接入 Qt 应用；下文的应用读取器、编辑后 opaque 保存及布局保留仍是规划。保存接受结构合法但语义有误的文档并返回诊断，不授予生成能力，不改变现行 Qt ProjectStore 或生成工作区。
+
 状态：Draft，2026-10-12。本文描述长期 Architecture B，不是已实现功能清单。
 蓝图 Schema v2、Plugin API v1、插件 manifest、RPC 和多 Unit 产物元数据均未冻结；当前程序不能加载这些提案。
 字段约定见[蓝图 Schema v2](blueprint-schema-v2.md)，插件边界见[Plugin API v1](plugin-api-v1.md)。
@@ -54,7 +56,7 @@ Qt Unit 独立工程         Embedded Unit 独立工程
        +----- 显式 typed Channel / Bridge（仅设计） -----+
 ```
 
-图中的 Registry 目前仅实现独立 TS 的声明数据管理；可编辑节点、v2 读取器、插件宿主和 Embedded 路径仍未实现。
+图中的 Registry 目前仅实现独立 TS 的声明数据管理；v2 文本解析与未修改原文存储也仅提供独立 TS API。可编辑节点、应用 v2 读取器、插件宿主和 Embedded 路径仍未实现。
 插件输出诊断、IR 或候选计划，可信服务复验后执行允许的文件事务。
 平台层校验身份、引用、Unit 边界和类型；插件只补充其节点与目标的语义约束。
 目标插件不能放宽宿主的路径、受保护文件、版本或人工确认规则。

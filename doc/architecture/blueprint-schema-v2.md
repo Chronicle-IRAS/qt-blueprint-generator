@@ -8,6 +8,8 @@ P0.3 的 [Descriptor 协议](plugin-descriptor-contracts.md) 定义可信描述�
 
 P1.2A 补充独立的 [TS 只读文档读取 API](../../tools/schema-contracts/README.md#read-only-blueprint-document-reader)：读取 v2 JSON 文本，保留原文和完整解析数据，复用 Registry 校验并返回带 sourceIndex 的 KnownNode/UnknownNode 展示信息。精确定义与可信精确锁缺一不可；普通属性或端口语义错误不自动使定义变成未知。所有结果均禁止生成。它尚未接入 Qt 应用，不提供保存、布局恢复或 opaque payload 原始字节往返；下文相关保存要求仍是未来 Draft，不代表本轮已实现，也不改变机器 Schema。
 
+P1.2B1 在 Reader 外增加独立的 [TS 保留式文档存储](../../tools/schema-contracts/README.md#preserving-blueprint-document-store)：仅将未修改的原始 JSON 文本按 UTF-8 写入独立目录的 `blueprint.json`，并重新读取复验。结构非法拒绝，语义错误允许原文保存且返回诊断，生成始终关闭。覆盖核对原文件 SHA-256，同目录临时写入后发布；目录保护、并发及崩溃边界见 API 文档。它不保存布局、不迁移 v1，也不实现编辑后 opaque payload 原始字节保留；后者留待 P1.2B2。
+
 ## 与现有版本的边界
 
 当前 [BlueprintDocument](../../src/blueprint/blueprint_document.h) 的 `CurrentSchemaVersion` 为 1，NodeType 固定为 Start、End、UiPage、LogicModule、Decision、ExternalCode。
@@ -195,7 +197,7 @@ AI 只接收 interfaceContract，不接收用户驱动源码；驱动变化使�
 
 ## 未知节点、锁与保存
 
-未来 v2 读取器先验证安全的文档容器、ID 和引用；缺失插件/定义时显示 UnknownNode 占位与诊断。
+P1.2A 独立读取器区分结构门禁与 ID/引用等语义诊断，缺失插件/定义时返回 UnknownNode 展示数据；P1.2B1 允许这些结构合法的文档按原文保存。Qt GUI 占位尚未接入。以下段落中关于编辑后 opaque payload、布局和 canonical 摘要的要求仍是后续 Draft。
 未识别节点的未知字段、properties、ports 及命名空间扩展须无损保留，其中 opaque 插件 payload 的原始字节单独保留。
 未改动的 opaque payload 不得因规范化、改名或保存被删除、重写或丢失；布局也保留。
 该要求针对 payload 字节与未知字段，不要求重新保存后的整个 JSON 文件字节一致；显式复制保留的原工程不改写。
@@ -236,6 +238,6 @@ P0.1 已实现结构 Schema 与离线测试，校验 required、known-field type
 
 P0.2 已覆盖对象数组 ID 唯一/引用存在、Unit 归属与同 Unit 普通边、方向/kind/type/声明基数、注册类型/目标支持、精确锁 metadata 与定义版本、Bridge wire 映射及逐侧必需驱动的数量和归属。两个相同 Qt target 的不同 Unit 仍拒绝普通边，锁定 Bridge 要求某侧驱动而字段缺失时仍失败关闭。可信上下文是纯数据，不是插件注册或加载；包版本、节点定义版本与 Bridge 适配器版本独立比较。Core 允许多 Unit 与任意领域节点，不增加 Start/End、环、分支或单 Unit 的目标限制。
 
-实际包/文件字节 hash、完整 driver interface 兼容、target 业务规则、动态 ID 历史与迁移、unknown raw 保存、IR hash 与生成 context 仍待实现。P0.2 API 的 digest 比较仅核对可信 metadata，不编译插件属性 Schema；P0.3 descriptor-aware 入口新增同步属性 Schema 及静态端口检查。语义通过不代表生成能力支持。
+实际包/文件字节 hash、完整 driver interface 兼容、target 业务规则、动态 ID 历史与迁移、编辑后 unknown raw 保存、IR hash 与生成 context 仍待实现。P0.2 API 的 digest 比较仅核对可信 metadata，不编译插件属性 Schema；P0.3 descriptor-aware 入口新增同步属性 Schema 及静态端口检查。语义通过不代表生成能力支持。
 
 `semantic-only` fixtures 的 schemaPass 仍只证明结构层未覆盖这些规则；P0.2 在独立语义测试中配合明确的可信上下文验证拒绝。原 59 份 fixture JSON 和 75 项结构测试保持不变；非 mutation 测试仅验证解析后的值与上下文保持，不等于 opaque 原字节保存已实现。当前 GUI/C++ Schema 1、旧清单/协议、生产测试均未接入 v2。
