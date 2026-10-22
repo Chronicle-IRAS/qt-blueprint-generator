@@ -234,6 +234,8 @@ saveBlueprintDocument(request: BlueprintDocumentSaveRequest, registry: PluginReg
 
 `BlueprintDocumentSaveRequest` contains `directory`, `sourceText` and explicit `mode: "create" | "save-as" | "overwrite"`. Overwrite additionally requires `expectedSha256`; use the exact-byte hash returned by a prior load/save, not a hash of reserialized JSON. Create/save-as never authorize replacement of an existing target.
 
+The store captures these scalar request fields before its first asynchronous operation and uses the validated absolute directory throughout the save. Later caller changes to the request object cannot change the selected destination, source, mode or overwrite baseline; the caller's object is not frozen or modified.
+
 Successful load/save results use `status: "loaded"` / `"saved"`, `readResult` (the Reader's full `status: "read"` result) and `sha256`. A successful save has `writeState: "verified"`. Failures use `status: "failed"`, stable `code`, a safe message and, when available, `readResult` with Reader diagnostics. Saving distinguishes `writeState: "not-written"` from `"committed-unverified"`; the latter requires inspecting/reloading the destination before another save. If safe temp cleanup fails, `cleanupFailed` and `retainedTempPath` report it. Do not retry by deleting files or discarding the expected hash.
 
 Example in this package's TypeScript environment, using caller-selected existing empty directories:

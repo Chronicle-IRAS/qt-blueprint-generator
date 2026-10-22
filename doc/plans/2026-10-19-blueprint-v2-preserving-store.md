@@ -46,7 +46,7 @@
 - [x] Step 4: Add staged-write/sync/rename/post-commit/cleanup fault tests and concurrent operations; use narrow fs spies only for otherwise unreliable failures, assert real disk bytes and directory contents. Cover all review focus cases, unknown plugins/nodes/fields, duplicate IDs and fixture records for locks/ports/edges/channels/drivers.
 - [x] Step 5: Run full Vitest, typecheck, diff check; report exact passed/skipped totals and observed RED evidence. Do not claim CTest was run.
 - [x] Step 6: Update actual API and safety guarantees, explicitly distinguish ordinary failure, concurrent modification and system crash, and defer edited opaque preservation to P1.2B2.
-- [ ] Step 7: Independent read-only spec/security/quality review, fix confirmed findings with regression tests, rerun affected checks and obtain focused re-review.
+- [x] Step 7: Independent read-only spec/security/quality review, fix confirmed findings with regression tests, rerun affected checks and obtain focused re-review.
 - [ ] Step 8: Fetch latest main, normal commit/push, independent PR base main; verify clean status and matching remote HEAD. No automatic merge, tag changes or next-stage work.
 
 ## Plan review
