@@ -423,6 +423,46 @@ it("rejects overlapping operations for the same directory", async () => {
   expect(await fs.readFile(target(dir), "utf8")).toBe(sourceText);
 });
 
+it("keeps the original overwrite baseline when the caller mutates its request", async () => {
+  const dir = await directory();
+  const external = sourceText + "\n";
+  await fs.writeFile(target(dir), sourceText);
+  const request = { directory: dir, sourceText: sourceText + " ", mode: "overwrite" as const, expectedSha256: hash(sourceText) };
+  duringStage(async () => {
+    await fs.writeFile(target(dir), external);
+    request.expectedSha256 = hash(external);
+  });
+  expect(await saveBlueprintDocument(request, registry))
+    .toMatchObject({ status: "failed", code: "CONFLICT", writeState: "not-written" });
+  expect(await fs.readFile(target(dir), "utf8")).toBe(external);
+  expect(await fs.readdir(dir)).toEqual(["blueprint.json"]);
+});
+
+it("keeps the selected directory and source when the caller mutates its request", async () => {
+  const dir = await directory(), other = await directory();
+  const request = { directory: dir, sourceText, mode: "create" as const };
+  const saving = saveBlueprintDocument(request, registry);
+  request.directory = other + path.sep;
+  request.sourceText = sourceText + " ";
+  expect(await saving).toMatchObject({ status: "saved", writeState: "verified" });
+  expect(await fs.readFile(target(dir), "utf8")).toBe(sourceText);
+  expect(await fs.readdir(dir)).toEqual(["blueprint.json"]);
+  expect(await fs.readdir(other)).toEqual([]);
+  expect(request.directory).toBe(other + path.sep);
+});
+
+it("keeps the overwrite mode when the caller mutates its request", async () => {
+  const dir = await directory();
+  await fs.writeFile(target(dir), sourceText);
+  const request: { directory: string; sourceText: string; mode: "overwrite" | "create"; expectedSha256: string } =
+    { directory: dir, sourceText: sourceText + " ", mode: "overwrite", expectedSha256: hash(sourceText) };
+  duringStage(async () => { request.mode = "create"; });
+  expect(await saveBlueprintDocument(request, registry)).toMatchObject({ status: "saved", writeState: "verified" });
+  expect(await fs.readFile(target(dir), "utf8")).toBe(sourceText + " ");
+  expect(await fs.readdir(dir)).toEqual(["blueprint.json"]);
+  expect(request.mode).toBe("create");
+});
+
 it.runIf(process.platform === "win32")("fails closed when native Windows attribute inspection is unavailable", async () => {
   const dir = await directory();
   vi.spyOn(childProcess, "execFile").mockImplementationOnce((...args: any[]) => {

@@ -115,23 +115,27 @@ export async function saveBlueprintDocument(request: BlueprintDocumentSaveReques
     temp = undefined;
   };
   try {
-    key = acquire(request.directory);
-    const bytes = Buffer.from(request.sourceText, "utf8");
-    if (decode(bytes) !== request.sourceText) throw new StoreError("ENCODING_INVALID", "Source text cannot be encoded losslessly");
+    const { directory: requestedDirectory, sourceText, mode: saveMode } = request;
+    const expectedSha256 = request.mode === "overwrite" ? request.expectedSha256 : undefined;
+    const directory = blueprintDirectory(requestedDirectory);
+    key = acquire(directory);
+    const bytes = Buffer.from(sourceText, "utf8");
+    if (decode(bytes) !== sourceText) throw new StoreError("ENCODING_INVALID", "Source text cannot be encoded losslessly");
     read(bytes, registry, "SOURCE_REJECTED");
-    if (!["create", "save-as", "overwrite"].includes(request.mode) ||
-      (request.mode === "overwrite" && !/^[a-f0-9]{64}$/i.test(request.expectedSha256))) {
+    if (!["create", "save-as", "overwrite"].includes(saveMode) ||
+      (saveMode === "overwrite" && !/^[a-f0-9]{64}$/i.test(expectedSha256 ?? ""))) {
       throw new StoreError("INVALID_REQUEST", "A supported mode and overwrite SHA-256 baseline are required");
     }
-    const mode = request.mode === "overwrite" ? "existing" : "empty";
-    snapshot = await inspectBlueprintDirectory(request.directory, mode);
+    const baseline = expectedSha256?.toLowerCase();
+    const mode = saveMode === "overwrite" ? "existing" : "empty";
+    snapshot = await inspectBlueprintDirectory(directory, mode);
     const { destination } = snapshot;
-    if (request.mode === "overwrite") {
+    if (saveMode === "overwrite") {
       const existing = await readTarget(snapshot);
-      if (digest(existing) !== request.expectedSha256.toLowerCase()) throw new StoreError("CONFLICT", "The destination content changed");
+      if (digest(existing) !== baseline) throw new StoreError("CONFLICT", "The destination content changed");
       read(existing, registry, "EXISTING_REJECTED");
     }
-    const candidate = path.join(request.directory, `.blueprint-${randomUUID()}.tmp`);
+    const candidate = path.join(directory, `.blueprint-${randomUUID()}.tmp`);
     const handle = await fs.open(candidate, "wx", 0o600);
     temp = candidate;
     try {
@@ -140,7 +144,7 @@ export async function saveBlueprintDocument(request: BlueprintDocumentSaveReques
     }
     finally { await handle.close(); }
     if (!(await fs.readFile(temp)).equals(bytes)) throw new StoreError("VERIFY_FAILED", "Staged bytes do not match source text");
-    const current = await inspectBlueprintDirectory(request.directory, mode, path.basename(temp));
+    const current = await inspectBlueprintDirectory(directory, mode, path.basename(temp));
     if (!sameBlueprintLocation(snapshot, current) || snapshot.targetIdentity !== current.targetIdentity) {
       throw new StoreError("CONFLICT", "The project or destination identity changed");
     }
@@ -156,9 +160,9 @@ export async function saveBlueprintDocument(request: BlueprintDocumentSaveReques
         throw new StoreError("VERIFY_FAILED", "Staged bytes or identity changed before publication");
       }
     } finally { await staged.close(); }
-    if (request.mode === "overwrite") {
+    if (saveMode === "overwrite") {
       const existing = await readTarget(current);
-      if (digest(existing) !== request.expectedSha256.toLowerCase()) throw new StoreError("CONFLICT", "The destination content changed");
+      if (digest(existing) !== baseline) throw new StoreError("CONFLICT", "The destination content changed");
       read(existing, registry, "EXISTING_REJECTED");
       await fs.rename(temp, destination);
       temp = undefined;
@@ -174,7 +178,7 @@ export async function saveBlueprintDocument(request: BlueprintDocumentSaveReques
       try { await cleanup(); }
       catch { throw new StoreError("CLEANUP_FAILED", "Published file exists but staging cleanup failed"); }
     }
-    const loaded = await loadDocument(request.directory, registry);
+    const loaded = await loadDocument(directory, registry);
     if (loaded.status !== "loaded" || loaded.sha256 !== digest(bytes)) throw new StoreError("VERIFY_FAILED", "Published bytes could not be verified");
     return Object.freeze({ status: "saved", writeState: "verified", readResult: loaded.readResult, sha256: loaded.sha256, canGenerate: false });
   } catch (error) {
