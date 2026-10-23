@@ -1,16 +1,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import type { PluginRegistry } from "./plugin-registry.js";
+import type { PluginRegistry, RegistrySnapshot } from "./plugin-registry.js";
 import { readBlueprintDocument, type BlueprintDocumentReadResult } from "./blueprint-document-reader.js";
 import { BlueprintPathError, blueprintDirectory, inspectBlueprintDirectory, inspectOwnedTemp, fileIdentity, sameBlueprintLocation, type BlueprintPathSnapshot } from "./blueprint-store-paths.js";
 
-export type BlueprintDocumentSaveRequest = Readonly<{ directory: string; sourceText: string } & (
+export type BlueprintDocumentSaveRequest = Readonly<{ directory: string; sourceText: string; expectedRegistrySnapshot?: RegistrySnapshot } & (
   | { mode: "create" | "save-as" }
   | { mode: "overwrite"; expectedSha256: string }
 )>;
 export type BlueprintStoreFailureCode = "SOURCE_REJECTED" | "EXISTING_REJECTED" | "ENCODING_INVALID" |
-  "PATH_UNSAFE" | "DIRECTORY_UNSUITABLE" | "CONFLICT" | "BUSY" | "INVALID_REQUEST" | "IO_ERROR" | "VERIFY_FAILED" | "CLEANUP_FAILED";
+  "PATH_UNSAFE" | "DIRECTORY_UNSUITABLE" | "CONFLICT" | "BUSY" | "INVALID_REQUEST" | "IO_ERROR" | "VERIFY_FAILED" | "CLEANUP_FAILED" | "REGISTRY_CHANGED";
 type ReadDocument = Extract<BlueprintDocumentReadResult, { status: "read" }>;
 interface StoreFailure {
   readonly status: "failed";
@@ -117,6 +117,13 @@ export async function saveBlueprintDocument(request: BlueprintDocumentSaveReques
   try {
     const { directory: requestedDirectory, sourceText, mode: saveMode } = request;
     const expectedSha256 = request.mode === "overwrite" ? request.expectedSha256 : undefined;
+    const expectedRegistrySnapshot = request.expectedRegistrySnapshot;
+    const checkRegistry = () => {
+      if (expectedRegistrySnapshot !== undefined && registry.snapshot() !== expectedRegistrySnapshot) {
+        throw new StoreError("REGISTRY_CHANGED", "Registry authority changed during the save transaction");
+      }
+    };
+    checkRegistry();
     const directory = blueprintDirectory(requestedDirectory);
     key = acquire(directory);
     const bytes = Buffer.from(sourceText, "utf8");
@@ -164,9 +171,11 @@ export async function saveBlueprintDocument(request: BlueprintDocumentSaveReques
       const existing = await readTarget(current);
       if (digest(existing) !== baseline) throw new StoreError("CONFLICT", "The destination content changed");
       read(existing, registry, "EXISTING_REJECTED");
+      checkRegistry();
       await fs.rename(temp, destination);
       temp = undefined;
     } else {
+      checkRegistry();
       try { await fs.link(temp, destination); }
       catch (error) {
         if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new StoreError("CONFLICT", "The destination was created concurrently");
@@ -179,6 +188,7 @@ export async function saveBlueprintDocument(request: BlueprintDocumentSaveReques
       catch { throw new StoreError("CLEANUP_FAILED", "Published file exists but staging cleanup failed"); }
     }
     const loaded = await loadDocument(directory, registry);
+    checkRegistry();
     if (loaded.status !== "loaded" || loaded.sha256 !== digest(bytes)) throw new StoreError("VERIFY_FAILED", "Published bytes could not be verified");
     return Object.freeze({ status: "saved", writeState: "verified", readResult: loaded.readResult, sha256: loaded.sha256, canGenerate: false });
   } catch (error) {

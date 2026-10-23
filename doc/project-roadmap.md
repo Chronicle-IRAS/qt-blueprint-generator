@@ -33,11 +33,13 @@ Phase 1 不支持 Decision、ExternalCode 运行时、连线标签、分支、�
 
 毕业范围优先收敛为 Qt GUI、可复用插件边界、Qt 目标适配和首个 Embedded 目标真实交叉编译。多 Unit 通信与完整 AI Review/返工属于后续增量，不提前承诺全部交付。已完成的 Candidate Accept/工作区集成不再按旧 Issue #32 作为待补工作；后续评审功能应建立新的明确范围。
 
-P1.2B1 补充独立的 [v2 保留式文档存储](../tools/schema-contracts/README.md#preserving-blueprint-document-store)：原始 JSON 文本按 UTF-8 创建、显式另存为或经 SHA-256 冲突检查覆盖，随后重读复验。缺失插件、未知定义及其他语义问题不会导致数据被删除或阻止保留式保存；结构非法仍拒绝，生成始终关闭。安全范围是独立目录中的单个 `blueprint.json`，不包含布局、GUI、局部属性编辑或旧工程迁移。P1.2B2 的编辑后 opaque payload 保留须另行设计，本轮不进入该阶段。
+P1.2B1 提供独立的 [v2 保留式文档存储](../tools/schema-contracts/README.md#preserving-blueprint-document-store)：原始 JSON 文本按 UTF-8 创建、显式另存为或经 SHA-256 冲突检查覆盖，随后重读复验。缺失插件、未知定义及其他语义问题不会导致数据被删除或阻止保留式保存；结构非法仍拒绝，生成始终关闭。安全范围是独立目录中的单个 `blueprint.json`，不包含布局、GUI 或旧工程迁移。
+
+P1.2B2 增加[受限局部编辑](../tools/schema-contracts/README.md#restricted-blueprint-document-edits)：仅修改工程名称、KnownNode 既有且直接声明的标量属性，以及已有静态端口的显示名称。节点按 sourceIndex 定位，端口同时核对数组位置和声明 ID；批量操作整体验证，失败不返回可保存的候选文本。只替换原文中的授权值范围，其余片段保留原始 UTF-8 字节；重复 JSON 键或不确定定位拒绝编辑。保存复用 B1 的原文件哈希与文件事务，并检查 Registry 授权快照。嵌套属性、节点/端口增删、任意 JSON 编辑、布局、GUI 和生成仍不在本阶段范围内。
 
 ## 迁移与信任约束
 
-现有 `blueprint.json` / `layout.json` 不做自动升级或降级；未来转换必须显式复制到新工程，给出诊断并保留原文件、布局、未知字段与 opaque 插件 payload 原始字节，不要求新 JSON 文件整体字节一致。旧读取器拒绝未知版本。P1.2A 提供独立 TS 文本解析和只读占位数据；P1.2B1 仅将未修改文本完整保存并重读，不保证编辑后 opaque payload 原始字节往返。未来的 GUI 占位、布局及编辑后保留式保存仍需独立设计和验收；不能把它们描述成当前 v1 能力。文件路径检查和提交前摘要复验不能彻底消除恶意并发路径替换，不宣称跨文件或系统崩溃原子性。
+现有 `blueprint.json` / `layout.json` 不做自动升级或降级；未来转换必须显式复制到新工程，给出诊断并保留原文件、布局、未知字段与 opaque 插件 payload 原始字节，不要求新 JSON 文件整体字节一致。旧读取器拒绝未知版本。P1.2A 提供独立 TS 文本解析和只读占位数据；P1.2B1 保存未修改文本；P1.2B2 仅在上述授权标量值替换之外保留原始片段，不提供通用编辑后的无损重建。未来的 GUI 占位、布局及其他编辑操作仍需独立设计和验收；不能把它们描述成当前 v1 能力。文件路径检查和提交前摘要复验不能彻底消除恶意并发路径替换，不宣称跨文件或系统崩溃原子性。
 
 多 Unit 产物索引采用独立 Draft 元数据，不能向严格六字段的旧 generation manifest 添加字段。插件 capability manifest 只是能力声明，不是 OS 沙箱；初期只加载可信插件，未经验证隔离的不可信插件被拒绝。可信服务拥有 Candidate 写入、Accept、scaffold 和 Build 授权；Sidecar 进程本身不能证明文件权限隔离，构建执行也不是代码沙箱。生成/接受上下文最终应绑定项目、文档、Unit、插件版本及驱动/受保护文件哈希，变化或取消后拒绝旧结果。
 
