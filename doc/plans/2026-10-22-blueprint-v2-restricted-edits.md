@@ -48,7 +48,9 @@
 - [x] Step 5: Add real temporary-directory save/reload/re-edit tests, source/hash mismatch, late disk conflict, write/rename/postcommit faults and mutable request/Registry changes. Delegate all file writes to existing Store and verify actual disk bytes; only narrow low-level fault injection.
 - [x] Step 6: Full Vitest, typecheck and diff checks; record exact totals, platform skips and real RED/GREEN evidence. Existing 373 tests stay intact. No CMake/CTest needed for untouched Qt paths; report this explicitly.
 - [x] Step 7: Update API/examples, editable/read-only fields, precise byte guarantee, resource bounds and Store concurrency/crash limitations. Update roadmap and progress without rewriting historical acceptance evidence.
-- [ ] Step 8: Independent read-only spec/security/quality review, regression fixes and focused re-review. Fetch latest main, commit/push and create one PR base main; verify clean/matching HEAD, no merge or tag/release changes, then stop.
+- [x] Step 8: Independent read-only spec/security/quality review, regression fixes and focused re-review. Fetch latest main, commit/push and create one PR base main; verify clean/matching HEAD, no merge or tag/release changes, then stop.
+
+Delivery: [PR #60](https://github.com/Chronicle-IRAS/qt-blueprint-generator/pull/60), base main. Independent review Ready; Windows full Vitest 459/459, primary focused rerun 86/86, typecheck and diff checks passed. No automatic merge, Tag or Release changes.
 
 ## Self-review
 
