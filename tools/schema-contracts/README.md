@@ -284,3 +284,61 @@ On Windows, the built-in Windows PowerShell executable performs a fixed, noninte
 | Process/system crash | A crash may leave a temp or interrupt post-commit verification. File flush and single-file publication are not a guarantee of directory-entry durability on every filesystem. There is no cross-file/crash transaction, automatic recovery or stale-file deletion. |
 
 The API does not preserve filesystem metadata such as ACLs, ownership or timestamps as a document-format contract. The byte-preservation claim concerns the valid original UTF-8 JSON text. Neither generation workspaces nor the Qt/C++ ProjectStore participate in this store.
+
+## Restricted Blueprint document edits
+
+P1.2B2 adds [blueprint-document-editor.ts](blueprint-document-editor.ts). The pure API accepts original text, explicit operations and the current Registry:
+
+```typescript
+prepareBlueprintEdits(sourceText, [
+  { kind: "project-name", value: "演示工程" },
+  { kind: "node-property", sourceIndex: 0, property: "label", value: "温度" },
+  { kind: "port-name", sourceIndex: 0, portIndex: 0, portId: "out", value: "输出" },
+], registry);
+```
+
+The result is either `status: "prepared"` with candidate `sourceText`, the full post-edit `readResult` and its diagnostics, or `status: "failed"` with a stable `code` and diagnostics and no approved candidate text. All results keep `canGenerate: false`. The whole batch succeeds or fails; repeated/overlapping targets are rejected, even if their replacement values agree. This function performs no file I/O and does not modify the input text, operations or Registry.
+
+| Target | Edit permission |
+| --- | --- |
+| Top-level `projectName` | String replacement in any structurally valid, unambiguous v2 document, including documents with missing plugins or semantic errors |
+| KnownNode direct property | Existing own scalar member, explicitly declared in the exact trusted definition's root `propertiesSchema.properties`; new value must be string, boolean, finite number or null and satisfy its contract |
+| KnownNode static port `name` | String replacement; `sourceIndex`, `portIndex` and supplied `portId` must resolve exactly to an existing, uniquely identified static declaration |
+| UnknownNode and all other fields | Read-only: identities, locks, versions, nested values, ports other than display names, edges, channels, driver bindings, and unknown extensions cannot be edited |
+
+KnownNode recognition is re-evaluated by the Reader using exact definitions and trusted locks. A duplicate node ID does not collapse array records: `sourceIndex` selects the intended record. Port names never select ports. Pattern-only, conditional-only or reference-only property declarations do not grant edit permission; there must be a direct declaration. The existing P0.3 Ajv compiler/evaluator checks the complete edited property object, including conditional/cross-property rules. Errors on other fields may remain, but they cannot conceal a newly introduced contract failure or an invalid edited field.
+
+Special property names are treated as data. Declared `constructor`, slash and tilde names can be edited using own-member lookup. `__proto__` is an explicit read-only exception: the current Ajv evaluator skips its `properties` constraint, so this API refuses to certify replacements rather than introducing different validation rules. Other edits preserve its original text. This does not change P0.3 or Reader behavior.
+
+### Original-text guarantee
+
+[json-value-spans.ts](json-value-spans.ts) uses bounded iterative token/span traversal, with strict JSON syntax and the existing Reader/Schema as validation authorities. It locates decoded object keys and original array positions; regular expressions and string searches do not choose field locations. Duplicate decoded keys anywhere in the source, including escaped aliases and opaque payloads, refuse editing. Existing B1 unchanged-text saving retains its previous behavior.
+
+Only the authorized scalar value ranges are replaced. Every other text fragment retains identical UTF-8 bytes: whitespace, CRLF, indentation, key order, escape spelling, unrelated number literals, unknown fields/nodes and nested opaque payloads. Replacement scalar spelling may change; the whole document is never rebuilt with `JSON.stringify(document)`. Raw unpaired surrogates and BOM are refused. Negative zero replacements remain `-0`.
+
+Limits are explicit: source and candidate at most 8 Mi UTF-16 code units, at most 250,000 indexed values, 16,384 container depth and 256 operations per batch. Empty batches are rejected. Iterative scanning rejects excess resources before unbounded Reader work and supports deeply nested opaque data without recursive traversal. These edit limits do not redefine the Blueprint machine Schema or the existing Reader/Store acceptance rules.
+
+### Save and edit again
+
+```typescript
+const loaded = await loadBlueprintDocument(directory, registry);
+if (loaded.status === "loaded") {
+  const saved = await saveEditedBlueprintDocument({
+    directory,
+    sourceText: loaded.readResult.sourceText,
+    expectedSha256: loaded.sha256,
+    edits: [{ kind: "project-name", value: "新名称" }],
+  }, registry);
+  if (saved.status === "saved") {
+    // Use saved.readResult.sourceText and saved.sha256 for the next edit.
+  }
+}
+```
+
+This entry point re-prepares edits against the current Registry; a previously prepared result is not an authorization token. It checks that the original source's UTF-8 SHA-256 matches the supplied disk baseline before I/O, then delegates controlled overwrite to B1 `saveBlueprintDocument`. Requests and scalar operations are captured before awaiting. There is no second filesystem transaction or path policy.
+
+The Store's optional `expectedRegistrySnapshot` is checked at entry, before publication and after re-read. Changes observed before publication refuse the write; changes observed after publication return `REGISTRY_CHANGED` with `writeState: "committed-unverified"`. Ordinary Store callers without this guard retain their existing behavior. Snapshot identity is an in-process authority guard, not a cross-process filesystem lock.
+
+Edit-validation failures return `writeState: "not-written"` and no approved candidate. Store failures retain the existing `code`, `message` and `writeState`; source/baseline or disk conflicts report `CONFLICT`. Only `status: "saved", writeState: "verified"` confirms the post-write content and Reader result. Do not blindly retry or roll back `committed-unverified`: reload and inspect the actual file first. The concurrency, path-replacement, metadata and crash limits in **Actual write guarantees** still apply unchanged.
+
+This is not a general JSON editor or a save mechanism for layout, node/port insertion, dynamic ports or plugin migration. It does not enable generation or change the legacy Qt/C++ persistence path.

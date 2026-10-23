@@ -43,6 +43,22 @@ const diagnostic = (code: string, message: string, path: string, location: Parti
 const schemaErrors = (errors: ErrorObject[] | null | undefined, code: string, prefix: string) =>
   (errors ?? []).map(e => diagnostic(code, `${e.keyword}: ${e.message ?? "Invalid structure"}`, prefix + e.instancePath));
 
+/** The P0.3 isolated strict compiler, also used by restricted editing. */
+export function compileNodePropertiesSchema(schema: AnySchema): ValidateFunction {
+  const validate = new Ajv2020(options).compile(schema);
+  if ((validate as { $async?: boolean }).$async) throw new Error("Async properties schemas are unsupported");
+  return validate;
+}
+
+/** Copy errors immediately: Ajv overwrites validate.errors on its next evaluation. */
+export function evaluateNodeProperties(validate: ValidateFunction, properties: unknown):
+  { status: "evaluated"; valid: boolean; errors: readonly ErrorObject[] } | { status: "uncertain" } {
+  try {
+    const valid = validate(properties) as boolean;
+    return { status: "evaluated", valid, errors: (validate.errors ?? []).map(error => ({ ...error, params: { ...error.params } })) };
+  } catch { return { status: "uncertain" }; }
+}
+
 function prepare(input: unknown, trustedLocks: unknown): Prepared {
   if (!validateDescriptors(input)) return { diagnostics: schemaErrors(validateDescriptors.errors, "DESCRIPTOR_STRUCTURE", "/descriptors") };
   if (!validateLocks(trustedLocks)) return { diagnostics: schemaErrors(validateLocks.errors, "TRUSTED_LOCK_STRUCTURE", "/trustedLocks") };
@@ -96,8 +112,7 @@ function prepare(input: unknown, trustedLocks: unknown): Prepared {
       });
       try {
         // Isolated compiler: only this schema's self/local references are available.
-        const validate = new Ajv2020(options).compile(n.propertiesSchema);
-        if ((validate as { $async?: boolean }).$async) throw new Error("Async properties schemas are unsupported");
+        const validate = compileNodePropertiesSchema(n.propertiesSchema);
         properties.set(definitionKey(n), validate);
       } catch {
         add("PROPERTY_SCHEMA_INVALID", "Invalid or unsupported strict Draft 2020-12 properties schema", `${nodePath}/propertiesSchema`, m.pluginId);
@@ -192,11 +207,10 @@ export function validateBlueprintWithDescriptors(input: unknown, descriptors: un
     if (!definition) return; // Original validator diagnoses unknown definitions; do not guess a version.
     const location = { nodeId: node.id }, path = `/nodes/${i}`;
     const validateProperties = prepared.properties!.get(defKey)!;
-    try {
-      if (!validateProperties(node.properties)) extra.push(diagnostic("NODE_PROPERTIES", "Properties violate the declared node schema", `${path}/properties`, location));
-    } catch {
+    const evaluation = evaluateNodeProperties(validateProperties, node.properties);
+    if (evaluation.status === "uncertain") {
       extra.push(diagnostic("NODE_PROPERTIES_EVALUATION", "Declared node schema could not safely evaluate properties", `${path}/properties`, location));
-    }
+    } else if (!evaluation.valid) extra.push(diagnostic("NODE_PROPERTIES", "Properties violate the declared node schema", `${path}/properties`, location));
     for (const p of definition.ports) {
       const observed = node.ports.find(actual => actual.id === p.id);
       if (!observed) extra.push(diagnostic("NODE_PORT_MISSING", "Declared static port is missing", `${path}/ports`, { ...location, portId: p.id }));

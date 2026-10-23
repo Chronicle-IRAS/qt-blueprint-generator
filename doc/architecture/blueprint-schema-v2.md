@@ -8,7 +8,9 @@ P0.3 的 [Descriptor 协议](plugin-descriptor-contracts.md) 定义可信描述�
 
 P1.2A 补充独立的 [TS 只读文档读取 API](../../tools/schema-contracts/README.md#read-only-blueprint-document-reader)：读取 v2 JSON 文本，保留原文和完整解析数据，复用 Registry 校验并返回带 sourceIndex 的 KnownNode/UnknownNode 展示信息。精确定义与可信精确锁缺一不可；普通属性或端口语义错误不自动使定义变成未知。所有结果均禁止生成。它尚未接入 Qt 应用，不提供保存、布局恢复或 opaque payload 原始字节往返；下文相关保存要求仍是未来 Draft，不代表本轮已实现，也不改变机器 Schema。
 
-P1.2B1 在 Reader 外增加独立的 [TS 保留式文档存储](../../tools/schema-contracts/README.md#preserving-blueprint-document-store)：仅将未修改的原始 JSON 文本按 UTF-8 写入独立目录的 `blueprint.json`，并重新读取复验。结构非法拒绝，语义错误允许原文保存且返回诊断，生成始终关闭。覆盖核对原文件 SHA-256，同目录临时写入后发布；目录保护、并发及崩溃边界见 API 文档。它不保存布局、不迁移 v1，也不实现编辑后 opaque payload 原始字节保留；后者留待 P1.2B2。
+P1.2B1 在 Reader 外增加独立的 [TS 保留式文档存储](../../tools/schema-contracts/README.md#preserving-blueprint-document-store)：仅将未修改的原始 JSON 文本按 UTF-8 写入独立目录的 `blueprint.json`，并重新读取复验。结构非法拒绝，语义错误允许原文保存且返回诊断，生成始终关闭。覆盖核对原文件 SHA-256，同目录临时写入后发布；目录保护、并发及崩溃边界见 API 文档。该 Store 本身不编辑文档、不保存布局、不迁移 v1；受限编辑由下述 P1.2B2 API 提供。
+
+P1.2B2 的 [TS 受限编辑器](../../tools/schema-contracts/README.md#restricted-blueprint-document-edits)仅开放 projectName、KnownNode 既有直接声明的标量属性及已有静态端口 name。按原始 JSON 值范围整体替换，其他片段（含未知节点及 opaque payload）保持原始 UTF-8 字节；重复键、定位歧义、越界及新契约错误拒绝操作。保存仍使用 B1，并绑定原文哈希与当前 Registry 快照。此限制性能力不等于任意 JSON 编辑、布局保存或迁移，机器 Schema 不变。
 
 ## 与现有版本的边界
 
@@ -197,7 +199,7 @@ AI 只接收 interfaceContract，不接收用户驱动源码；驱动变化使�
 
 ## 未知节点、锁与保存
 
-P1.2A 独立读取器区分结构门禁与 ID/引用等语义诊断，缺失插件/定义时返回 UnknownNode 展示数据；P1.2B1 允许这些结构合法的文档按原文保存。Qt GUI 占位尚未接入。以下段落中关于编辑后 opaque payload、布局和 canonical 摘要的要求仍是后续 Draft。
+P1.2A 独立读取器区分结构门禁与 ID/引用等语义诊断，缺失插件/定义时返回 UnknownNode 展示数据；P1.2B1 允许这些结构合法的文档按原文保存。P1.2B2 可修改工程名称而保持 UnknownNode 全文只读，并在受限已知字段编辑时保留其他原始片段。Qt GUI 占位尚未接入。以下段落中超出受限标量编辑的 opaque payload、布局和 canonical 摘要要求仍是后续 Draft。
 未识别节点的未知字段、properties、ports 及命名空间扩展须无损保留，其中 opaque 插件 payload 的原始字节单独保留。
 未改动的 opaque payload 不得因规范化、改名或保存被删除、重写或丢失；布局也保留。
 该要求针对 payload 字节与未知字段，不要求重新保存后的整个 JSON 文件字节一致；显式复制保留的原工程不改写。

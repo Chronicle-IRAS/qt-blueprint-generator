@@ -2,7 +2,9 @@
 
 P0.3 当前实现见 [Plugin Descriptor Contracts](plugin-descriptor-contracts.md)：纯数据声明、独立可信锁、依赖/版本/所有权/双向目标支持校验及 P0.2 上下文装配。P1.1 增加[最小内存 Registry](../../tools/schema-contracts/README.md#minimal-plugin-registry)，复用 P0.3 原子登记/注销可信声明、发现/查询及验证；不执行插件，不实现 Host、Graph IR 或 GUI 接入。
 
-P1.2A/P1.2B1 已分别提供独立 TS 的 [v2 只读解析](../../tools/schema-contracts/README.md#read-only-blueprint-document-reader)与[未修改原文的保留式存储](../../tools/schema-contracts/README.md#preserving-blueprint-document-store)。它们尚未接入 Qt 应用；下文的应用读取器、编辑后 opaque 保存及布局保留仍是规划。保存接受结构合法但语义有误的文档并返回诊断，不授予生成能力，不改变现行 Qt ProjectStore 或生成工作区。
+P1.2A/P1.2B1 已分别提供独立 TS 的 [v2 只读解析](../../tools/schema-contracts/README.md#read-only-blueprint-document-reader)与[未修改原文的保留式存储](../../tools/schema-contracts/README.md#preserving-blueprint-document-store)。它们尚未接入 Qt 应用；应用读取器、布局保留及下述 P1.2B2 范围以外的编辑仍是规划。保存接受结构合法但语义有误的文档并返回诊断，不授予生成能力，不改变现行 Qt ProjectStore 或生成工作区。
+
+P1.2B2 增加独立的[受限编辑 API](../../tools/schema-contracts/README.md#restricted-blueprint-document-edits)，只开放工程名、可信已知节点的既有声明标量属性和静态端口显示名。原文中未替换的范围保持 UTF-8 字节，UnknownNode 内部数据仍只读；保存复用 B1 并验证原文哈希及 Registry 快照。通用编辑、布局、应用 GUI 与生成仍待后续实现。
 
 状态：Draft，2026-10-12。本文描述长期 Architecture B，不是已实现功能清单。
 蓝图 Schema v2、Plugin API v1、插件 manifest、RPC 和多 Unit 产物元数据均未冻结；当前程序不能加载这些提案。
