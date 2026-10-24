@@ -27,6 +27,11 @@
 #include <QPointer>
 #include <QDirIterator>
 #include <QDockWidget>
+#include <QUrl>
+#include <QGraphicsTextItem>
+#include <QClipboard>
+#include <QWheelEvent>
+#include <QDialogButtonBox>
 
 namespace {
 QByteArray read(const QString &path) { QFile file(path); return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray(); }
@@ -96,6 +101,20 @@ private slots:
    for (auto *item : view->scene()->items()) if (item->data(0).isValid()) ++nodes;
    QCOMPARE(nodes, 3);
  }
+ void chineseV2OpenDialogTranslatesButtons() {
+   MainWindow w; QVERIFY(w.setLanguage("zh_CN")); QString openText,cancelText;
+   QTimer::singleShot(0,&w,[&] {
+     auto *dialog=qobject_cast<QDialog *>(QApplication::activeModalWidget()); if(!dialog)return;
+     auto *buttons=dialog->findChild<QDialogButtonBox *>();
+     if(buttons) for(auto *button:buttons->buttons()) {
+       if(buttons->buttonRole(button)==QDialogButtonBox::AcceptRole)openText=button->text();
+       if(buttons->buttonRole(button)==QDialogButtonBox::RejectRole)cancelText=button->text();
+     }
+     dialog->reject();
+   });
+   w.findChild<QAction *>("openV2ProjectAction")->trigger();
+   QCOMPARE(openText,QString("打开")); QCOMPARE(cancelText,QString("取消")); QVERIFY(!w.isV2Mode());
+ }
  void knownNodesSelectionAndNoWrites() {
    QTemporaryDir temp; QVERIFY(temp.isValid()); auto trust=bundle(temp); const auto before=files(temp.path());const auto beforeInput=files(QStringLiteral(V2_FIXTURE_DIR));
    MainWindow w; configure(w); QSignalSpy done(&w,&MainWindow::v2LoadFinished); w.openV2Project(QStringLiteral(V2_FIXTURE_DIR),trust);
@@ -130,6 +149,46 @@ private slots:
    QCOMPARE(count,3);QVERIFY(w.findChild<QPlainTextEdit *>("v2Properties")->toPlainText().contains("second duplicate"));
    auto text=w.findChild<QPlainTextEdit *>("v2Diagnostics")->toPlainText();QVERIFY(text.contains("DUPLICATE_NODE_ID"));QVERIFY(text.contains("unresolved"));QVERIFY(text.contains("archive-value"));
    int lines=0;for(auto *item:view->scene()->items()) if(dynamic_cast<QGraphicsLineItem *>(item))++lines;QCOMPARE(lines,0);
+ }
+ void defaultV2LayoutIsReadableAndResetPreservesMode_data() {
+   QTest::addColumn<QString>("language"); QTest::addColumn<bool>("dark");
+   QTest::newRow("english-light")<<QString("en")<<false;
+   QTest::newRow("english-dark")<<QString("en")<<true;
+   QTest::newRow("chinese-light")<<QString("zh_CN")<<false;
+   QTest::newRow("chinese-dark")<<QString("zh_CN")<<true;
+ }
+ void defaultV2LayoutIsReadableAndResetPreservesMode() {
+   QFETCH(QString,language); QFETCH(bool,dark);
+   MainWindow w; configure(w); QVERIFY(w.setLanguage(language)); w.setTheme(dark ? EditorTheme::Theme::Dark : EditorTheme::Theme::Light);
+   w.resize(1100,700); w.show(); QCoreApplication::processEvents();
+   auto *legacyProperties=w.findChild<QDockWidget *>("propertiesDock"); auto *legacyBuild=w.findChild<QDockWidget *>("buildExportDock");
+   if(dark)legacyBuild->hide();
+   const bool propertiesVisible=legacyProperties->isVisible(), buildVisible=legacyBuild->isVisible();
+   QSignalSpy done(&w,&MainWindow::v2LoadFinished); w.openV2Project(QStringLiteral(V2_FIXTURE_DIR));
+   QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,20000); QVERIFY(done[0][0].toBool()); QCoreApplication::processEvents();
+   auto *banner=w.findChild<QLabel *>("v2ReadOnlyBanner"); auto *view=w.findChild<QGraphicsView *>("v2GraphicsView");
+   qInfo()<<"V2 layout: window"<<w.size()<<"banner"<<banner->size()<<"viewport"<<view->viewport()->size()<<"scene"<<view->sceneRect()<<"scale"<<view->transform().m11();
+   QVERIFY2(banner->height()<=banner->fontMetrics().height()*3,qPrintable(QString("banner %1px; font %2px").arg(banner->height()).arg(banner->fontMetrics().height())));
+   QVERIFY(view->viewport()->height()>w.centralWidget()->height()*0.8);
+   QVERIFY(view->viewport()->width()>w.centralWidget()->width()*0.55);
+   int nodes=0; QGraphicsItem *first=nullptr;
+   for(auto *item:view->scene()->items()) if(item->data(0).isValid()) {
+     ++nodes; if(item->data(0).toInt()==0)first=item;
+     QVERIFY(view->viewport()->rect().contains(view->mapFromScene(item->sceneBoundingRect().center())));
+     auto *label=dynamic_cast<QGraphicsTextItem *>(item->childItems().first()); QVERIFY(label);
+     const qreal screenTextHeight=QFontMetricsF(label->font()).height()*view->transform().m22();
+     QVERIFY2(screenTextHeight>=10.0,qPrintable(QString("node text height %1px").arg(screenTextHeight)));
+   }
+   QCOMPARE(nodes,3); QVERIFY(first);
+   QTest::mouseClick(view->viewport(),Qt::LeftButton,Qt::NoModifier,view->mapFromScene(first->sceneBoundingRect().center()));
+   auto *properties=w.findChild<QPlainTextEdit *>("v2Properties"); QVERIFY(properties->toPlainText().contains("source"));
+   properties->selectAll(); properties->copy(); QCOMPARE(QApplication::clipboard()->text(),properties->toPlainText());
+   const qreal scale=view->transform().m11(); const QPoint center=view->viewport()->rect().center();
+   QWheelEvent zoom(center,view->viewport()->mapToGlobal(center),QPoint(),QPoint(0,120),Qt::NoButton,Qt::ControlModifier,Qt::NoScrollPhase,false);
+   QApplication::sendEvent(view->viewport(),&zoom); QVERIFY(view->transform().m11()>scale);
+   w.findChild<QAction *>("resetLayoutAction")->trigger(); QCoreApplication::processEvents();
+   QVERIFY(!legacyProperties->isVisible()); QVERIFY(!legacyBuild->isVisible());
+   w.exitV2Mode(); QCOMPARE(legacyProperties->isVisible(),propertiesVisible); QCOMPARE(legacyBuild->isVisible(),buildVisible);
  }
  void failedLoadsPreserveProjectAndDirtyHistory() {
    QTemporaryDir temp; MainWindow w; configure(w);QVERIFY(w.addNodeOfType(NodeType::Start));const auto prior=w.document();const auto title=w.windowTitle();const auto undo=w.scene()->undoStack()->count();
@@ -227,6 +286,60 @@ private slots:
    connect(&w,&MainWindow::v2LoadFinished,&w,[&](bool success){if(success && prompt)prompt->findChild<QPushButton *>("replaceBlueprintProjectButton")->click();});
    QTimer::singleShot(0,&w,[&]{prompt=qobject_cast<QMessageBox *>(QApplication::activeModalWidget());if(prompt)w.openV2Project(QStringLiteral(V2_FIXTURE_DIR));});
    const bool saved=w.saveProjectAs(target.path());QCOMPARE(done.size(),1);QVERIFY(done[0][0].toBool());QVERIFY(w.isV2Mode());QVERIFY(!saved);QCOMPARE(files(target.path()),before);
+ }
+ void sourcePreflightCannotBuildOrExportAfterV2Entry_data() {
+   QTest::addColumn<bool>("exporting"); QTest::addColumn<bool>("switchWorkspace"); QTest::addColumn<bool>("rejectBuild");
+   for (bool switching : {false, true}) {
+     const QByteArray suffix = switching ? "-switch-workspace" : "-same-workspace";
+     QTest::newRow(("build" + suffix).constData()) << false << switching << false;
+     QTest::newRow(("rejected-build" + suffix).constData()) << false << switching << true;
+     QTest::newRow(("export" + suffix).constData()) << true << switching << false;
+   }
+ }
+ void sourcePreflightCannotBuildOrExportAfterV2Entry() {
+   QFETCH(bool, exporting); QFETCH(bool, switchWorkspace); QFETCH(bool, rejectBuild);
+   QTemporaryDir source, alternate, legacy, output, runtime;
+   BlueprintDocument document; document.projectId="preflight"; document.projectName="Preflight"; document.target="qt6-widgets-cpp17-cmake";
+   BlueprintNode start; start.id="start"; start.type=NodeType::Start; BlueprintNode end; end.id="end"; end.type=NodeType::End;
+   document.nodes={start,end}; document.edges={{"edge","start","end",{}}}; QString error;
+   QVERIFY2(ProjectScaffolder::create(document,source.path(),&error),qPrintable(error));
+   QVERIFY2(ProjectScaffolder::create(document,alternate.path(),&error),qPrintable(error));
+   write(source.filePath("generated-project/note.txt"),"saved");
+   // Delay loading the deployed production CLI, not a synthetic Reader response.
+   const QByteArray entry = QJsonDocument(QJsonArray{QUrl::fromLocalFile(QStringLiteral(V2_READER_ENTRY)).toString()}).toJson(QJsonDocument::Compact);
+   write(runtime.filePath("delayed.cjs"),"setTimeout(()=>import(" + entry.mid(1,entry.size()-2) + "),250);");
+   write(runtime.filePath("build.cjs"),"setTimeout(()=>process.exit(0),1000);");
+   MainWindow w; QVERIFY(w.addNodeOfType(NodeType::Start)); QVERIFY(w.saveProjectAs(legacy.path()));
+   w.setV2ReaderConfiguration(QStringLiteral(V2_NODE_EXECUTABLE),runtime.filePath("delayed.cjs"));
+   w.setBuildToolConfiguration(QStringLiteral(V2_NODE_EXECUTABLE),{runtime.filePath("build.cjs")});
+   auto *workspace=w.findChild<WorkspaceBrowserWidget *>(); QVERIFY(workspace->setWorkspacePath(source.path())); workspace->openFile("note.txt");
+   auto *preview=workspace->findChild<QPlainTextEdit *>("workspacePreview"); preview->insertPlainText("dirty"); QVERIFY(workspace->hasUnsavedChanges());
+   w.findChild<QLineEdit *>("workspacePathEdit")->setText(switchWorkspace ? alternate.path() : source.path());
+   w.findChild<QLineEdit *>("buildDirectoryEdit")->setText(rejectBuild ? (switchWorkspace ? alternate : source).filePath("generated-project") : output.filePath("build"));
+   w.findChild<QLineEdit *>("exportTargetEdit")->setText(output.path());
+   QSignalSpy done(&w,&MainWindow::v2LoadFinished); QPointer<QMessageBox> original; int nestedPrompts=0; bool completedInsideOriginal=false;
+   const auto discard=[](QMessageBox *box) { for(auto *button:box->buttons()) if(box->buttonRole(button)==QMessageBox::DestructiveRole) { button->click(); return; } };
+   QTimer prompts; prompts.setInterval(10);
+   connect(&prompts,&QTimer::timeout,&w,[&] {
+     auto *box=qobject_cast<QMessageBox *>(QApplication::activeModalWidget()); if(!box)return;
+     if(!original) original=box;
+     else if(box!=original) { ++nestedPrompts; discard(box); }
+   }); prompts.start();
+   connect(&w,&MainWindow::v2LoadFinished,&w,[&](bool success) {
+     completedInsideOriginal=success && original && QApplication::activeModalWidget()==original;
+     if(original) discard(original);
+   });
+   // Avoid hanging the suite if the expected modal ordering stops occurring.
+   QTimer deadline; deadline.setSingleShot(true); connect(&deadline,&QTimer::timeout,&w,[&] { if(auto *box=qobject_cast<QMessageBox *>(QApplication::activeModalWidget()))box->reject(); }); deadline.start(15000);
+   w.openV2Project(QStringLiteral(V2_FIXTURE_DIR));
+   w.findChild<QAction *>(exporting ? "toolbarExportAction" : "toolbarBuildAction")->trigger();
+   QCOMPARE(done.size(),1); QVERIFY(done[0][0].toBool()); QVERIFY(completedInsideOriginal); QCOMPARE(nestedPrompts,1); QVERIFY(w.isV2Mode());
+   QVERIFY(!w.findChild<BuildService *>()->isRunning());
+   QVERIFY(files(output.path()).isEmpty());
+   QVERIFY(!w.findChild<QAction *>("toolbarBuildAction")->isEnabled());
+   QVERIFY(!w.findChild<QPushButton *>("buildProjectButton")->isEnabled());
+   const auto log=w.findChild<QPlainTextEdit *>("buildLog")->toPlainText();
+   QVERIFY(!log.contains("Starting configure")); QVERIFY(!log.contains("Export finished"));
  }
  void failedLoadKeepsCandidateSuccessDismissesWithoutDiskWrites() {
    QTemporaryDir workspace,legacy,invalid;DeferredClient *client=nullptr;MainWindow w([&](const AiProviderSettings &,QObject *p){client=new DeferredClient(p);return client;});configure(w);prepareGeneration(w,workspace.path());QVERIFY(w.saveProjectAs(legacy.path()));

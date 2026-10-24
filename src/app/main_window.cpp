@@ -52,6 +52,7 @@
 #include <QSignalBlocker>
 #include <QSettings>
 #include <QScopedValueRollback>
+#include <QScopeGuard>
 #include <QStatusBar>
 #include <QToolBar>
 #include <QToolButton>
@@ -877,7 +878,9 @@ void MainWindow::chooseOpenV2Project() {
     auto *note = new QLabel(tr("Default: no plugins. The optional bundle is independent trusted metadata; it does not install or execute plugins."), &dialog); note->setWordWrap(true); layout->addRow(note);
     connect(browse, &QPushButton::clicked, &dialog, [&] { auto path = QFileDialog::getExistingDirectory(&dialog, tr("Project directory")); if (!path.isEmpty()) directory->setText(path); });
     connect(trustBrowse, &QPushButton::clicked, &dialog, [&] { auto path = QFileDialog::getOpenFileName(&dialog, tr("Trusted declaration bundle"), {}, "JSON (*.json)"); if (!path.isEmpty()) bundle->setText(path); });
-    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Open | QDialogButtonBox::Cancel, &dialog); layout->addRow(buttons);
+    auto *buttons = new QDialogButtonBox(&dialog); layout->addRow(buttons);
+    buttons->addButton(tr("Open"), QDialogButtonBox::AcceptRole);
+    buttons->addButton(tr("Cancel"), QDialogButtonBox::RejectRole);
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept); connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     dialog.resize(650, 200); if (dialog.exec() == QDialog::Accepted) openV2Project(directory->text(), bundle->text());
 }
@@ -1418,22 +1421,29 @@ void MainWindow::finishAbortedWorkspaceOperationClick()
 bool MainWindow::prepareWorkspaceOperation()
 {
     if (m_v2Mode) return false;
+    const quint64 epoch = m_projectEpoch;
+    const auto current = [this, epoch] { return !m_v2Mode && m_projectEpoch == epoch; };
     m_workspaceOperationPreflightActive = true;
+    const auto cleanup = qScopeGuard([this] {
+        m_workspaceOperationPreflightActive = false;
+        m_workspaceOperationMousePressPending = false;
+        m_deferredWorkspaceEdit = false;
+    });
     const QString target = m_workspacePathEdit->text().trimmed();
     const bool switched = m_workspaceBrowser->setWorkspacePath(target);
+    // Both source prompts may dispatch a Reader reply or another project transition.
+    if (!current()) return false;
     if (!switched) {
         const QSignalBlocker blocked(m_workspacePathEdit);
         m_workspacePathEdit->setText(m_workspaceBrowser->workspacePath());
     }
     const bool ready = switched && m_workspaceBrowser->requestCanDiscardChanges();
-    m_workspaceOperationPreflightActive = false;
-    m_workspaceOperationMousePressPending = false;
-    m_deferredWorkspaceEdit = false;
-    return ready;
+    return current() && ready;
 }
 
 void MainWindow::startBuild()
 {
+    const quint64 epoch = m_projectEpoch;
     if (!prepareWorkspaceOperation()) return;
     BuildRequest request;
     const QString workspace = m_workspacePathEdit->text().trimmed();
@@ -1451,9 +1461,11 @@ void MainWindow::startBuild()
     appendBuildLog(tr("Starting configure for %1\n").arg(request.sourceDirectory));
     m_buildProjectButton->setEnabled(false);
     m_toolbarBuildAction->setEnabled(false);
+    if (m_v2Mode || m_projectEpoch != epoch) return;
     if (!m_buildService->start(request, &error)) {
-        m_buildProjectButton->setEnabled(true);
-        m_toolbarBuildAction->setEnabled(true);
+        const bool current = !m_v2Mode && m_projectEpoch == epoch;
+        m_buildProjectButton->setEnabled(current);
+        m_toolbarBuildAction->setEnabled(current);
         appendBuildLog(tr("Build request rejected: %1\n").arg(error));
         return;
     }
@@ -1461,8 +1473,10 @@ void MainWindow::startBuild()
 
 void MainWindow::exportProject()
 {
+    const quint64 epoch = m_projectEpoch;
     if (!prepareWorkspaceOperation()) return;
     QString error;
+    if (m_v2Mode || m_projectEpoch != epoch) return;
     if (ProjectExporter::exportProject(m_workspacePathEdit->text().trimmed(),
                                        m_exportTargetEdit->text().trimmed(), &error)) {
         appendBuildLog(tr("Export finished successfully.\n"));
@@ -1485,8 +1499,8 @@ void MainWindow::resetWindowLayout()
     }
     addDockWidget(Qt::RightDockWidgetArea, m_propertiesDock);
     addDockWidget(Qt::BottomDockWidgetArea, m_buildDock);
-    m_propertiesDock->show();
-    m_buildDock->show();
+    m_propertiesDock->setVisible(!m_v2Mode);
+    m_buildDock->setVisible(!m_v2Mode);
     resizeDocks({m_propertiesDock}, {340}, Qt::Horizontal);
     resizeDocks({m_buildDock}, {260}, Qt::Vertical);
 }

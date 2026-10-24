@@ -10,7 +10,7 @@ Qt Desktop Editor 承担毕业设计要求的 Qt 图形界面、画布和本地�
 
 默认运行时生成使用 `startRuntime()` / `createRuntime()`，创建 generation manifest v2 工程。确定性生成器负责受保护的 `main.cpp`、WorkflowController、CMake 和公共契约，AI 负责当前节点 `implementation/` 与 `tests/`，必须定义契约声明的固定 `createModule_HASH` factory，返回保护契约类的 `std::unique_ptr`；装配器不猜测 AI 的具体类名。manifest 严格保留 `version`、`blueprintSha256`、`modules`、`protectedFiles`、`files`、`batches` 六字段，只接受版本 1 或 2。
 
-AI 菜单和节点右键菜单保留明确的 legacy v1 模块生成动作，通过原 `create()` / `start()` 保留 module-only v1 原字节产物和占位入口；既有 v1 工程可继续生成候选及 Build / Export。两种模式不互迁，运行时失败不自动回退到旧版，新运行时使用新的空工作区。蓝图读取器本身仍为 Schema 1、固定六类 NodeType；generation manifest v2 不意味着蓝图 Schema v2 已实现。Candidate JSON、固定 factory 与 ExternalCode import manifest 本次均不变。
+AI 菜单和节点右键菜单保留明确的 legacy v1 模块生成动作，通过原 `create()` / `start()` 保留 module-only v1 原字节产物和占位入口；既有 v1 工程可继续生成候选及 Build / Export。两种模式不互迁，运行时失败不自动回退到旧版，新运行时使用新的空工作区。该 Runtime 路径的 C++ 蓝图读取器仍为 Schema 1、固定六类 NodeType；generation manifest v2 与独立 Blueprint v2 只读入口是不同协议。Candidate JSON、固定 factory 与 ExternalCode import manifest 本次均不变。
 
 支持 `Start → 零个或多个 LogicModule → 可选的唯一末端 UiPage → End`，按 Flow 连线执行一次启动链。第一个模块的 Inputs 为空；后续仅从直接前驱 Outputs 绑定同名且声明类型相同的输入，没有重命名、默认值、转换或全局上下文。端口类型限定为 `bool`、`int`、`double`、`QString`、`QByteArray`、`QStringList`、`QVariantList`、`QVariantMap` 和 `QVariant`；输出键必须与声明一致，值必须有效，除接受任意有效值的 `QVariant` 外必须匹配精确 Qt 类型。末端 UiPage factory 接收 Inputs 并复制页面后续使用的数据；控制器显示并持续持有页面。End 只表示启动链终点，有页面时进入 Qt 事件循环，仅逻辑链执行后直接退出。
 
@@ -26,8 +26,8 @@ P1.2C 的桌面只读入口已连接 TS Reader/Registry：可打开 v2 工程、
 
 以下阶段是顺序收敛的 Draft 计划，各阶段需独立实现、验证和审核。参考[平台架构](architecture/plugin-platform.md)、[蓝图 Schema v2](architecture/blueprint-schema-v2.md)和[Plugin API v1](architecture/plugin-api-v1.md)。新核心服务、protocol、NodeRegistry、IRCompiler、AIProvider 优先评估 TS/Node；现有 C++/Qt 保留不迁移，Cordis 仍是候选，Python 仅按具体 SDK/tool 需求评估，不预设 Worker。新协议仍未冻结。
 
-1. **P0 契约基础**：P0.1 已完成 Blueprint v2 结构 Schema，P0.2 已完成独立只读语义校验。P0.3 增加 [Plugin Descriptor Contracts](architecture/plugin-descriptor-contracts.md) 与可信上下文装配，校验声明式 Manifest、精确依赖/版本、所有权、静态节点/属性/端口、类型、节点与 Target 双方支持及 Bridge 映射，见[API](../tools/schema-contracts/README.md)。协议仍 Draft；Host、动态 ID 历史、编辑后未知片段原字节保存、Core IR/hash 与显式复制转换仍未实现。GUI/C++ 继续只读 Schema 1。
-2. **P1 最小插件注册与 Qt GUI 接入**：P1.1 已实现[独立 TS Registry](../tools/schema-contracts/README.md#minimal-plugin-registry)，复用 P0.3 做原子批量登记/注销、依赖与引用复验、节点/类型/Target/Bridge 发现与精确查询，提供不可变快照、零插件与只读图验证。P1.2A 新增[独立 v2 JSON 文本读取 API](../tools/schema-contracts/README.md#read-only-blueprint-document-reader)，复用现有结构/语义/声明校验，返回原文、不可变解析数据及带 sourceIndex 的 KnownNode/UnknownNode 展示信息。缺插件、缺定义或锁不可信时保留节点；普通属性/端口语义错误不等于定义未知。所有读取结果均关闭生成。Qt GUI 节点编辑、实际占位显示/保存、动态执行及具体交互仍未实现；本轮不接入 GUI 或继续后续子阶段。Cordis/本地 Sidecar 仍为候选，须先验证进程与权限边界，不预建通用调度框架。
+1. **P0 契约基础**：P0.1 已完成 Blueprint v2 结构 Schema，P0.2 已完成独立只读语义校验。P0.3 增加 [Plugin Descriptor Contracts](architecture/plugin-descriptor-contracts.md) 与可信上下文装配，校验声明式 Manifest、精确依赖/版本、所有权、静态节点/属性/端口、类型、节点与 Target 双方支持及 Bridge 映射，见[API](../tools/schema-contracts/README.md)。协议仍 Draft；Host、动态 ID 历史、超出 B2 范围的编辑后未知片段保留、Core IR/hash 与显式复制转换仍未实现。C++ 可写模型保持 Schema 1，P1.2C 通过 TS 读取 v2。
+2. **P1 最小插件注册与 Qt GUI 接入**：P1.1 已实现[独立 TS Registry](../tools/schema-contracts/README.md#minimal-plugin-registry)，复用 P0.3 做原子批量登记/注销、依赖与引用复验、节点/类型/Target/Bridge 发现与精确查询，提供不可变快照、零插件与只读图验证。P1.2A 新增[独立 v2 JSON 文本读取 API](../tools/schema-contracts/README.md#read-only-blueprint-document-reader)，复用现有结构/语义/声明校验，返回原文、不可变解析数据及带 sourceIndex 的 KnownNode/UnknownNode 展示信息。缺插件、缺定义或锁不可信时保留节点；普通属性/端口语义错误不等于定义未知。所有读取结果均关闭生成。P1.2C 已提供 Qt 只读占位、属性与诊断展示及一次性 Node 通信；插件节点编辑、GUI 保存和动态执行仍未实现。Cordis/完整 Sidecar Host 仍为候选，不预建通用调度框架。
 3. **P2 Qt Target 适配器**：优先复用已验证 Qt IR、候选和 Runtime v2 路径。v2 → LegacyQt 转接只接收现有线性流程、直接前驱同名同类型等可表示语义；拒绝其他语义，不猜边、不转换类型、不破坏原图。Legacy v1 字节产物、v2 固定 factory 和旧清单保持兼容。
 4. **P3 首个 Embedded Target**：后续选择一套明确支持的芯片/SDK/工具链和首批节点，验证完整目标工程及可审查产物，目前不预定具体选型。用户驱动 Snapshot 拟复用当前导入器的复制及哈希机制，Reference 模式需另行设计；AI 只接收接口摘要。
 5. **P4 实际演示与产品验收**：在同一个 Qt 桌面编辑器选择 Qt 或 Embedded target，每份毕业演示蓝图执行一个 Build Unit，同 Unit 可包含多个与目标兼容的插件。分别实际验证 Qt 工程和首个 Embedded 完整工程的交叉编译；烧录、硬件运行及广泛芯片支持不作为毕业条件。P0.2 的 API/可读诊断只证明独立校验实现，不等于这些产品路径已验收。
@@ -41,7 +41,7 @@ P1.2B2 增加[受限局部编辑](../tools/schema-contracts/README.md#restricted
 
 ## 迁移与信任约束
 
-现有 `blueprint.json` / `layout.json` 不做自动升级或降级；未来转换必须显式复制到新工程，给出诊断并保留原文件、布局、未知字段与 opaque 插件 payload 原始字节，不要求新 JSON 文件整体字节一致。旧读取器拒绝未知版本。P1.2A 提供独立 TS 文本解析和只读占位数据；P1.2B1 保存未修改文本；P1.2B2 仅在上述授权标量值替换之外保留原始片段，不提供通用编辑后的无损重建。未来的 GUI 占位、布局及其他编辑操作仍需独立设计和验收；不能把它们描述成当前 v1 能力。文件路径检查和提交前摘要复验不能彻底消除恶意并发路径替换，不宣称跨文件或系统崩溃原子性。
+现有 `blueprint.json` / `layout.json` 不做自动升级或降级；未来转换必须显式复制到新工程，给出诊断并保留原文件、布局、未知字段与 opaque 插件 payload 原始字节，不要求新 JSON 文件整体字节一致。旧读取器拒绝未知版本。P1.2A 提供独立 TS 文本解析和只读占位数据；P1.2B1 保存未修改文本；P1.2B2 仅在上述授权标量值替换之外保留原始片段，不提供通用编辑后的无损重建。GUI 只读占位由 P1.2C 提供，布局及其他编辑操作仍需独立设计和验收；不能把它们描述成当前 v1 能力。文件路径检查和提交前摘要复验不能彻底消除恶意并发路径替换，不宣称跨文件或系统崩溃原子性。
 
 多 Unit 产物索引采用独立 Draft 元数据，不能向严格六字段的旧 generation manifest 添加字段。插件 capability manifest 只是能力声明，不是 OS 沙箱；初期只加载可信插件，未经验证隔离的不可信插件被拒绝。可信服务拥有 Candidate 写入、Accept、scaffold 和 Build 授权；Sidecar 进程本身不能证明文件权限隔离，构建执行也不是代码沙箱。生成/接受上下文最终应绑定项目、文档、Unit、插件版本及驱动/受保护文件哈希，变化或取消后拒绝旧结果。
 

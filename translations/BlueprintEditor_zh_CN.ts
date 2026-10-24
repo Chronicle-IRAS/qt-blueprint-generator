@@ -683,6 +683,7 @@ Read-only snapshot
     <name>MainWindow</name>
     <message><source>Open Blueprint v2 (read-only)...</source><translation>打开蓝图 v2（只读）...</translation></message>
     <message><source>Open Blueprint v2 (read-only)</source><translation>打开蓝图 v2（只读）</translation></message>
+    <message><source>Open</source><translation>打开</translation></message>
     <message><source>Return to Schema 1 project</source><translation>返回 Schema 1 工程</translation></message>
     <message><source>Blueprint v2 (read-only)</source><translation>蓝图 v2（只读）</translation></message>
     <message><source>Cannot open Blueprint v2: %1</source><translation>无法打开蓝图 v2：%1</translation></message>

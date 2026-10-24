@@ -46,8 +46,9 @@ protected:
 BlueprintV2View::BlueprintV2View(QWidget *parent) : QWidget(parent) {
     auto *layout = new QVBoxLayout(this);
     m_banner = new QLabel(this); m_banner->setObjectName("v2ReadOnlyBanner");
+    m_banner->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     m_banner->setTextInteractionFlags(Qt::TextSelectableByMouse); layout->addWidget(m_banner);
-    auto *split = new QSplitter(this); layout->addWidget(split);
+    auto *split = new QSplitter(this); layout->addWidget(split, 1);
     m_scene = new QGraphicsScene(this);
     m_view = new ReadOnlyGraphicsView(m_scene, split); m_view->setObjectName("v2GraphicsView");
     m_view->setRenderHint(QPainter::Antialiasing); m_view->setDragMode(QGraphicsView::RubberBandDrag);
@@ -55,6 +56,7 @@ BlueprintV2View::BlueprintV2View(QWidget *parent) : QWidget(parent) {
     m_properties = new QPlainTextEdit(details); m_properties->setReadOnly(true); m_properties->setObjectName("v2Properties");
     m_diagnostics = new QPlainTextEdit(details); m_diagnostics->setReadOnly(true); m_diagnostics->setObjectName("v2Diagnostics");
     split->setStretchFactor(0, 3); split->setStretchFactor(1, 2);
+    split->setSizes({660, 400});
     connect(m_scene, &QGraphicsScene::selectionChanged, this, &BlueprintV2View::showSelection);
 }
 void BlueprintV2View::setReply(const QJsonObject &reply) { m_reply = reply; refreshPresentation(); }
@@ -87,11 +89,11 @@ void BlueprintV2View::refreshPresentation() {
     QVector<QGraphicsRectItem *> items;
     qreal rowY = 0, rowHeight = 0;
     for (int i = 0; i < nodes.size(); ++i) {
-        if (i && i % 3 == 0) { rowY += rowHeight + 140; rowHeight = 0; }
+        if (i && i % 2 == 0) { rowY += rowHeight + 100; rowHeight = 0; }
         const auto node = nodes[i].toObject(); const auto data = node["data"].toObject();
         const auto ports = data["ports"].toArray();
         auto *item = m_scene->addRect(QRectF(0, 0, 330, 118 + ports.size() * 40), QPen(colors.nodeBorder, 2), colors.nodeBody);
-        item->setPos((i % 3) * 420, rowY); item->setFlag(QGraphicsItem::ItemIsSelectable); item->setData(0, i);
+        item->setPos((i % 2) * 380, rowY); item->setFlag(QGraphicsItem::ItemIsSelectable); item->setData(0, i);
         rowHeight = qMax(rowHeight, item->rect().height());
         QString text = tr("#%1 · %2 · %3").arg(i).arg(node["nodeId"].toString(), node["kind"] == "known" ? tr("KnownNode") : tr("UnknownNode"));
         text += "\n" + node.value("title").toString(node["typeId"].toString()) + "\n" + node["unitId"].toString() + " · " + node["nodeDefinitionVersion"].toString();
@@ -126,7 +128,7 @@ void BlueprintV2View::refreshPresentation() {
         if (resolved) {
             QPen pen(channel ? colors.accent : colors.edge, 2); if (channel) pen.setStyle(Qt::DashLine);
             auto *line = m_scene->addLine(QLineF(source, target), pen); line->setZValue(-1);
-            auto *text = m_scene->addText(label); text->setDefaultTextColor(colors.textMuted); text->setPos((source + target) / 2);
+            auto *text = m_scene->addText(label); text->setDefaultTextColor(colors.textMuted); text->setTextWidth(250); text->setPos((source + target) / 2);
         }
     }
     QString diagnostics = tr("Diagnostics") + "\n";

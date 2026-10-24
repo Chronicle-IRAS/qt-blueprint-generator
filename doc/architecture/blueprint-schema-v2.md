@@ -6,7 +6,7 @@ P0.3 的 [Descriptor 协议](plugin-descriptor-contracts.md) 定义可信描述�
 本页 JSON 示例说明 Draft 提案。P1.2C 只读入口以机器 Schema/Reader 为准，可查看结构合法的 v2 文档并报告插件可用性；示例不代表可生成、可执行或已冻结的目标协议。
 总览见[插件平台架构](plugin-platform.md)，节点定义与目标编译边界见[Plugin API v1](plugin-api-v1.md)。
 
-P1.2A 补充独立的 [TS 只读文档读取 API](../../tools/schema-contracts/README.md#read-only-blueprint-document-reader)：读取 v2 JSON 文本，保留原文和完整解析数据，复用 Registry 校验并返回带 sourceIndex 的 KnownNode/UnknownNode 展示信息。精确定义与可信精确锁缺一不可；普通属性或端口语义错误不自动使定义变成未知。所有结果均禁止生成。它尚未接入 Qt 应用，不提供保存、布局恢复或 opaque payload 原始字节往返；下文相关保存要求仍是未来 Draft，不代表本轮已实现，也不改变机器 Schema。
+P1.2A 补充独立的 [TS 只读文档读取 API](../../tools/schema-contracts/README.md#read-only-blueprint-document-reader)：读取 v2 JSON 文本，保留原文和完整解析数据，复用 Registry 校验并返回带 sourceIndex 的 KnownNode/UnknownNode 展示信息。精确定义与可信精确锁缺一不可；普通属性或端口语义错误不自动使定义变成未知。所有结果均禁止生成。Reader 自身不提供保存或布局恢复；P1.2C 通过下述只读适配接入 Qt。B1/B2 的保存边界与未来 opaque/layout 要求分别说明，机器 Schema 不变。
 
 P1.2B1 在 Reader 外增加独立的 [TS 保留式文档存储](../../tools/schema-contracts/README.md#preserving-blueprint-document-store)：仅将未修改的原始 JSON 文本按 UTF-8 写入独立目录的 `blueprint.json`，并重新读取复验。结构非法拒绝，语义错误允许原文保存且返回诊断，生成始终关闭。覆盖核对原文件 SHA-256，同目录临时写入后发布；目录保护、并发及崩溃边界见 API 文档。该 Store 本身不编辑文档、不保存布局、不迁移 v1；受限编辑由下述 P1.2B2 API 提供。
 
@@ -244,4 +244,4 @@ P0.2 已覆盖对象数组 ID 唯一/引用存在、Unit 归属与同 Unit 普�
 
 实际包/文件字节 hash、完整 driver interface 兼容、target 业务规则、动态 ID 历史与迁移、编辑后 unknown raw 保存、IR hash 与生成 context 仍待实现。P0.2 API 的 digest 比较仅核对可信 metadata，不编译插件属性 Schema；P0.3 descriptor-aware 入口新增同步属性 Schema 及静态端口检查。语义通过不代表生成能力支持。
 
-`semantic-only` fixtures 的 schemaPass 仍只证明结构层未覆盖这些规则；P0.2 在独立语义测试中配合明确的可信上下文验证拒绝。原 59 份 fixture JSON 和 75 项结构测试保持不变；非 mutation 测试仅验证解析后的值与上下文保持，不等于 opaque 原字节保存已实现。当前 GUI/C++ Schema 1、旧清单/协议、生产测试均未接入 v2。
+`semantic-only` fixtures 的 schemaPass 仍只证明结构层未覆盖这些规则；P0.2 在独立语义测试中配合明确的可信上下文验证拒绝。原 59 份 fixture JSON 和 75 项结构测试保持不变；非 mutation 测试仅验证解析后的值与上下文保持，不等于 opaque 原字节保存已实现。这些早期契约测试不是 GUI 接入证据；P1.2C 的 Qt/Node 与可见窗口验证单独记录，Schema 1 和旧生成协议仍按原路径处理。
