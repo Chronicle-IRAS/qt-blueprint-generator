@@ -2,8 +2,8 @@
 
 P0.3 的 [Descriptor 协议](plugin-descriptor-contracts.md) 定义可信描述装配与静态节点声明检查。它复用本页机器 Schema，不改变原 Blueprint v2、Schema 1 或 P0.2 API；完整声明校验由新的 descriptor-aware 入口提供。
 
-状态：Draft，2026-10-16。P0.1 已增加唯一权威结构定义 [JSON Schema](../../schemas/blueprint-v2.schema.json)（Draft 2020-12）、[离线 fixtures](../../tests/fixtures/blueprint-v2/README.md) 与独立 TS/Ajv/Vitest 工具；P0.2 增加[独立只读语义校验](../../tools/schema-contracts/README.md)。运行见 [schemas/README](../../schemas/README.md)。Qt 应用尚无 v2 读取器，协议未冻结。
-本页 JSON 示例符合本页描述的提案，不是当前程序可加载的文件，也不是已冻结协议。
+状态：Draft。P0.1 已增加唯一权威结构定义 [JSON Schema](../../schemas/blueprint-v2.schema.json)（Draft 2020-12）、[离线 fixtures](../../tests/fixtures/blueprint-v2/README.md) 与独立 TS/Ajv/Vitest 工具；P0.2 增加[独立只读语义校验](../../tools/schema-contracts/README.md)。运行见 [schemas/README](../../schemas/README.md)。P1.2C 提供 Qt 只读接入，协议仍未冻结。
+本页 JSON 示例说明 Draft 提案。P1.2C 只读入口以机器 Schema/Reader 为准，可查看结构合法的 v2 文档并报告插件可用性；示例不代表可生成、可执行或已冻结的目标协议。
 总览见[插件平台架构](plugin-platform.md)，节点定义与目标编译边界见[Plugin API v1](plugin-api-v1.md)。
 
 P1.2A 补充独立的 [TS 只读文档读取 API](../../tools/schema-contracts/README.md#read-only-blueprint-document-reader)：读取 v2 JSON 文本，保留原文和完整解析数据，复用 Registry 校验并返回带 sourceIndex 的 KnownNode/UnknownNode 展示信息。精确定义与可信精确锁缺一不可；普通属性或端口语义错误不自动使定义变成未知。所有结果均禁止生成。它尚未接入 Qt 应用，不提供保存、布局恢复或 opaque payload 原始字节往返；下文相关保存要求仍是未来 Draft，不代表本轮已实现，也不改变机器 Schema。
@@ -13,6 +13,8 @@ P1.2B1 在 Reader 外增加独立的 [TS 保留式文档存储](../../tools/sche
 P1.2B2 的 [TS 受限编辑器](../../tools/schema-contracts/README.md#restricted-blueprint-document-edits)仅开放 projectName、KnownNode 既有直接声明的标量属性及已有静态端口 name。按原始 JSON 值范围整体替换，其他片段（含未知节点及 opaque payload）保持原始 UTF-8 字节；重复键、定位歧义、越界及新契约错误拒绝操作。保存仍使用 B1，并绑定原文哈希与当前 Registry 快照。此限制性能力不等于任意 JSON 编辑、布局保存或迁移，机器 Schema 不变。
 
 ## 与现有版本的边界
+
+P1.2C 的 Qt 查看模式通过本地 Node 子进程复用现有 TS Reader 与 Registry，显示 KnownNode/UnknownNode、属性、端口、连接与诊断。它不改变下述 Schema 1 模型，也不开放 B1/B2 编辑保存或生成。可信声明由宿主显式提供，默认零插件；结构或通信失败保留当前工程。显示布局不落盘，不参与 IR。操作见[使用指南](../project-usage-guide.md#510-只读查看-blueprint-v2)。
 
 当前 [BlueprintDocument](../../src/blueprint/blueprint_document.h) 的 `CurrentSchemaVersion` 为 1，NodeType 固定为 Start、End、UiPage、LogicModule、Decision、ExternalCode。
 [Serializer](../../src/blueprint/blueprint_serializer.cpp) 只接受版本 1；现有节点 `type`、工程 `target` 与端口 name/type 字段不改名、不接受本文新模型。
@@ -199,7 +201,7 @@ AI 只接收 interfaceContract，不接收用户驱动源码；驱动变化使�
 
 ## 未知节点、锁与保存
 
-P1.2A 独立读取器区分结构门禁与 ID/引用等语义诊断，缺失插件/定义时返回 UnknownNode 展示数据；P1.2B1 允许这些结构合法的文档按原文保存。P1.2B2 可修改工程名称而保持 UnknownNode 全文只读，并在受限已知字段编辑时保留其他原始片段。Qt GUI 占位尚未接入。以下段落中超出受限标量编辑的 opaque payload、布局和 canonical 摘要要求仍是后续 Draft。
+P1.2A 独立读取器区分结构门禁与 ID/引用等语义诊断，缺失插件/定义时返回 UnknownNode 展示数据；P1.2B1 允许这些结构合法的文档按原文保存。P1.2B2 可修改工程名称而保持 UnknownNode 全文只读，并在受限已知字段编辑时保留其他原始片段。P1.2C 只读 GUI 使用这些识别结果，不开放编辑保存。以下段落中超出受限标量编辑的 opaque payload、布局和 canonical 摘要要求仍是后续 Draft。
 未识别节点的未知字段、properties、ports 及命名空间扩展须无损保留，其中 opaque 插件 payload 的原始字节单独保留。
 未改动的 opaque payload 不得因规范化、改名或保存被删除、重写或丢失；布局也保留。
 该要求针对 payload 字节与未知字段，不要求重新保存后的整个 JSON 文件字节一致；显式复制保留的原工程不改写。

@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": false, "rootDir": ".", "outDir": "../../build/v2-reader/tools/schema-contracts" },
+  "include": ["blueprint-reader-cli.ts", "blueprint-reader-protocol.ts"],
+  "exclude": ["*.test.ts"]
+}

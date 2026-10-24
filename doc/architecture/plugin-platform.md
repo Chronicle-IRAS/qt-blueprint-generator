@@ -6,8 +6,10 @@ P1.2A/P1.2B1 已分别提供独立 TS 的 [v2 只读解析](../../tools/schema-c
 
 P1.2B2 增加独立的[受限编辑 API](../../tools/schema-contracts/README.md#restricted-blueprint-document-edits)，只开放工程名、可信已知节点的既有声明标量属性和静态端口显示名。原文中未替换的范围保持 UTF-8 字节，UnknownNode 内部数据仍只读；保存复用 B1 并验证原文哈希及 Registry 快照。通用编辑、布局、应用 GUI 与生成仍待后续实现。
 
-状态：Draft，2026-10-12。本文描述长期 Architecture B，不是已实现功能清单。
-蓝图 Schema v2、Plugin API v1、插件 manifest、RPC 和多 Unit 产物元数据均未冻结；当前程序不能加载这些提案。
+P1.2C 增加 Qt 桌面的 v2 只读查看：一次性 Node 子进程通过标准输入/输出复用 TS Reader/Registry，界面展示已知/未知节点、端口、连接、属性和诊断。默认零插件，可显式选择独立可信声明数据；不执行插件。v2 查看期间关闭修改、保存、生成及构建导出，保留 Schema 1 兼容路径；不是完整 Sidecar/Plugin Host。使用见[指南](../project-usage-guide.md#510-只读查看-blueprint-v2)。
+
+状态：Draft。本文描述长期 Architecture B；已实现子集以上方阶段说明为准。
+蓝图 Schema v2、Plugin API v1、插件 manifest、通信和多 Unit 产物元数据均未冻结；当前只实现上述声明校验与只读查看子集，不能据此执行插件或生成多 Unit 工程。
 字段约定见[蓝图 Schema v2](blueprint-schema-v2.md)，插件边界见[Plugin API v1](plugin-api-v1.md)。
 P0.1 已增加 [Blueprint v2 机器结构 Schema、离线 fixtures 和 TS/Ajv/Vitest 工具](../../schemas/README.md)。P0.2 增加独立只读 TS 语义校验，基于可信纯数据上下文检查通用引用、Unit、端口、锁与 Bridge 策略，见[实际 API](../../tools/schema-contracts/README.md)。它不是 Registry 或 PluginHost；应用 v2 读取器与新 Core IR 仍未实现，当前 GUI/C++ 仍读 Schema 1。
 
@@ -58,7 +60,7 @@ Qt Unit 独立工程         Embedded Unit 独立工程
        +----- 显式 typed Channel / Bridge（仅设计） -----+
 ```
 
-图中的 Registry 目前仅实现独立 TS 的声明数据管理；v2 文本解析与未修改原文存储也仅提供独立 TS API。可编辑节点、应用 v2 读取器、插件宿主和 Embedded 路径仍未实现。
+图中的 Registry 目前实现 TS 声明数据管理；P1.2C 将 v2 Reader/Registry 接入 Qt 只读查看，保留式存储和受限编辑仍为独立 TS API。可编辑的插件节点、插件宿主和 Embedded 路径仍未实现。
 插件输出诊断、IR 或候选计划，可信服务复验后执行允许的文件事务。
 平台层校验身份、引用、Unit 边界和类型；插件只补充其节点与目标的语义约束。
 目标插件不能放宽宿主的路径、受保护文件、版本或人工确认规则。

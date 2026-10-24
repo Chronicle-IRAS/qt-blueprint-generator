@@ -6,7 +6,8 @@
   "engines": { "node": ">=24.18.1 <25", "npm": ">=11.16.0 <12" },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:reader": "node build-reader.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

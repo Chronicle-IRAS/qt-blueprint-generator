@@ -22,6 +22,8 @@ Phase 1 不支持 Decision、ExternalCode 运行时、连线标签、分支、�
 
 ## 后续阶段与进入条件
 
+P1.2C 的桌面只读入口已连接 TS Reader/Registry：可打开 v2 工程、查看已知/未知节点、端口、连接、属性与诊断；缺失插件和普通语义问题不丢弃结构合法的数据。默认零插件，可信声明由用户独立选择。此模式禁止保存、编辑、生成及构建导出，Schema 1 继续走既有可写路径。下文尚待实现的 GUI 能力指插件节点编辑、持久化交互和目标生成，而非本次只读查看。操作见[使用指南](project-usage-guide.md#510-只读查看-blueprint-v2)。
+
 以下阶段是顺序收敛的 Draft 计划，各阶段需独立实现、验证和审核。参考[平台架构](architecture/plugin-platform.md)、[蓝图 Schema v2](architecture/blueprint-schema-v2.md)和[Plugin API v1](architecture/plugin-api-v1.md)。新核心服务、protocol、NodeRegistry、IRCompiler、AIProvider 优先评估 TS/Node；现有 C++/Qt 保留不迁移，Cordis 仍是候选，Python 仅按具体 SDK/tool 需求评估，不预设 Worker。新协议仍未冻结。
 
 1. **P0 契约基础**：P0.1 已完成 Blueprint v2 结构 Schema，P0.2 已完成独立只读语义校验。P0.3 增加 [Plugin Descriptor Contracts](architecture/plugin-descriptor-contracts.md) 与可信上下文装配，校验声明式 Manifest、精确依赖/版本、所有权、静态节点/属性/端口、类型、节点与 Target 双方支持及 Bridge 映射，见[API](../tools/schema-contracts/README.md)。协议仍 Draft；Host、动态 ID 历史、编辑后未知片段原字节保存、Core IR/hash 与显式复制转换仍未实现。GUI/C++ 继续只读 Schema 1。

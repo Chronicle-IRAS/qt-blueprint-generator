@@ -613,6 +613,7 @@ Bound workspace: %3</source><translation>已应用的节点：%1（%2）
 </context>
 <context>
     <name>WorkspaceBrowserWidget</name>
+    <message><source>Read-only while Blueprint v2 is open.</source><translation>蓝图 v2 打开期间只读。</translation></message>
     <message><source>Refresh</source><translation>刷新</translation></message>
     <message><source>Save</source><translation>保存</translation></message>
     <message><source>Unsaved changes</source><translation>未保存修改</translation></message>
@@ -643,5 +644,55 @@ Bound workspace: %3</source><translation>已应用的节点：%1（%2）
     <message><source>Read-only preview — protected scaffold / contract.</source><translation>只读预览 — 受保护的骨架 / 契约文件。</translation></message>
     <message><source>Read-only preview — protected external code.</source><translation>只读预览 — 受保护的外部代码。</translation></message>
     <message><source>Read-only preview — protection metadata is unavailable.</source><translation>只读预览 — 保护元数据不可用。</translation></message>
+</context>
+<context>
+    <name>BlueprintV2View</name>
+    <message><source>Fit View</source><translation>适应视图</translation></message>
+    <message><source>Reset View</source><translation>重置视图</translation></message>
+    <message><source>Select All</source><translation>全选</translation></message>
+    <message><source>Blueprint v2 — Read-only · Generation, saving, build and export unavailable</source><translation>蓝图 v2 — 只读 · 不支持生成、保存、构建与导出</translation></message>
+    <message><source>Node source index: %1
+Read-only snapshot
+</source><translation>节点源索引：%1
+只读快照
+</translation></message>
+    <message><source>Select a node to inspect its full properties and port snapshot.</source><translation>选择节点以查看完整属性和端口快照。</translation></message>
+    <message><source>#%1 · %2 · %3</source><translation>#%1 · %2 · %3</translation></message>
+    <message><source>KnownNode</source><translation>KnownNode（已识别节点）</translation></message>
+    <message><source>UnknownNode</source><translation>UnknownNode（未知节点）</translation></message>
+    <message><source>Declared channel (metadata only)</source><translation>声明通道（仅元数据）</translation></message>
+    <message><source>Edge</source><translation>连接</translation></message>
+    <message><source> — displayed</source><translation> — 已显示</translation></message>
+    <message><source> — unresolved: ambiguous or missing node/port endpoint</source><translation> — 未解析：节点或端口端点不唯一或不存在</translation></message>
+    <message><source>Diagnostics</source><translation>诊断</translation></message>
+    <message><source>No diagnostics.</source><translation>无诊断。</translation></message>
+    <message><source>Relationships</source><translation>关系</translation></message>
+</context>
+<context>
+    <name>BlueprintV2Reader</name>
+    <message><source>Reader runtime unavailable. Install Node and run npm ci, then build the blueprint_v2_reader target.</source><translation>读取器运行环境不可用。请安装 Node 并执行 npm ci，然后构建 blueprint_v2_reader 目标。</translation></message>
+    <message><source>Reader request exceeds the size limit.</source><translation>读取请求超出大小上限。</translation></message>
+    <message><source>Reader reply exceeds the size limit.</source><translation>读取器回复超出大小上限。</translation></message>
+    <message><source>Reader exceeded its diagnostic output limit.</source><translation>读取器诊断输出超出大小上限。</translation></message>
+    <message><source>Reader process could not run. Check the configured Node runtime and entry point.</source><translation>读取器进程无法运行。请检查配置的 Node 运行环境和入口文件。</translation></message>
+    <message><source>Reader process failed.</source><translation>读取器进程失败。</translation></message>
+    <message><source>Reader returned an invalid or uncorrelated reply.</source><translation>读取器回复无效或请求标识不匹配。</translation></message>
+    <message><source>Reader timed out.</source><translation>读取器超时。</translation></message>
+</context>
+<context>
+    <name>MainWindow</name>
+    <message><source>Open Blueprint v2 (read-only)...</source><translation>打开蓝图 v2（只读）...</translation></message>
+    <message><source>Open Blueprint v2 (read-only)</source><translation>打开蓝图 v2（只读）</translation></message>
+    <message><source>Return to Schema 1 project</source><translation>返回 Schema 1 工程</translation></message>
+    <message><source>Blueprint v2 (read-only)</source><translation>蓝图 v2（只读）</translation></message>
+    <message><source>Cannot open Blueprint v2: %1</source><translation>无法打开蓝图 v2：%1</translation></message>
+    <message><source>Finish the active build before opening Blueprint v2.</source><translation>请先完成正在进行的构建，再打开蓝图 v2。</translation></message>
+    <message><source>Cannot read blueprint.json as UTF-8 (limit: 8 MiB).</source><translation>无法以 UTF-8 读取 blueprint.json（上限：8 MiB）。</translation></message>
+    <message><source>Cannot read the trusted declaration bundle.</source><translation>无法读取可信声明文件。</translation></message>
+    <message><source>Invalid trusted declaration bundle: descriptors and trustedLocks are required.</source><translation>可信声明文件无效：必须包含 descriptors 和 trustedLocks。</translation></message>
+    <message><source>Project directory</source><translation>工程目录</translation></message>
+    <message><source>Trusted declaration bundle (optional)</source><translation>可信声明文件（可选）</translation></message>
+    <message><source>Trusted declaration bundle</source><translation>可信声明文件</translation></message>
+    <message><source>Default: no plugins. The optional bundle is independent trusted metadata; it does not install or execute plugins.</source><translation>默认不加载插件。可选文件提供独立的可信声明元数据，不会安装或执行插件。</translation></message>
 </context>
 </TS>
