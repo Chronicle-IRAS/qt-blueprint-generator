@@ -1,9 +1,13 @@
 # 实现进度
 
-更新时间：2026-10-23（Asia/Shanghai）
+更新时间：2026-10-25（Asia/Shanghai）
 
 ## 当前状态
 
+- 2026-10-25（P1.2C 交付复核）：主代理重新运行完整 Vitest，11 文件、478/478、120.82 秒，typecheck 通过；最新远端 main 仍为 `467f8e0`，MVP Tag 不变。实现及审查修复位于独立分支，交付 [PR #61](https://github.com/Chronicle-IRAS/qt-blueprint-generator/pull/61)，base 为 main；等待人工审核，不自动合并、不继续下一阶段。下方 Qt/Windows 验证对应 `c749a36`，此后仅更新验收文档。
+- 2026-10-24（P1.2C Qt v2 最小只读接入）：基于 PR #60 合并后的 `467f8e0`，新增一次性 Node 标准输入/输出适配，复用现有 TS Reader/Registry；Qt 独立画布显示 KnownNode/UnknownNode、原始端口、普通 Edge 和声明式 Channel，按 sourceIndex 保留重复 ID 记录，歧义端点不猜测连接。属性和诊断只读可复制；默认零插件，可显式选择独立可信声明文件。v2 模式统一关闭编辑/保存/生成/Build/Export，保留原 Schema 1 路径与工程切换提示，失败不替换当前工程。新增真实 fixture 示例及中英文标签。
+- P1.2C 实跑验证：完整 TS 478/478（11 文件、0 跳过）、typecheck 通过；审查修复后的 Qt v2 专项 41/41（含 init/cleanup、0 跳过），完整 CMake build 成功、CTest 33/33、0 失败，308.16 秒。首轮基线 TS459/459、CTest32/32 均亲跑通过；新增功能先观察可导入/可运行实现的断言 RED。独立审查发现 Build/Export 在模态确认框内切入 v2 后继续执行的竞态，以 6 行真实失败复现，再补模式与工程 epoch 的返回后/执行前复核；同时修正默认画布布局和重置布局时的 Dock 状态。同一审查者增量复核 Ready，无剩余阻塞。
+- P1.2C Windows 实际验收：主代理启动最终 BlueprintEditor.exe，以真实示例分别加载零插件 UnknownNode 和显式可信声明 KnownNode，看到 3 个节点、原始端口、普通 Edge 与声明式 Channel；选择节点可查看并选择完整属性快照。中英文及浅/深色显示正常；v2 保存/生成/Build/Export 控件关闭、Ctrl+S 不触发保存。读取不存在工程时显示错误并保留当前图，重置布局不显示旧版 Dock，返回 Schema 1 恢复编辑界面；最后恢复中文/浅色并正常关闭。通信、错误版本、重复 ID、模态切换与文件不变性由 QtTest 另外覆盖，不将其冒充逐项人工操作。未调用真实 AI，未改机器 Schema、Schema 1 Serializer/ProjectStore、Runtime/Candidate/manifest 或依赖版本；Node/声明元数据不是插件安装、包完整性验证或沙箱，v2 生成始终关闭。交付独立 PR 等待人工审核，不自动合并。
 - 2026-10-23（P1.2B2 独立审查收尾）：只读审查覆盖全部 14 文件及 Reader/Registry/Store 边界，结论 Ready，无剩余阻塞发现。保存入口先检查批次上限再复制，契约拒绝保留冻结 Reader 诊断但不返回候选文本；主代理另复跑专项 86/86、typecheck 与 staged diff 检查通过。信任边界不涵盖恶意 JS Proxy/accessor 调用方或敌意可信描述的任意计算耗时；已披露的 B1 并发/崩溃限制不变。交付独立 PR 等待人工审核，不自动合并。
 - 2026-10-23（P1.2B2 受限编辑与安全保存闭环）：基于 PR #59 已合并的 `d0eb638`，新增纯 TS `prepareBlueprintEdits` 和 `saveEditedBlueprintDocument`。仅允许工程名、可信 KnownNode 的既有直接声明标量属性、已有静态端口显示名；节点按 sourceIndex、端口按原数组下标及声明 ID 定位，批量整体通过或拒绝。迭代 JSON 值范围索引仅替换授权标量，其他原始 UTF-8 片段（中文、转义、CRLF、数字字面量、未知字段及 opaque 数据）不变；重复解码键、重叠范围和资源超限拒绝。复用 Reader/Registry 与 P0.3 属性评价，保留无关语义错误但拒绝目标字段及新增契约错误。现有 Ajv 不校验 `__proto__` 的属性约束，因此该字段明确只读，不另建验证规则。
 - P1.2B2 保存沿用 B1 的路径、临时文件、哈希冲突及提交后重读流程；绑定原文 SHA-256，并在入口、发布前及复验后检查 Registry 快照。提交前失败不写正式文件，提交后无法确认返回 committed-unverified，不盲目回滚。没有新增依赖、机器 Schema、Qt/C++、Legacy v1 / Runtime v2、Candidate 或 generation manifest 改动；不实现 GUI、布局、通用 JSON 编辑、动态端口、迁移或生成，始终 canGenerate:false。Node 路径竞态、跨进程并发及崩溃持久性边界仍沿用 B1，不宣称绝对原子性。

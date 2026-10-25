@@ -2,6 +2,19 @@ cmake_minimum_required(VERSION 3.22)
 
 project(BlueprintEditor LANGUAGES CXX)
 
+find_program(BLUEPRINT_NODE_EXECUTABLE NAMES node)
+set(BLUEPRINT_READER_DEPENDENCIES_AVAILABLE TRUE)
+foreach(reader_dependency IN ITEMS typescript ajv fast-deep-equal fast-uri json-schema-traverse require-from-string)
+    if(NOT EXISTS "${PROJECT_SOURCE_DIR}/tools/schema-contracts/node_modules/${reader_dependency}/package.json")
+        set(BLUEPRINT_READER_DEPENDENCIES_AVAILABLE FALSE)
+    endif()
+endforeach()
+if(BLUEPRINT_NODE_EXECUTABLE AND BLUEPRINT_READER_DEPENDENCIES_AVAILABLE)
+    add_custom_target(blueprint_v2_reader ALL
+        COMMAND "${BLUEPRINT_NODE_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/schema-contracts/build-reader.mjs" "${PROJECT_BINARY_DIR}/v2-reader"
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/tools/schema-contracts" VERBATIM)
+endif()
+
 option(BUILD_MANUAL_AI_INTEGRATION
     "Build the opt-in real-provider manual integration executable"
     OFF)
@@ -36,6 +49,10 @@ qt_add_library(BlueprintEditorCore STATIC
     src/app/generation_controller.h
     src/app/main_window.cpp
     src/app/main_window.h
+    src/app/blueprint_v2_reader.cpp
+    src/app/blueprint_v2_reader.h
+    src/app/blueprint_v2_view.cpp
+    src/app/blueprint_v2_view.h
     src/app/external_code_dialog.cpp
     src/app/external_code_dialog.h
     src/app/workspace_browser_widget.cpp
@@ -99,6 +116,9 @@ qt_add_executable(BlueprintEditor
 target_link_libraries(BlueprintEditor PRIVATE
     BlueprintEditorCore
 )
+if(TARGET blueprint_v2_reader)
+    add_dependencies(BlueprintEditor blueprint_v2_reader)
+endif()
 
 if(BUILD_MANUAL_AI_INTEGRATION)
     qt_add_executable(manual_ai_integration
@@ -119,7 +139,7 @@ endif()
 
 set(translation_targets BlueprintEditor)
 if(BUILD_TESTING)
-    list(APPEND translation_targets tst_language_switch tst_theme_switch tst_ai_settings_dialog tst_generation_workflow tst_candidate_review_dialog tst_editor_theme tst_validation_diagnostics_dialog tst_blueprint_persistence tst_external_code_gui tst_workspace_browser tst_workspace_main_integration)
+    list(APPEND translation_targets tst_language_switch tst_theme_switch tst_ai_settings_dialog tst_generation_workflow tst_candidate_review_dialog tst_editor_theme tst_validation_diagnostics_dialog tst_blueprint_persistence tst_external_code_gui tst_workspace_browser tst_workspace_main_integration tst_blueprint_v2_gui)
 endif()
 
 qt_add_translations(

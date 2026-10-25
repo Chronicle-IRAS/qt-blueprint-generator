@@ -342,3 +342,35 @@ The Store's optional `expectedRegistrySnapshot` is checked at entry, before publ
 Edit-validation failures return `writeState: "not-written"` and no approved candidate. Store failures retain the existing `code`, `message` and `writeState`; source/baseline or disk conflicts report `CONFLICT`. Only `status: "saved", writeState: "verified"` confirms the post-write content and Reader result. Do not blindly retry or roll back `committed-unverified`: reload and inspect the actual file first. The concurrency, path-replacement, metadata and crash limits in **Actual write guarantees** still apply unchanged.
 
 This is not a general JSON editor or a save mechanism for layout, node/port insertion, dynamic ports or plugin migration. It does not enable generation or change the legacy Qt/C++ persistence path.
+
+## Qt read-only reader process
+
+P1.2C adds a one-shot local Node adapter around the existing Reader and Plugin Registry. It has one operation: read supplied UTF-8 JSON text. No path, save, generation, build or plugin-execution operation is exposed.
+
+Build the compiled runtime after the normal locked dependency installation:
+
+```powershell
+npm ci --ignore-scripts --prefix tools/schema-contracts
+npm run build:reader --prefix tools/schema-contracts
+```
+
+The default output is the repository's `build/v2-reader`. For a different destination, pass an absolute directory after `--`. The output contains `tools/schema-contracts/blueprint-reader-cli.js`, the unchanged machine Schemas and the existing Ajv runtime dependency closure. It can be moved as a whole. It requires the supported Node 24 runtime; it does not execute TypeScript source or depend on a global TS loader. CMake uses the same local build when prerequisites exist, without downloading dependencies. The Qt Schema 1 application remains usable when reader prerequisites are absent, with an actionable error at the v2-open entry.
+
+The caller starts Node directly with the compiled entry, writes one JSON request to stdin and closes stdin. Stdout is reserved for one JSON reply. The pure `handleReaderRequest(input)` is separately testable:
+
+```typescript
+const reply = handleReaderRequest({
+  protocolVersion: 1,
+  requestId: "open-1",
+  sourceText,
+  registry: { descriptors, trustedLocks },
+});
+```
+
+The reply echoes `protocolVersion: 1` and `requestId`, always includes `canGenerate: false`, and has `status: "read" | "rejected" | "error"`. Read/rejected results carry the existing Reader fields and diagnostics. Errors identify invalid transport/configuration rather than turning a failed Registry registration into an empty Registry. An empty Registry must be explicit (`descriptors: [], trustedLocks: []`).
+
+Declarations and pins are independent host inputs. Qt may load a user-selected `{descriptors,trustedLocks}` JSON bundle, but does not discover or trust it from the Blueprint's pluginLocks. These are trusted metadata, not proof of package byte integrity, installation or execution rights.
+
+Blueprint source is limited to 8 MiB UTF-8; stdin/reply messages to 32 MiB. Qt bounds stderr and enforces a 15-second process deadline, rejects malformed/version-mismatched/uncorrelated replies and ignores obsolete results. Missing Node, timeout, crash or invalid reply cannot replace the active project. Only the supported display data is rendered; structural and semantic decisions stay in TS. This process is not an OS sandbox or a general Plugin Host.
+
+The Qt GUI deliberately keeps all v2 data read-only, even when `semanticValid` is true. B1/B2 persistence APIs remain independent and are not exposed by this transport. See [the desktop usage guide](../../doc/project-usage-guide.md#510-只读查看-blueprint-v2) for opening projects, UnknownNode display and returning to the legacy editor.

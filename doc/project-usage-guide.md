@@ -211,6 +211,22 @@ cmake --build $buildRoot
 
 切换工作区会加载新工作区的文件树；取消切换会保留原工作区和未保存内容。外部生成或修改文件后可点击 `Refresh / 刷新` 重新加载。点击 `Build / 构建` 或 `Export / 导出` 前，如有未保存修改，会询问保存、放弃或取消；保存失败或取消时不会开始构建或导出。构建失败后仍可在工作区编辑器中修改源码、保存，再次点击构建。此过程不改动候选审核流程或生成清单。
 
+### 5.10 只读查看 Blueprint v2
+
+Blueprint v2 有独立的只读查看模式，与现有 Schema 1 编辑器分开。它通过本机 Node 运行已经实现的 TypeScript Reader/Plugin Registry；Qt 不另行维护蓝图结构或语义验证规则。
+
+请先安装工具约束的 Node 24（至少 24.18.1，低于 25）和 npm 11，并在仓库根目录运行 `npm ci --ignore-scripts --prefix tools/schema-contracts`，然后重新运行第 4 节的 CMake 配置与构建。CMake 的 `blueprint_v2_reader` 目标会将编译后的 JS、机器 Schema 和既有 Ajv 依赖放在可执行文件旁的 `v2-reader` 目录；整目录需一同保留。构建阶段不自动联网安装依赖。缺少运行条件时，v2 打开入口会提示设置方法，原 Schema 1 功能仍可使用。
+
+在 **File → Open Blueprint v2 (read-only)...** 选择包含 `blueprint.json` 的工程目录。可以另行选择可信声明 JSON 文件，内容为 `{ "descriptors": [...], "trustedLocks": [...] }`；不选择时 Registry 为空，文档中的插件锁不会自动成为已安装或可信插件。声明文件由用户独立提供，不能把蓝图自身的锁当作来源验证；这一步不安装或执行插件，也不验证实际插件包的文件哈希。
+
+可直接打开仓库的 [examples/blueprint-v2-readonly](../examples/blueprint-v2-readonly/README.md)。先不选择声明文件，观察 3 个 UnknownNode 及缺失插件诊断；再打开同目录并显式选择其中的 `trusted-declarations.json`，观察 KnownNode、普通 Edge 和声明式 Channel。这个示例复用真实契约 fixture，演示哈希并不代表下载或校验了插件包。
+
+结构合法的图即使缺少插件或存在语义错误，仍会显示全部节点。KnownNode 表示精确定义和可信锁均匹配；UnknownNode 显示原始身份、端口和不可识别原因。属性错误与定义是否可识别分别显示。选择节点可以查看其身份、属性与端口；诊断中保留稳定错误码和来源路径。重复节点 ID 不会合并记录；连接端点有歧义时保留连接记录并说明原因。
+
+v2 模式下可以选择、浏览和复制信息，编辑、保存、生成、Build/Export 与外部代码写操作均关闭。它不会把 v2 转换成 Schema 1，不调用独立 B1/B2 保存 API，也不写 `layout.json`；画布位置仅用于展示。通过 **File → Return to Schema 1 project** 返回保留的旧工程后，继续使用原有 Schema 1 功能。
+
+文件非法、版本不支持、Node 不可用或通信失败会给出错误，并保留当前工程。切换前仍处理当前蓝图和工作区源码的未保存修改；Cancel 不切换。有构建任务运行时请等待它结束。
+
 ## 6. 运行离线登录示例
 
 这一节保留原 MVP 的 legacy v1 模块工程示例。它会读取 `tests/fixtures/login-demo/blueprint.json` 和固定 Fake AI 响应，创建工程、接受候选、构建、导出并运行导出项目自己的测试，全程不访问模型服务。示例含 Decision 与多个 End，其测试调用模块并验证登录流程；它不通过新的 Phase 1 运行时生成校验，也不表示生成入口自动执行该图。新运行时离线测试见 8.2.4。

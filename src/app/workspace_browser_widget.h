@@ -20,6 +20,7 @@ public:
     bool refresh();
     void openFile(const QString &relative);
     bool saveCurrentFile();
+    void setReadOnly(bool readOnly);
     bool requestCanDiscardChanges();
     bool hasUnsavedChanges() const;
     QString workspacePath() const;
@@ -44,6 +45,7 @@ private:
     struct RemovedLineEndings { qsizetype index = 0; QStringList styles; };
     QHash<QByteArray, RemovedLineEndings> m_removedLineEndings;
     bool m_trackingEdits = false;
+    bool m_readOnly = false;
     QJsonObject m_manifest;
     WorkspaceFilePolicy::Kind m_kind = WorkspaceFilePolicy::Kind::UnknownProtected;
     Status m_status = Status::Missing;

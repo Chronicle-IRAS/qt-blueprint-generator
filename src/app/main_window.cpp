@@ -1,5 +1,7 @@
 #include "app/main_window.h"
 #include "app/workspace_browser_widget.h"
+#include "app/blueprint_v2_reader.h"
+#include "app/blueprint_v2_view.h"
 #include "ui/node_type_display.h"
 #include "ui/theme.h"
 
@@ -29,6 +31,11 @@
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QFileInfo>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QStackedWidget>
+#include <QStringDecoder>
 #include <QGraphicsView>
 #include <QHBoxLayout>
 #include <QKeySequence>
@@ -45,6 +52,7 @@
 #include <QSignalBlocker>
 #include <QSettings>
 #include <QScopedValueRollback>
+#include <QScopeGuard>
 #include <QStatusBar>
 #include <QToolBar>
 #include <QToolButton>
@@ -366,7 +374,42 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_view->setDragMode(QGraphicsView::RubberBandDrag);
     m_view->setRenderHint(QPainter::Antialiasing);
     m_view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
-    setCentralWidget(m_view);
+    m_canvasStack = new QStackedWidget(this);
+    m_canvasStack->addWidget(m_view);
+    m_v2View = new BlueprintV2View(this); m_canvasStack->addWidget(m_v2View);
+    setCentralWidget(m_canvasStack);
+    m_v2Reader = new BlueprintV2Reader(this);
+    connect(m_v2Reader, &BlueprintV2Reader::finished, this, [this](const QJsonObject &reply, const QString &error) {
+        if (m_pendingV2Directory.isEmpty()) return;
+        const QString directory = m_pendingV2Directory;
+        const quint64 serial = m_v2LoadSerial;
+        m_pendingV2Directory.clear();
+        if (!error.isEmpty() || reply["status"] != "read") {
+            QString detail = error;
+            for (const auto &value : reply["diagnostics"].toArray()) {
+                const auto d = value.toObject(); detail += d["code"].toString() + ": " + d["message"].toString() + "\n";
+            }
+            statusBar()->showMessage(tr("Cannot open Blueprint v2: %1").arg(detail));
+            emit v2LoadFinished(false); return;
+        }
+        if (m_buildService->isRunning()) { statusBar()->showMessage(tr("Finish the active build before opening Blueprint v2.")); emit v2LoadFinished(false); return; }
+        // Prepare the reply first. A failed read never invalidates candidates or legacy state.
+        if (!confirmProjectTransition() || serial != m_v2LoadSerial || !m_workspaceBrowser->requestCanDiscardChanges() || serial != m_v2LoadSerial) { emit v2LoadFinished(false); return; }
+        if (!m_v2Mode && isModified()) {
+            const QScopedValueRollback<bool> replacing(m_replacingProject, true);
+            QString resetError;
+            if (!m_scene->resetDocument(m_savedDocument, m_savedLayout, &resetError)) { emit v2LoadFinished(false); return; }
+        }
+        resetProjectGenerationContext(); m_scene->cancelConnection();
+        if (!m_v2Mode) {
+            m_legacyPropertiesVisible = !m_propertiesDock->isHidden();
+            m_legacyBuildVisible = !m_buildDock->isHidden();
+        }
+        m_propertiesDock->hide(); m_buildDock->hide();
+        m_v2Mode = true; m_v2Directory = directory; m_v2View->setReply(reply);
+        m_canvasStack->setCurrentWidget(m_v2View); m_view->setEnabled(false);
+        updateModePermissions(); updateProjectTitle(); emit v2LoadFinished(true);
+    });
 
     m_fileMenu = menuBar()->addMenu(tr("File"));
     m_fileMenu->setObjectName(QStringLiteral("fileMenu"));
@@ -379,6 +422,10 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     };
     m_newProjectAction = addFileAction(tr("New"), QStringLiteral("newProjectAction"), QKeySequence::New);
     m_openProjectAction = addFileAction(tr("Open..."), QStringLiteral("openProjectAction"), QKeySequence::Open);
+    m_openV2Action = m_fileMenu->addAction(tr("Open Blueprint v2 (read-only)...")); m_openV2Action->setObjectName("openV2ProjectAction");
+    m_exitV2Action = m_fileMenu->addAction(tr("Return to Schema 1 project")); m_exitV2Action->setObjectName("exitV2ModeAction"); m_exitV2Action->setEnabled(false);
+    connect(m_openV2Action, &QAction::triggered, this, &MainWindow::chooseOpenV2Project);
+    connect(m_exitV2Action, &QAction::triggered, this, &MainWindow::exitV2Mode);
     m_fileMenu->addSeparator();
     m_saveProjectAction = addFileAction(tr("Save"), QStringLiteral("saveProjectAction"), QKeySequence::Save);
     m_saveProjectAsAction = addFileAction(tr("Save As..."), QStringLiteral("saveProjectAsAction"), QKeySequence::SaveAs);
@@ -664,6 +711,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     });
     connect(m_generationController, &GenerationController::candidateReady, this,
             [this](const CandidateBatch &batch) {
+        if (m_v2Mode) return;
         auto *dialog = new CandidateReviewDialog(m_generationSnapshot, batch.workspace,
                                                  batch.generationId, batch.result, this, batch.mode);
         m_reviewDialog = dialog;
@@ -681,8 +729,9 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     connect(m_workspacePathEdit, &QLineEdit::textChanged,
             this, &MainWindow::invalidateExternalCodeContext);
 
-    connect(m_deleteAction, &QAction::triggered, this, [this] { m_scene->deleteSelectedItems(); });
+    connect(m_deleteAction, &QAction::triggered, this, [this] { if (!m_v2Mode) m_scene->deleteSelectedItems(); });
     connect(m_connectAction, &QAction::triggered, this, [this] {
+        if (m_v2Mode) return;
         m_scene->beginConnection(m_connectionLabelEdit->text());
         statusBar()->showMessage(tr("Choose source node, then target node"));
     });
@@ -691,20 +740,20 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
     m_scene->setDragConnectionLabel(m_connectionLabelEdit->text());
     connect(m_cancelConnectionAction, &QAction::triggered, this, [this] { cancelConnection(); });
     for (QAction *action : {m_toolbarUndoAction, m_menuUndoAction}) {
-        connect(action, &QAction::triggered, m_scene->undoStack(), &QUndoStack::undo);
+        connect(action, &QAction::triggered, this, [this] { if (!m_v2Mode) m_scene->undoStack()->undo(); });
         action->setEnabled(m_scene->undoStack()->canUndo());
     }
     for (QAction *action : {m_toolbarRedoAction, m_menuRedoAction}) {
-        connect(action, &QAction::triggered, m_scene->undoStack(), &QUndoStack::redo);
+        connect(action, &QAction::triggered, this, [this] { if (!m_v2Mode) m_scene->undoStack()->redo(); });
         action->setEnabled(m_scene->undoStack()->canRedo());
     }
     connect(m_scene->undoStack(), &QUndoStack::canUndoChanged, this, [this](bool enabled) {
-        m_toolbarUndoAction->setEnabled(enabled);
-        m_menuUndoAction->setEnabled(enabled);
+        m_toolbarUndoAction->setEnabled(enabled && !m_v2Mode);
+        m_menuUndoAction->setEnabled(enabled && !m_v2Mode);
     });
     connect(m_scene->undoStack(), &QUndoStack::canRedoChanged, this, [this](bool enabled) {
-        m_toolbarRedoAction->setEnabled(enabled);
-        m_menuRedoAction->setEnabled(enabled);
+        m_toolbarRedoAction->setEnabled(enabled && !m_v2Mode);
+        m_menuRedoAction->setEnabled(enabled && !m_v2Mode);
     });
     connect(m_scene->undoStack(), &QUndoStack::indexChanged, this, [this] {
         if (!m_replacingProject) updateProjectTitle();
@@ -737,8 +786,8 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
                 appendBuildLog(tr("[%1] exit code %2\n").arg(buildStageName(stage)).arg(exitCode));
             });
     connect(m_buildService, &BuildService::finished, this, [this](const BuildResult &result) {
-        m_buildProjectButton->setEnabled(true);
-        m_toolbarBuildAction->setEnabled(true);
+        m_buildProjectButton->setEnabled(!m_v2Mode);
+        m_toolbarBuildAction->setEnabled(!m_v2Mode);
         appendBuildLog(result.success ? tr("Build finished successfully.\n")
                                       : tr("Build failed: %1\n").arg(result.error));
     });
@@ -779,6 +828,7 @@ MainWindow::MainWindow(GenerationController::ClientFactory factory, QWidget *par
 
 MainWindow::~MainWindow()
 {
+    cancelV2Load();
     if (m_externalCodeDialog)
         QObject::disconnect(m_externalCodeDialog, nullptr, this, nullptr);
     if (m_reviewDialog)
@@ -792,12 +842,75 @@ MainWindow::~MainWindow()
     }
 }
 
+void MainWindow::cancelV2Load() { ++m_v2LoadSerial; m_pendingV2Directory.clear(); if (m_v2Reader) m_v2Reader->cancel(); }
+void MainWindow::setV2ReaderConfiguration(const QString &node, const QString &entry, int timeout) { cancelV2Load(); m_v2Reader->setConfiguration(node, entry, timeout); }
+void MainWindow::openV2Project(const QString &directory, const QString &bundlePath) {
+    cancelV2Load();
+    const auto failed = [this](const QString &error) { statusBar()->showMessage(tr("Cannot open Blueprint v2: %1").arg(error)); emit v2LoadFinished(false); };
+    if (m_buildService->isRunning()) { failed(tr("Finish the active build before opening Blueprint v2.")); return; }
+    const auto readUtf8 = [](const QString &path, qsizetype limit, QString &text) {
+        QFile file(path); if (!file.open(QIODevice::ReadOnly) || file.size() > limit) return false;
+        const auto bytes = file.read(limit + 1); QStringDecoder decoder(QStringDecoder::Utf8, QStringConverter::Flag::Stateless);
+        text = decoder.decode(bytes); return file.error() == QFileDevice::NoError && bytes.size() <= limit && !decoder.hasError();
+    };
+    QString source;
+    if (!readUtf8(QDir(directory).filePath("blueprint.json"), 8 * 1024 * 1024, source)) { failed(tr("Cannot read blueprint.json as UTF-8 (limit: 8 MiB).")); return; }
+    QJsonObject registry{{"descriptors", QJsonArray()}, {"trustedLocks", QJsonArray()}};
+    if (!bundlePath.isEmpty()) {
+        QString text; QJsonParseError error;
+        if (!readUtf8(bundlePath, 16 * 1024 * 1024, text)) { failed(tr("Cannot read the trusted declaration bundle.")); return; }
+        const auto bundle = QJsonDocument::fromJson(text.toUtf8(), &error);
+        if (error.error != QJsonParseError::NoError || !bundle.isObject() || !bundle.object().contains("descriptors") || !bundle.object().contains("trustedLocks")) { failed(tr("Invalid trusted declaration bundle: descriptors and trustedLocks are required.")); return; }
+        registry = bundle.object();
+    }
+    m_pendingV2Directory = normalizedProjectDirectory(directory);
+    m_v2Reader->read(source, registry);
+}
+void MainWindow::chooseOpenV2Project() {
+    QDialog dialog(this); dialog.setObjectName("openV2ProjectDialog"); dialog.setWindowTitle(tr("Open Blueprint v2 (read-only)"));
+    auto *layout = new QFormLayout(&dialog);
+    auto *directory = new QLineEdit(&dialog); directory->setObjectName("v2ProjectDirectoryEdit");
+    auto *bundle = new QLineEdit(&dialog); bundle->setObjectName("v2TrustedBundleEdit");
+    auto *browse = new QPushButton(tr("Browse..."), &dialog), *trustBrowse = new QPushButton(tr("Browse..."), &dialog);
+    auto *projectRow = new QWidget(&dialog); auto *pr = new QHBoxLayout(projectRow); pr->setContentsMargins(0,0,0,0); pr->addWidget(directory); pr->addWidget(browse);
+    auto *bundleRow = new QWidget(&dialog); auto *br = new QHBoxLayout(bundleRow); br->setContentsMargins(0,0,0,0); br->addWidget(bundle); br->addWidget(trustBrowse);
+    layout->addRow(tr("Project directory"), projectRow); layout->addRow(tr("Trusted declaration bundle (optional)"), bundleRow);
+    auto *note = new QLabel(tr("Default: no plugins. The optional bundle is independent trusted metadata; it does not install or execute plugins."), &dialog); note->setWordWrap(true); layout->addRow(note);
+    connect(browse, &QPushButton::clicked, &dialog, [&] { auto path = QFileDialog::getExistingDirectory(&dialog, tr("Project directory")); if (!path.isEmpty()) directory->setText(path); });
+    connect(trustBrowse, &QPushButton::clicked, &dialog, [&] { auto path = QFileDialog::getOpenFileName(&dialog, tr("Trusted declaration bundle"), {}, "JSON (*.json)"); if (!path.isEmpty()) bundle->setText(path); });
+    auto *buttons = new QDialogButtonBox(&dialog); layout->addRow(buttons);
+    buttons->addButton(tr("Open"), QDialogButtonBox::AcceptRole);
+    buttons->addButton(tr("Cancel"), QDialogButtonBox::RejectRole);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept); connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    dialog.resize(650, 200); if (dialog.exec() == QDialog::Accepted) openV2Project(directory->text(), bundle->text());
+}
+void MainWindow::exitV2Mode() {
+    const bool wasV2 = m_v2Mode;
+    cancelV2Load(); m_v2Mode = false; m_v2Directory.clear(); m_canvasStack->setCurrentWidget(m_view); m_view->setEnabled(true);
+    if (wasV2) { m_propertiesDock->setVisible(m_legacyPropertiesVisible); m_buildDock->setVisible(m_legacyBuildVisible); }
+    updateModePermissions(); updateProjectTitle(); updatePropertyEditor();
+}
+void MainWindow::updateModePermissions() {
+    const bool writable = !m_v2Mode;
+    for (auto *action : {m_saveProjectAction, m_saveProjectAsAction, m_deleteAction, m_connectAction, m_cancelConnectionAction, m_toolbarExportAction}) action->setEnabled(writable);
+    for (const auto &entry : m_addNodeActions) entry.second->setEnabled(writable);
+    m_addNodeButton->setEnabled(writable); m_connectionLabelEdit->setEnabled(writable);
+    m_exitV2Action->setEnabled(m_v2Mode);
+    m_propertiesDockAction->setEnabled(writable); m_buildDockAction->setEnabled(writable);
+    m_toolbarUndoAction->setEnabled(writable && m_scene->undoStack()->canUndo()); m_menuUndoAction->setEnabled(m_toolbarUndoAction->isEnabled());
+    m_toolbarRedoAction->setEnabled(writable && m_scene->undoStack()->canRedo()); m_menuRedoAction->setEnabled(m_toolbarRedoAction->isEnabled());
+    m_toolbarBuildAction->setEnabled(writable && !m_buildService->isRunning());
+    m_buildDock->widget()->setEnabled(writable); m_propertiesDock->widget()->setEnabled(writable);
+    m_workspaceBrowser->setReadOnly(m_v2Mode); updateGenerationUi();
+}
+
 bool MainWindow::newProject()
 {
     if (!confirmProjectTransition()) return false;
     const QScopedValueRollback<bool> replacing(m_replacingProject, true);
     QString error;
     if (!m_scene->resetDocument(blankBlueprint(), {}, &error)) return false;
+    exitV2Mode();
     resetProjectGenerationContext();
     m_projectDirectory.clear();
     m_scene->setDragConnectionLabel(m_connectionLabelEdit->text());
@@ -829,6 +942,7 @@ bool MainWindow::openProject(const QString &directory)
         QMessageBox::critical(this, tr("Cannot open blueprint project"), error);
         return false;
     }
+    exitV2Mode();
     resetProjectGenerationContext();
     m_projectDirectory = normalizedProjectDirectory(directory);
     m_scene->setDragConnectionLabel(m_connectionLabelEdit->text());
@@ -841,13 +955,16 @@ bool MainWindow::openProject(const QString &directory)
 
 bool MainWindow::saveProject()
 {
+    if (m_v2Mode) return false;
     return m_projectDirectory.isEmpty() ? chooseSaveProjectDirectory()
                                        : saveProjectAs(m_projectDirectory);
 }
 
 bool MainWindow::saveProjectAs(const QString &directory)
 {
+    if (m_v2Mode) return false;
     if (directory.isEmpty()) return false;
+    const quint64 epoch = m_projectEpoch;
     const QString normalized = normalizedProjectDirectory(directory);
     if (!sameProjectDirectory(normalized, m_projectDirectory)
         && (QFileInfo::exists(QDir(directory).filePath(QStringLiteral("blueprint.json")))
@@ -865,6 +982,8 @@ bool MainWindow::saveProjectAs(const QString &directory)
         prompt.exec();
         if (prompt.clickedButton() != replace) return false;
     }
+    // A reader completion can switch projects while the confirmation runs its event loop.
+    if (m_v2Mode || m_projectEpoch != epoch) return false;
     QString error;
     if (!BlueprintProjectStore::save(directory, m_document, m_scene->layoutSnapshot(), &error)) {
         QMessageBox::critical(this, tr("Cannot save blueprint project"), error);
@@ -876,7 +995,7 @@ bool MainWindow::saveProjectAs(const QString &directory)
     return true;
 }
 
-QString MainWindow::projectDirectory() const { return m_projectDirectory; }
+QString MainWindow::projectDirectory() const { return m_v2Mode ? m_v2Directory : m_projectDirectory; }
 
 bool MainWindow::isModified() const
 {
@@ -894,6 +1013,7 @@ void MainWindow::markProjectSaved()
 void MainWindow::updateProjectTitle()
 {
     QString title = tr("Blueprint Editor");
+    if (m_v2Mode) { setWindowTitle(title + " — " + QFileInfo(m_v2Directory).fileName() + " — " + tr("Blueprint v2 (read-only)")); return; }
     if (!m_projectDirectory.isEmpty())
         title += QStringLiteral(" — ") + QFileInfo(m_projectDirectory).fileName();
     if (isModified()) title += QStringLiteral(" *");
@@ -902,6 +1022,7 @@ void MainWindow::updateProjectTitle()
 
 bool MainWindow::confirmProjectTransition()
 {
+    if (m_v2Mode) return true;
     if (!isModified()) return true;
     QMessageBox prompt(QMessageBox::Warning, tr("Unsaved blueprint changes"),
                        tr("Save changes to the current blueprint project?"),
@@ -950,6 +1071,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
         return;
     }
     resetProjectGenerationContext();
+    cancelV2Load();
     event->accept();
 }
 
@@ -980,6 +1102,7 @@ bool MainWindow::addNodeOfType(NodeType type)
 
 bool MainWindow::addNodeOfTypeAt(NodeType type, const QPointF &scenePosition)
 {
+    if (m_v2Mode) return false;
     int number = 1;
     QString id;
     do {
@@ -1010,7 +1133,7 @@ BlueprintScene *MainWindow::scene() const
 
 QGraphicsView *MainWindow::graphicsView() const
 {
-    return m_view;
+    return m_v2Mode ? m_v2View->graphicsView() : m_view;
 }
 
 QString MainWindow::currentLanguage() const
@@ -1064,6 +1187,8 @@ void MainWindow::applyTheme(EditorTheme::Theme theme, bool persist)
     // invalidated to repaint them with the new theme.
     m_scene->update();
 
+    if (m_v2View) m_v2View->refreshPresentation();
+
     if (persist) {
         QSettings().setValue(QStringLiteral("ui/theme"),
                              theme == EditorTheme::Theme::Dark ? QStringLiteral("dark")
@@ -1094,6 +1219,7 @@ void MainWindow::updateThemeActions()
 
 void MainWindow::retranslateUi()
 {
+    m_openV2Action->setText(tr("Open Blueprint v2 (read-only)...")); m_exitV2Action->setText(tr("Return to Schema 1 project"));
     updateProjectTitle();
     m_fileMenu->setTitle(tr("File"));
     m_newProjectAction->setText(tr("New"));
@@ -1178,6 +1304,7 @@ void MainWindow::setBuildToolConfiguration(const QString &cmakeExecutable,
 
 void MainWindow::startGeneration(ProjectScaffolder::Mode mode)
 {
+    if (m_v2Mode) return;
     const QAction *action = mode == ProjectScaffolder::Mode::LinearRuntime
         ? m_generateAction : m_generateLegacyAction;
     if (!action->isEnabled())
@@ -1209,6 +1336,7 @@ void MainWindow::updateGenerationUi()
 {
     if (!m_generationController)
         return;
+    if (m_v2Mode) { m_generateAction->setEnabled(false); m_generateLegacyAction->setEnabled(false); m_cancelGenerationAction->setEnabled(false); m_generationStatus->setText(tr("Blueprint v2 (read-only)")); return; }
     const auto state = m_generationController->state();
     bool runtimeGeneratable = false;
     bool legacyGeneratable = false;
@@ -1292,22 +1420,30 @@ void MainWindow::finishAbortedWorkspaceOperationClick()
 
 bool MainWindow::prepareWorkspaceOperation()
 {
+    if (m_v2Mode) return false;
+    const quint64 epoch = m_projectEpoch;
+    const auto current = [this, epoch] { return !m_v2Mode && m_projectEpoch == epoch; };
     m_workspaceOperationPreflightActive = true;
+    const auto cleanup = qScopeGuard([this] {
+        m_workspaceOperationPreflightActive = false;
+        m_workspaceOperationMousePressPending = false;
+        m_deferredWorkspaceEdit = false;
+    });
     const QString target = m_workspacePathEdit->text().trimmed();
     const bool switched = m_workspaceBrowser->setWorkspacePath(target);
+    // Both source prompts may dispatch a Reader reply or another project transition.
+    if (!current()) return false;
     if (!switched) {
         const QSignalBlocker blocked(m_workspacePathEdit);
         m_workspacePathEdit->setText(m_workspaceBrowser->workspacePath());
     }
     const bool ready = switched && m_workspaceBrowser->requestCanDiscardChanges();
-    m_workspaceOperationPreflightActive = false;
-    m_workspaceOperationMousePressPending = false;
-    m_deferredWorkspaceEdit = false;
-    return ready;
+    return current() && ready;
 }
 
 void MainWindow::startBuild()
 {
+    const quint64 epoch = m_projectEpoch;
     if (!prepareWorkspaceOperation()) return;
     BuildRequest request;
     const QString workspace = m_workspacePathEdit->text().trimmed();
@@ -1325,9 +1461,11 @@ void MainWindow::startBuild()
     appendBuildLog(tr("Starting configure for %1\n").arg(request.sourceDirectory));
     m_buildProjectButton->setEnabled(false);
     m_toolbarBuildAction->setEnabled(false);
+    if (m_v2Mode || m_projectEpoch != epoch) return;
     if (!m_buildService->start(request, &error)) {
-        m_buildProjectButton->setEnabled(true);
-        m_toolbarBuildAction->setEnabled(true);
+        const bool current = !m_v2Mode && m_projectEpoch == epoch;
+        m_buildProjectButton->setEnabled(current);
+        m_toolbarBuildAction->setEnabled(current);
         appendBuildLog(tr("Build request rejected: %1\n").arg(error));
         return;
     }
@@ -1335,8 +1473,10 @@ void MainWindow::startBuild()
 
 void MainWindow::exportProject()
 {
+    const quint64 epoch = m_projectEpoch;
     if (!prepareWorkspaceOperation()) return;
     QString error;
+    if (m_v2Mode || m_projectEpoch != epoch) return;
     if (ProjectExporter::exportProject(m_workspacePathEdit->text().trimmed(),
                                        m_exportTargetEdit->text().trimmed(), &error)) {
         appendBuildLog(tr("Export finished successfully.\n"));
@@ -1359,8 +1499,8 @@ void MainWindow::resetWindowLayout()
     }
     addDockWidget(Qt::RightDockWidgetArea, m_propertiesDock);
     addDockWidget(Qt::BottomDockWidgetArea, m_buildDock);
-    m_propertiesDock->show();
-    m_buildDock->show();
+    m_propertiesDock->setVisible(!m_v2Mode);
+    m_buildDock->setVisible(!m_v2Mode);
     resizeDocks({m_propertiesDock}, {340}, Qt::Horizontal);
     resizeDocks({m_buildDock}, {260}, Qt::Vertical);
 }
@@ -1406,6 +1546,7 @@ void MainWindow::appendBuildLog(const QString &text)
 void MainWindow::showCanvasContextMenu(QGraphicsItem *target, const QPoint &screenPosition,
                                        const QPointF &scenePosition)
 {
+    if (m_v2Mode) return;
     // The scene already made the clicked object the current one, so every entry can keep
     // reusing the shared actions: Delete acts on the selection, Edit on the clicked node.
     QMenu menu(this);
@@ -1439,6 +1580,7 @@ void MainWindow::showCanvasContextMenu(QGraphicsItem *target, const QPoint &scre
 
 void MainWindow::editNodeFromCanvas(const QString &nodeId)
 {
+    if (m_v2Mode) return;
     const auto iterator = std::find_if(m_document.nodes.cbegin(), m_document.nodes.cend(),
                                        [&nodeId](const BlueprintNode &node) {
                                            return node.id == nodeId;
@@ -1451,8 +1593,9 @@ void MainWindow::editNodeFromCanvas(const QString &nodeId)
     if (NodeItem *item = m_scene->nodeItem(nodeId)) {
         item->setSelected(true);
     }
+    const quint64 epoch = m_projectEpoch;
     NodeEditDialog dialog(*iterator, this);
-    if (dialog.exec() == QDialog::Accepted) {
+    if (dialog.exec() == QDialog::Accepted && !m_v2Mode && m_projectEpoch == epoch) {
         m_scene->editNode(nodeId, dialog.node());
         statusBar()->clearMessage();
     }
@@ -1460,6 +1603,7 @@ void MainWindow::editNodeFromCanvas(const QString &nodeId)
 
 void MainWindow::applyProperties()
 {
+    if (m_v2Mode) return;
     const QString id = selectedNodeId();
     if (!id.isEmpty()) {
         BlueprintNode updated;
@@ -1485,7 +1629,7 @@ void MainWindow::updatePropertyEditor()
 {
     m_manageExternalCodeButton->hide();
     const QString id = selectedNodeId();
-    const bool editable = !id.isEmpty();
+    const bool editable = !m_v2Mode && !id.isEmpty();
     m_nodePropertiesEditor->setEditorEnabled(editable);
     m_applyPropertiesButton->setEnabled(editable);
     if (!editable) {
@@ -1513,6 +1657,7 @@ void MainWindow::invalidateExternalCodeContext()
 
 void MainWindow::showExternalCodeManagement()
 {
+    if (m_v2Mode) return;
     const QString id = selectedNodeId();
     const auto it = std::find_if(m_document.nodes.cbegin(), m_document.nodes.cend(),
                                [&id](const BlueprintNode &node) { return node.id == id; });

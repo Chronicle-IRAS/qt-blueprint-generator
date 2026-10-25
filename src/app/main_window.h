@@ -15,6 +15,9 @@
 #include <QPointer>
 
 class BlueprintScene;
+class BlueprintV2Reader;
+class BlueprintV2View;
+class QStackedWidget;
 class BuildService;
 class WorkspaceBrowserWidget;
 class CandidateReviewDialog;
@@ -53,6 +56,10 @@ public:
     QGraphicsView *graphicsView() const;
     bool newProject();
     bool openProject(const QString &projectDirectory);
+    void openV2Project(const QString &directory, const QString &trustedBundlePath = {});
+    bool isV2Mode() const { return m_v2Mode; }
+    void exitV2Mode();
+    void setV2ReaderConfiguration(const QString &nodeExecutable, const QString &entryPoint, int timeoutMs = 15000);
     bool saveProject();
     bool saveProjectAs(const QString &projectDirectory);
     QString projectDirectory() const;
@@ -64,12 +71,26 @@ public:
                                    const QStringList &configureArguments,
                                    const QStringList &buildArguments = {});
 
+signals:
+    void v2LoadFinished(bool success);
+
 protected:
     void changeEvent(QEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
+    void chooseOpenV2Project();
+    void updateModePermissions();
+    void cancelV2Load();
+    BlueprintV2Reader *m_v2Reader = nullptr;
+    BlueprintV2View *m_v2View = nullptr;
+    QStackedWidget *m_canvasStack = nullptr;
+    QAction *m_openV2Action = nullptr, *m_exitV2Action = nullptr;
+    bool m_v2Mode = false;
+    bool m_legacyPropertiesVisible = true, m_legacyBuildVisible = true;
+    QString m_v2Directory, m_pendingV2Directory;
+    quint64 m_v2LoadSerial = 0;
     bool applyLanguage(const QString &languageCode, bool persist);
     void applyTheme(EditorTheme::Theme theme, bool persist);
     void retranslateUi();

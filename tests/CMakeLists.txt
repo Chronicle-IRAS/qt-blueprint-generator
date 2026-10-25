@@ -625,3 +625,21 @@ foreach(runtime_test IN ITEMS runtime_assembly runtime_end_to_end)
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
 endforeach()
+set(v2_gui_moc "${CMAKE_CURRENT_BINARY_DIR}/tst_blueprint_v2_gui.moc")
+add_custom_command(OUTPUT "${v2_gui_moc}"
+    COMMAND Qt6::moc -o tst_blueprint_v2_gui.moc "${CMAKE_CURRENT_SOURCE_DIR}/tst_blueprint_v2_gui.cpp"
+    DEPENDS tst_blueprint_v2_gui.cpp WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM)
+qt_add_executable(tst_blueprint_v2_gui tst_blueprint_v2_gui.cpp "${v2_gui_moc}")
+set_target_properties(tst_blueprint_v2_gui PROPERTIES AUTOMOC OFF)
+target_include_directories(tst_blueprint_v2_gui PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(tst_blueprint_v2_gui PRIVATE BlueprintEditorCore Qt6::Test)
+target_compile_definitions(tst_blueprint_v2_gui PRIVATE
+    V2_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures/plugin-descriptors"
+    V2_READER_ENTRY="${PROJECT_BINARY_DIR}/v2-reader/tools/schema-contracts/blueprint-reader-cli.js"
+    V2_NODE_EXECUTABLE="${BLUEPRINT_NODE_EXECUTABLE}")
+if(TARGET blueprint_v2_reader)
+    add_dependencies(tst_blueprint_v2_gui blueprint_v2_reader)
+endif()
+add_test(NAME blueprint_v2_gui COMMAND tst_blueprint_v2_gui)
+set_tests_properties(blueprint_v2_gui PROPERTIES TIMEOUT 120 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")

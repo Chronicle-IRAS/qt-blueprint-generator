@@ -159,7 +159,7 @@ void WorkspaceBrowserWidget::openFile(const QString &relative)
                             m_cleanLineEndings = m_lineEndings;
                             m_observedText = sourceText(m_preview);
                             m_trackingEdits = true;
-                            m_preview->setReadOnly(m_kind != WorkspaceFilePolicy::Kind::OrdinaryFutureEditable);
+                            m_preview->setReadOnly(m_readOnly || m_kind != WorkspaceFilePolicy::Kind::OrdinaryFutureEditable);
                             m_status = text.isEmpty() ? Status::EmptyFile : Status::Selected;
                         }
                     }
@@ -172,6 +172,12 @@ void WorkspaceBrowserWidget::openFile(const QString &relative)
 bool WorkspaceBrowserWidget::hasUnsavedChanges() const
 {
     return !m_currentPath.isEmpty() && m_preview->document()->isModified();
+}
+void WorkspaceBrowserWidget::setReadOnly(bool readOnly)
+{
+    m_readOnly = readOnly;
+    m_preview->setReadOnly(readOnly || m_kind != WorkspaceFilePolicy::Kind::OrdinaryFutureEditable);
+    retranslateUi();
 }
 QString WorkspaceBrowserWidget::workspacePath() const { return m_workspace; }
 void WorkspaceBrowserWidget::trackTextChange()
@@ -260,7 +266,7 @@ bool WorkspaceBrowserWidget::reloadCurrentFile()
     m_fileIdentity = fileIdentity;
     m_hadBom = hadBom;
     m_kind = kind;
-    m_preview->setReadOnly(false);
+    m_preview->setReadOnly(m_readOnly);
     m_preview->document()->setModified(true);
     m_trackingEdits = true;
     m_status = Status::ReloadFailed;
@@ -269,6 +275,7 @@ bool WorkspaceBrowserWidget::reloadCurrentFile()
 }
 bool WorkspaceBrowserWidget::saveCurrentFile()
 {
+    if (m_readOnly) return false;
     if (m_kind != WorkspaceFilePolicy::Kind::OrdinaryFutureEditable || !hasUnsavedChanges()) return false;
     QString absolute;
     const auto currentManifest = WorkspaceFilePolicy::manifest(m_workspace);
@@ -331,7 +338,7 @@ void WorkspaceBrowserWidget::retranslateUi()
 {
     m_refresh->setText(tr("Refresh"));
     m_save->setText(tr("Save"));
-    m_save->setEnabled(m_kind == WorkspaceFilePolicy::Kind::OrdinaryFutureEditable && hasUnsavedChanges());
+    m_save->setEnabled(!m_readOnly && m_kind == WorkspaceFilePolicy::Kind::OrdinaryFutureEditable && hasUnsavedChanges());
     m_path->setText(m_currentPath.isEmpty() ? tr("No file selected") : m_currentPath + (hasUnsavedChanges() ? " *" : ""));
     QString status;
     switch (m_status) {
@@ -343,13 +350,13 @@ void WorkspaceBrowserWidget::retranslateUi()
     case Status::ReadError: status = tr("Cannot read this file."); break;
     case Status::Unsupported: status = tr("Preview is not supported for this file type or encoding. UTF-8 text is required."); break;
     case Status::TooLarge: status = tr("File is too large to preview (limit: 1 MiB)."); break;
-    case Status::EmptyFile: status = m_kind == WorkspaceFilePolicy::Kind::OrdinaryFutureEditable ? tr("Empty file. Editable.") : tr("Empty file. Read-only."); break;
+    case Status::EmptyFile: status = !m_readOnly && m_kind == WorkspaceFilePolicy::Kind::OrdinaryFutureEditable ? tr("Empty file. Editable.") : tr("Empty file. Read-only."); break;
     case Status::SaveFailed: status = tr("Save failed: %1").arg(m_saveError); break;
     case Status::ReloadFailed: status = tr("Reload failed; local edits were kept."); break;
     case Status::DiskChanged: status = tr("File changed on disk."); break;
     case Status::Selected:
         switch (m_kind) {
-        case WorkspaceFilePolicy::Kind::OrdinaryFutureEditable: status = tr("Editable project file."); break;
+        case WorkspaceFilePolicy::Kind::OrdinaryFutureEditable: status = m_readOnly ? tr("Read-only while Blueprint v2 is open.") : tr("Editable project file."); break;
         case WorkspaceFilePolicy::Kind::ProtectedScaffold: status = tr("Read-only preview — protected scaffold / contract."); break;
         case WorkspaceFilePolicy::Kind::ExternalProtected: status = tr("Read-only preview — protected external code."); break;
         default: status = tr("Read-only preview — protection metadata is unavailable."); break;
