@@ -2,6 +2,7 @@
 #include "editor/blueprint_scene.h"
 #include "editor/node_item.h"
 #include "app/blueprint_v2_reader.h"
+#include "app/blueprint_v2_edit_dialog.h"
 #include "app/workspace_browser_widget.h"
 #include "blueprint/blueprint_project_store.h"
 #include "ai/ai_client.h"
@@ -38,6 +39,10 @@ QByteArray read(const QString &path) { QFile file(path); return file.open(QIODev
 void write(const QString &path, const QByteArray &bytes) { QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); QCOMPARE(file.write(bytes), bytes.size()); }
 QString fixture(const char *name) { return QDir(QStringLiteral(V2_FIXTURE_DIR)).filePath(QString::fromUtf8(name)); }
 void configure(MainWindow &w) { w.setV2ReaderConfiguration(QStringLiteral(V2_NODE_EXECUTABLE), QStringLiteral(V2_READER_ENTRY)); }
+void editProjectName(MainWindow &w,const QString &name) {
+    QTimer::singleShot(0,&w,[&w,name]{auto *dialog=w.findChild<QDialog *>("v2EditValuesDialog");QVERIFY(dialog);dialog->findChild<QLineEdit *>("v2ProjectNameEdit")->setText(name);dialog->findChild<QPushButton *>("v2ApplyPreviewButton")->click();});
+    auto *button=w.findChild<QPushButton *>("v2EditValuesButton");QVERIFY(button);QVERIFY(button->isEnabled());button->click();
+}
 QJsonObject blueprint() { return QJsonDocument::fromJson(read(fixture("blueprint.json"))).object(); }
 QString bundle(QTemporaryDir &temporary) {
     const QString path = temporary.filePath("信任.json");
@@ -83,6 +88,104 @@ void prepareGeneration(MainWindow &w,const QString &workspace) {
 class BlueprintV2GuiTest : public QObject {
  Q_OBJECT
 private slots:
+ void longExistingScalarsAreNotSilentlyTruncatedIntoPendingEdits() {
+   const QString literal="\""+QString(40000,'x')+"\"";QJsonObject targets{{"projectName","old"},{"nodes",QJsonArray{QJsonObject{{"sourceIndex",0},{"properties",QJsonArray{QJsonObject{{"property","long"},{"valueLiteral",literal}}}},{"ports",QJsonArray()}}}}};
+   BlueprintV2EditDialog dialog(targets,0,targets,{},nullptr);QCOMPARE(dialog.findChild<QLineEdit *>("v2Property_0")->text(),literal);dialog.findChild<QLineEdit *>("v2ProjectNameEdit")->setText("new");QCOMPARE(dialog.edits(),QJsonArray({QJsonObject{{"kind","project-name"},{"value","new"}}}));
+ }
+ void editingPreviewsWithoutWritingAndSavesTwice() {
+   QTemporaryDir project, trust; const auto original=read(fixture("blueprint.json"));write(project.filePath("blueprint.json"),original);
+   MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path(),bundle(trust));QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);QVERIFY(loaded[0][0].toBool());
+   auto *button=w.findChild<QPushButton *>("v2EditValuesButton");QVERIFY2(button,"v2 restricted editor is available");
+   auto *view=w.findChild<QGraphicsView *>("v2GraphicsView");for(auto *item:view->scene()->items())if(item->data(0).isValid()&&item->data(0).toInt()==0)item->setSelected(true);
+   QTimer::singleShot(0,&w,[&]{auto *dialog=w.findChild<QDialog *>("v2EditValuesDialog");QVERIFY(dialog);dialog->findChild<QLineEdit *>("v2ProjectNameEdit")->setText("first edit");dialog->findChild<QLineEdit *>("v2Property_0")->setText("\"new label\"");dialog->findChild<QLineEdit *>("v2Port_0")->setText("output");dialog->findChild<QPushButton *>("v2ApplyPreviewButton")->click();});
+   button->click();QVERIFY(w.isModified());QCOMPARE(read(project.filePath("blueprint.json")),original);QVERIFY(w.windowTitle().contains('*'));QVERIFY(w.findChild<QPlainTextEdit *>("v2Properties")->toPlainText().contains("new label"));
+   bool portVisible=false;for(auto *item:view->scene()->items())if(auto *text=dynamic_cast<QGraphicsTextItem *>(item))portVisible|=text->toPlainText().contains("output");QVERIFY(portVisible);QCOMPARE(w.findChild<QAction *>("saveProjectAction")->shortcut(),QKeySequence(QKeySequence::Save));
+   QVERIFY(w.saveProject());QTRY_VERIFY_WITH_TIMEOUT(!w.isModified(),30000);const auto first=read(project.filePath("blueprint.json"));QCOMPARE(first,QByteArray(original).replace("Reading pipeline","first edit").replace("温度","new label").replace("可编辑显示名","output"));
+   QVERIFY2(button->isEnabled(),"verified save retains editable document authority");
+   w.openV2Project(project.path(),bundle(trust));QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),2,20000);QVERIFY(loaded[1][0].toBool());
+   QTimer::singleShot(0,&w,[&]{auto *dialog=w.findChild<QDialog *>("v2EditValuesDialog");dialog->findChild<QLineEdit *>("v2ProjectNameEdit")->setText("second edit");dialog->findChild<QPushButton *>("v2ApplyPreviewButton")->click();});button->click();QVERIFY(w.isModified());QVERIFY(w.saveProject());QTRY_VERIFY_WITH_TIMEOUT(!w.isModified(),30000);QCOMPARE(read(project.filePath("blueprint.json")),QByteArray(first).replace("first edit","second edit"));
+ }
+ void canonicalRepeatedEditsAndResetUseOriginalBaseline() {
+   QTemporaryDir project;const auto original=read(fixture("blueprint.json"));write(project.filePath("blueprint.json"),original);MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);
+   editProjectName(w,"one");QVERIFY(w.isModified());editProjectName(w,"two");QVERIFY(w.isModified());QCOMPARE(read(project.filePath("blueprint.json")),original);
+   editProjectName(w,"Reading pipeline");QVERIFY(!w.isModified());QCOMPARE(read(project.filePath("blueprint.json")),original);
+   editProjectName(w,"three");QVERIFY(w.saveProject());QTRY_VERIFY_WITH_TIMEOUT(!w.isModified(),30000);editProjectName(w,"four");QVERIFY(w.saveProject());QTRY_VERIFY_WITH_TIMEOUT(!w.isModified(),30000);QCOMPARE(read(project.filePath("blueprint.json")),QByteArray(original).replace("Reading pipeline","four"));
+ }
+ void invalidPreviewRetainsInputAndAcceptedViewAndUnknownHasNoInternalEditor() {
+   QTemporaryDir project,trust;const auto original=read(fixture("blueprint.json"));write(project.filePath("blueprint.json"),original);MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path(),bundle(trust));QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);
+   auto *view=w.findChild<QGraphicsView *>("v2GraphicsView");for(auto *item:view->scene()->items())if(item->data(0).isValid()&&item->data(0).toInt()==0)item->setSelected(true);
+   const auto snapshot=w.findChild<QPlainTextEdit *>("v2Properties")->toPlainText();QSignalSpy preview(&w,&MainWindow::v2PreviewFinished);
+   QTimer::singleShot(0,&w,[&]{auto *dialog=w.findChild<QDialog *>("v2EditValuesDialog");auto *input=dialog->findChild<QLineEdit *>("v2Property_0");QVERIFY(input);input->setText("17");dialog->findChild<QPushButton *>("v2ApplyPreviewButton")->click();});
+   QTimer timer;timer.setInterval(10);connect(&timer,&QTimer::timeout,&w,[&]{if(preview.size()!=1)return;auto *dialog=w.findChild<QDialog *>("v2EditValuesDialog");QVERIFY(dialog);QCOMPARE(dialog->findChild<QLineEdit *>("v2Property_0")->text(),QString("17"));QVERIFY(dialog->findChild<QLabel *>("v2EditError")->text().contains("PROPERTY_CONTRACT"));QCOMPARE(w.findChild<QPlainTextEdit *>("v2Properties")->toPlainText(),snapshot);QVERIFY(!w.isModified());dialog->reject();timer.stop();});timer.start();w.findChild<QPushButton *>("v2EditValuesButton")->click();QCOMPARE(read(project.filePath("blueprint.json")),original);
+   w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),2,20000);for(auto *item:view->scene()->items())if(item->data(0).isValid()&&item->data(0).toInt()==0)item->setSelected(true);
+   QTimer::singleShot(0,&w,[&]{auto *dialog=w.findChild<QDialog *>("v2EditValuesDialog");QVERIFY(!dialog->findChild<QLineEdit *>("v2Property_0"));QVERIFY(!dialog->findChild<QLineEdit *>("v2Port_0"));dialog->reject();});w.findChild<QPushButton *>("v2EditValuesButton")->click();
+ }
+ void actualConflictAndDirectoryFailureKeepDraftAndBytes() {
+   QTemporaryDir project;const auto original=read(fixture("blueprint.json"));write(project.filePath("blueprint.json"),original);MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);editProjectName(w,"draft");
+   QSignalSpy saved(&w,&MainWindow::v2SaveFinished);write(project.filePath("blueprint.json"),original+"\n");QVERIFY(w.saveProject());QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,30000);QVERIFY(!saved[0][0].toBool());QVERIFY(w.isModified());QCOMPARE(read(project.filePath("blueprint.json")),original+"\n");QVERIFY(w.findChild<QLabel *>("v2OperationStatus")->text().contains("CONFLICT"));
+   write(project.filePath("blueprint.json"),original);write(project.filePath("README.md"),"protected");QVERIFY(w.saveProject());QTRY_COMPARE_WITH_TIMEOUT(saved.size(),2,30000);QVERIFY(!saved[1][0].toBool());QVERIFY(w.isModified());QCOMPARE(read(project.filePath("blueprint.json")),original);QCOMPARE(read(project.filePath("README.md")),QByteArray("protected"));QVERIFY(w.findChild<QLabel *>("v2OperationStatus")->text().contains("DIRECTORY_UNSUITABLE"));
+ }
+ void saveReplyLossBlocksRetryAndCompetingTransitions_data() {
+   QTest::addColumn<QByteArray>("script");
+   QTest::newRow("timeout")<<QByteArray("setTimeout(()=>{},30000);");
+   QTest::newRow("crash")<<QByteArray("setTimeout(()=>process.exit(8),100);");
+   QTest::newRow("malformed")<<QByteArray("setTimeout(()=>process.stdout.write('{'),100);");
+   QTest::newRow("committed-unverified")<<QByteArray("let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>setTimeout(()=>{let r=JSON.parse(s);process.stdout.write(JSON.stringify({protocolVersion:2,requestId:r.requestId,operation:'save',canGenerate:false,result:{status:'failed',code:'VERIFY_FAILED',writeState:'committed-unverified',canGenerate:false,message:'inspect disk'}}))},100));");
+ }
+ void saveReplyLossBlocksRetryAndCompetingTransitions() {
+   QFETCH(QByteArray,script);QTemporaryDir project,runtime;const auto original=read(fixture("blueprint.json"));write(project.filePath("blueprint.json"),original);write(runtime.filePath("failure.cjs"),script);MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);editProjectName(w,"draft");w.setV2ReaderConfiguration(QStringLiteral(V2_NODE_EXECUTABLE),runtime.filePath("failure.cjs"),600);
+   QSignalSpy saved(&w,&MainWindow::v2SaveFinished);QVERIFY(w.saveProject());QVERIFY(!w.saveProject());QVERIFY(!w.newProject());w.exitV2Mode();QVERIFY(w.isV2Mode());QVERIFY(!w.close());w.openV2Project(QStringLiteral(V2_FIXTURE_DIR));QCOMPARE(loaded.size(),1);configure(w);
+   QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,3000);QVERIFY(!saved[0][0].toBool());QVERIFY(w.isModified());QVERIFY(!w.saveProject());QVERIFY(!w.findChild<QPushButton *>("v2EditValuesButton")->isEnabled());QVERIFY(w.findChild<QLabel *>("v2OperationStatus")->text().contains("unknown"));QCOMPARE(read(project.filePath("blueprint.json")),original);
+   configure(w);{Answers answers({QMessageBox::DestructiveRole});w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),2,20000);}QVERIFY(!w.isModified());QVERIFY(w.findChild<QPushButton *>("v2EditValuesButton")->isEnabled());
+ }
+ void dirtyV2Transitions_data() {
+   QTest::addColumn<QString>("operation");QTest::addColumn<int>("role");
+   for(const QString operation:{"new","legacy","return","close","v2"})for(auto role:{QMessageBox::AcceptRole,QMessageBox::DestructiveRole,QMessageBox::RejectRole})QTest::newRow(qPrintable(operation+QString::number(role)))<<operation<<int(role);
+ }
+ void dirtyV2Transitions() {
+   QFETCH(QString,operation);QFETCH(int,role);QTemporaryDir project,legacy;const auto original=read(fixture("blueprint.json"));write(project.filePath("blueprint.json"),original);MainWindow w;configure(w);QVERIFY(w.saveProjectAs(legacy.path()));QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);editProjectName(w,"transition draft");QSignalSpy saved(&w,&MainWindow::v2SaveFinished);
+   Answers answer({static_cast<QMessageBox::ButtonRole>(role)});
+   if(operation=="new")w.newProject();else if(operation=="legacy")w.openProject(legacy.path());else if(operation=="return")w.exitV2Mode();else if(operation=="close")w.close();else w.openV2Project(QStringLiteral(V2_FIXTURE_DIR));
+   if(operation=="v2")QTRY_VERIFY_WITH_TIMEOUT(loaded.size()>=2,20000);
+   if(role==QMessageBox::AcceptRole){QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,30000);QVERIFY(saved[0][0].toBool());if(operation=="v2")QTRY_VERIFY_WITH_TIMEOUT(w.projectDirectory()!=project.path(),20000);else if(operation!="close")QTRY_VERIFY(!w.isV2Mode());QCOMPARE(read(project.filePath("blueprint.json")),QByteArray(original).replace("Reading pipeline","transition draft"));}
+   else if(role==QMessageBox::RejectRole){QVERIFY(w.isV2Mode());QVERIFY(w.isModified());QCOMPARE(w.projectDirectory(),project.path());QCOMPARE(read(project.filePath("blueprint.json")),original);}
+   else {if(operation!="close")QVERIFY(!w.isModified());QCOMPARE(read(project.filePath("blueprint.json")),original);}
+ }
+ void actualStoreCommitWithLostReplyRequiresReloadRatherThanRetry() {
+   QTemporaryDir project,runtime;const auto original=read(fixture("blueprint.json"));write(project.filePath("blueprint.json"),original);MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);editProjectName(w,"committed without reply");
+   const auto protocol=QUrl::fromLocalFile(QFileInfo(QStringLiteral(V2_READER_ENTRY)).dir().filePath("blueprint-document-protocol.js")).toString();
+   write(runtime.filePath("lost.cjs"),("let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',async()=>{const api=await import('"+protocol+"');const r=await api.handleBlueprintDocumentRequest(JSON.parse(s));if(r.result.status!=='saved'){process.stdout.write(JSON.stringify(r));return;}setTimeout(()=>{},30000);});").toUtf8());
+   w.setV2ReaderConfiguration(QStringLiteral(V2_NODE_EXECUTABLE),runtime.filePath("lost.cjs"),8000);QSignalSpy saved(&w,&MainWindow::v2SaveFinished);QVERIFY(w.saveProject());QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,12000);QVERIFY(!saved[0][0].toBool());QVERIFY(w.isModified());QVERIFY(!w.saveProject());QCOMPARE(read(project.filePath("blueprint.json")),QByteArray(original).replace("Reading pipeline","committed without reply"));QVERIFY(w.findChild<QLabel *>("v2OperationStatus")->text().contains("unknown"));
+   configure(w);{Answers answers({QMessageBox::DestructiveRole});w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),2,20000);}QVERIFY(!w.isModified());QVERIFY(w.windowTitle().contains("committed without reply"));editProjectName(w,"after inspection");QVERIFY(w.saveProject());QTRY_VERIFY_WITH_TIMEOUT(!w.isModified(),30000);
+ }
+ void selectedNodeIdentityAndDiagnosticsFollowAcceptedPreview() {
+   QTemporaryDir project,trust;auto doc=blueprint();auto nodes=doc["nodes"].toArray();auto first=nodes[0].toObject();first["properties"]=QJsonObject{{"label",17}};nodes[0]=first;nodes.append(first);doc["nodes"]=nodes;const auto original=QJsonDocument(doc).toJson();write(project.filePath("blueprint.json"),original);MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path(),bundle(trust));QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);QVERIFY(w.findChild<QPlainTextEdit *>("v2Diagnostics")->toPlainText().contains("NODE_PROPERTIES"));
+   auto *view=w.findChild<QGraphicsView *>("v2GraphicsView");for(auto *item:view->scene()->items())if(item->data(0).isValid())item->setSelected(item->data(0).toInt()==0);
+   QTimer::singleShot(0,&w,[&]{auto *dialog=w.findChild<QDialog *>("v2EditValuesDialog");QVERIFY(dialog->findChild<QLineEdit *>("v2Property_0"));for(auto *item:view->scene()->items())if(item->data(0).isValid())item->setSelected(item->data(0).toInt()==3);dialog->findChild<QLineEdit *>("v2Property_0")->setText("\"repaired first\"");dialog->findChild<QPushButton *>("v2ApplyPreviewButton")->click();});w.findChild<QPushButton *>("v2EditValuesButton")->click();QVERIFY(w.isModified());QCOMPARE(read(project.filePath("blueprint.json")),original);
+   auto snapshot=w.findChild<QPlainTextEdit *>("v2Properties")->toPlainText();QVERIFY(snapshot.contains("17"));QVERIFY(snapshot.contains("sourceIndex\": 3"));QVERIFY(w.saveProject());QTRY_VERIFY_WITH_TIMEOUT(!w.isModified(),30000);auto after=QJsonDocument::fromJson(read(project.filePath("blueprint.json"))).object()["nodes"].toArray();QCOMPARE(after[0].toObject()["properties"].toObject()["label"].toString(),QString("repaired first"));QCOMPARE(after[3].toObject()["properties"].toObject()["label"].toInt(),17);
+ }
+ void chineseEditFormAndPolicyPermissions() {
+   QTemporaryDir project;write(project.filePath("blueprint.json"),read(fixture("blueprint.json")));MainWindow w;configure(w);QVERIFY(w.setLanguage("zh_CN"));QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);QCOMPARE(w.findChild<QAction *>("openV2ProjectAction")->text(),QString::fromUtf8("打开蓝图 v2..."));auto *button=w.findChild<QPushButton *>("v2EditValuesButton");QCOMPARE(button->text(),QString::fromUtf8("编辑 v2 值…"));
+   QTimer::singleShot(0,&w,[&]{auto *dialog=w.findChild<QDialog *>("v2EditValuesDialog");QCOMPARE(dialog->windowTitle(),QString::fromUtf8("编辑 v2 值"));QCOMPARE(dialog->findChild<QPushButton *>("v2ApplyPreviewButton")->text(),QString::fromUtf8("应用预览（未保存）"));dialog->reject();});button->click();
+   w.openV2Project(QStringLiteral(V2_FIXTURE_DIR));QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),2,20000);QVERIFY(!button->isEnabled());QVERIFY(w.findChild<QLabel *>("v2ReadOnlyBanner")->text().contains(QString::fromUtf8("目录保护")));QVERIFY(!w.saveProject());
+ }
+ void scalarNegativeZeroAndOpaqueCrLfBytesSurviveGuiSave() {
+   QTemporaryDir project,trust;const auto trustPath=bundle(trust);auto declarations=QJsonDocument::fromJson(read(trustPath)).object();auto descriptors=declarations["descriptors"].toArray();auto descriptor=descriptors[0].toObject();auto definitions=descriptor["nodeDefinitions"].toArray();auto definition=definitions[0].toObject();auto schema=definition["propertiesSchema"].toObject();auto properties=schema["properties"].toObject();properties["amount"]=QJsonObject{{"type","number"}};schema["properties"]=properties;definition["propertiesSchema"]=schema;definitions[0]=definition;descriptor["nodeDefinitions"]=definitions;descriptors[0]=descriptor;declarations["descriptors"]=descriptors;write(trustPath,QJsonDocument(declarations).toJson());
+   auto doc=blueprint();auto nodes=doc["nodes"].toArray();auto node=nodes[0].toObject();auto values=node["properties"].toObject();values["amount"]=0;node["properties"]=values;nodes[0]=node;doc["nodes"]=nodes;doc["opaque"]=QJsonObject{{"raw","escaped text"}};auto original=QJsonDocument(doc).toJson().replace("\n","\r\n").replace("escaped text","escap\\u0065d text").replace("\"label\"","\"la\\u0062el\"");write(project.filePath("blueprint.json"),original);
+   MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path(),trustPath);QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);auto *view=w.findChild<QGraphicsView *>("v2GraphicsView");for(auto *item:view->scene()->items())if(item->data(0).isValid())item->setSelected(item->data(0).toInt()==0);
+   QTimer::singleShot(0,&w,[&]{auto *dialog=w.findChild<QDialog *>("v2EditValuesDialog");QCOMPARE(dialog->findChild<QLineEdit *>("v2Property_0")->text(),QString("0"));dialog->findChild<QLineEdit *>("v2Property_0")->setText("-0");dialog->findChild<QPushButton *>("v2ApplyPreviewButton")->click();});w.findChild<QPushButton *>("v2EditValuesButton")->click();QVERIFY(w.isModified());QCOMPARE(read(project.filePath("blueprint.json")),original);QVERIFY(w.saveProject());QTRY_VERIFY_WITH_TIMEOUT(!w.isModified(),30000);QCOMPARE(read(project.filePath("blueprint.json")),QByteArray(original).replace("\"amount\": 0","\"amount\": -0"));
+   w.openV2Project(project.path(),trustPath);QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),2,20000);for(auto *item:view->scene()->items())if(item->data(0).isValid())item->setSelected(item->data(0).toInt()==0);
+   QTimer::singleShot(0,&w,[&]{auto *dialog=w.findChild<QDialog *>("v2EditValuesDialog");QCOMPARE(dialog->findChild<QLineEdit *>("v2Property_0")->text(),QString("-0"));dialog->reject();});w.findChild<QPushButton *>("v2EditValuesButton")->click();
+ }
+ void delayedPreviewKeepsCapturedNodeAndBlocksStaleTransitions() {
+   QTemporaryDir project,trust,runtime;write(project.filePath("blueprint.json"),read(fixture("blueprint.json")));MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path(),bundle(trust));QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);
+   const auto protocol=QUrl::fromLocalFile(QFileInfo(QStringLiteral(V2_READER_ENTRY)).dir().filePath("blueprint-document-protocol.js")).toString();write(runtime.filePath("delayed.cjs"),("let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>setTimeout(async()=>{let api=await import('"+protocol+"');process.stdout.write(JSON.stringify(await api.handleBlueprintDocumentRequest(JSON.parse(s))))},300));").toUtf8());w.setV2ReaderConfiguration(QStringLiteral(V2_NODE_EXECUTABLE),runtime.filePath("delayed.cjs"));
+   QTimer::singleShot(0,&w,[&]{auto *dialog=w.findChild<QDialog *>("v2EditValuesDialog");dialog->findChild<QLineEdit *>("v2ProjectNameEdit")->setText("delayed accepted");dialog->findChild<QPushButton *>("v2ApplyPreviewButton")->click();QVERIFY(!w.newProject());QVERIFY(!w.saveProject());w.exitV2Mode();w.openV2Project(QStringLiteral(V2_FIXTURE_DIR));QCOMPARE(loaded.size(),1);QVERIFY(w.isV2Mode());});w.findChild<QPushButton *>("v2EditValuesButton")->click();QVERIFY(w.isModified());QCOMPARE(w.projectDirectory(),project.path());QVERIFY(w.windowTitle().contains("delayed accepted"));
+ }
+ void staleSaveContinuationCannotOverrideACompletionListenerTransition() {
+   QTemporaryDir project;write(project.filePath("blueprint.json"),read(fixture("blueprint.json")));MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);editProjectName(w,"saved before transition");connect(&w,&MainWindow::v2SaveFinished,&w,[&](bool success){if(success)QVERIFY(w.newProject());});
+   QSignalSpy saved(&w,&MainWindow::v2SaveFinished);{Answers answers({QMessageBox::AcceptRole});w.openV2Project(QStringLiteral(V2_FIXTURE_DIR));QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,30000);}QVERIFY(!w.isV2Mode());QCOMPARE(w.document().nodes.size(),0);QTest::qWait(300);QVERIFY(!w.isV2Mode());
+ }
  void initTestCase() {
    if (!QFileInfo::exists(QStringLiteral(V2_NODE_EXECUTABLE)) || !QFileInfo::exists(QStringLiteral(V2_READER_ENTRY))) QSKIP("Optional Node reader runtime is not built; Schema 1 remains available.");
    QCoreApplication::setOrganizationName("BlueprintV2Tests"); QCoreApplication::setApplicationName("BlueprintV2Tests"); QSettings().clear();

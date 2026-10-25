@@ -647,6 +647,8 @@ Bound workspace: %3</source><translation>已应用的节点：%1（%2）
 </context>
 <context>
     <name>BlueprintV2View</name>
+    <message><source>Edit v2 values…</source><translation>编辑 v2 值…</translation></message>
+    <message><source>Blueprint v2 — Restricted editing · Generation, build and export unavailable</source><translation>蓝图 v2 — 受限编辑 · 不支持生成、构建与导出</translation></message>
     <message><source>Fit View</source><translation>适应视图</translation></message>
     <message><source>Reset View</source><translation>重置视图</translation></message>
     <message><source>Select All</source><translation>全选</translation></message>
@@ -670,6 +672,7 @@ Read-only snapshot
 </context>
 <context>
     <name>BlueprintV2Reader</name>
+    <message><source>Save outcome unknown. Inspect the file and explicitly reload before saving again.</source><translation>保存结果未知。请检查磁盘文件，并显式重新加载后再保存。</translation></message>
     <message><source>Reader runtime unavailable. Install Node and run npm ci, then build the blueprint_v2_reader target.</source><translation>读取器运行环境不可用。请安装 Node 并执行 npm ci，然后构建 blueprint_v2_reader 目标。</translation></message>
     <message><source>Reader request exceeds the size limit.</source><translation>读取请求超出大小上限。</translation></message>
     <message><source>Reader reply exceeds the size limit.</source><translation>读取器回复超出大小上限。</translation></message>
@@ -681,8 +684,19 @@ Read-only snapshot
 </context>
 <context>
     <name>MainWindow</name>
-    <message><source>Open Blueprint v2 (read-only)...</source><translation>打开蓝图 v2（只读）...</translation></message>
-    <message><source>Open Blueprint v2 (read-only)</source><translation>打开蓝图 v2（只读）</translation></message>
+    <message><source>Open Blueprint v2...</source><translation>打开蓝图 v2...</translation></message>
+    <message><source>Open Blueprint v2</source><translation>打开蓝图 v2</translation></message>
+    <message><source>Blueprint v2</source><translation>蓝图 v2</translation></message>
+    <message><source>Saving Blueprint v2…</source><translation>正在保存蓝图 v2…</translation></message>
+    <message><source>Blueprint v2 saved and verified.</source><translation>蓝图 v2 已保存并验证。</translation></message>
+    <message><source>Blueprint v2 save failed; draft retained.</source><translation>蓝图 v2 保存失败；草稿已保留。</translation></message>
+    <message><source>Save outcome unknown. Inspect the file and explicitly reload before saving again.</source><translation>保存结果未知。请检查磁盘文件，并显式重新加载后再保存。</translation></message>
+    <message><source>Save outcome unknown; explicit reload required</source><translation>保存结果未知；须显式重新加载</translation></message>
+    <message><source>Directory protection prevents editing (%1)</source><translation>目录保护禁止编辑（%1）</translation></message>
+    <message><source>Cleanup failed; inspect retained staging file: %1</source><translation>清理失败；请检查保留的暂存文件：%1</translation></message>
+    <message><source>Preview rejected. Check the field and location below.
+%1</source><translation>预览被拒绝。请检查下列字段和位置。
+%1</translation></message>
     <message><source>Open</source><translation>打开</translation></message>
     <message><source>Return to Schema 1 project</source><translation>返回 Schema 1 工程</translation></message>
     <message><source>Blueprint v2 (read-only)</source><translation>蓝图 v2（只读）</translation></message>
@@ -695,5 +709,16 @@ Read-only snapshot
     <message><source>Trusted declaration bundle (optional)</source><translation>可信声明文件（可选）</translation></message>
     <message><source>Trusted declaration bundle</source><translation>可信声明文件</translation></message>
     <message><source>Default: no plugins. The optional bundle is independent trusted metadata; it does not install or execute plugins.</source><translation>默认不加载插件。可选文件提供独立的可信声明元数据，不会安装或执行插件。</translation></message>
+</context>
+<context>
+    <name>BlueprintV2EditDialog</name>
+    <message><source>Edit v2 values</source><translation>编辑 v2 值</translation></message>
+    <message><source>Only declared fields are editable. Property values are JSON scalar literals, for example: "text", true, 12, null. Preview does not save.</source><translation>仅允许编辑已声明字段。属性值使用 JSON 标量字面量，例如："文字"、true、12、null。预览不会保存。</translation></message>
+    <message><source>Project name</source><translation>工程名称</translation></message>
+    <message><source>Property %1 (JSON scalar)</source><translation>属性 %1（JSON 标量）</translation></message>
+    <message><source>Port %1 display name</source><translation>端口 %1 显示名称</translation></message>
+    <message><source>Apply preview (not saved)</source><translation>应用预览（未保存）</translation></message>
+    <message><source>Cancel</source><translation>取消</translation></message>
+    <message><source>Validating preview…</source><translation>正在验证预览…</translation></message>
 </context>
 </TS>

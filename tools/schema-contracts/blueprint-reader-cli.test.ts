@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { readFileSync, mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,3 +46,12 @@ it("keeps request correlation when diagnostics make the reply exceed its output 
   expect(result.status, result.stderr).toBe(0);
   expect(JSON.parse(result.stdout)).toMatchObject({ requestId: "温度-1", status: "error", diagnostics: [{ code: "REPLY_TOO_LARGE" }] });
 }, 20000);
+it("uses the compiled relocated v2 load/preview/save closure and retains exact untouched bytes",()=>{
+ const directory=resolve(temporary,"standalone");mkdirSync(directory);const sourceText=request().sourceText;writeFileSync(resolve(directory,"blueprint.json"),sourceText);
+ const base={protocolVersion:2,requestId:"v2-relocated",registry:{descriptors:[],trustedLocks:[]}};
+ const send=(operation:string,payload:object)=>{const result=invoke(JSON.stringify({...base,operation,...payload}));expect(result.status,result.stderr).toBe(0);return JSON.parse(result.stdout);};
+ const loaded=send("load",{directory});expect(loaded).toMatchObject({protocolVersion:2,operation:"load",writable:true,result:{status:"loaded"}});
+ const edits=[{kind:"project-name",value:"relocated edit"}];const preview=send("preview",{sourceText,edits});expect(preview.result.status).toBe("prepared");expect(readFileSync(resolve(directory,"blueprint.json"),"utf8")).toBe(sourceText);
+ const saved=send("save",{directory,sourceText,expectedSha256:loaded.result.sha256,edits});expect(saved.result).toMatchObject({status:"saved",writeState:"verified"});expect(readFileSync(resolve(directory,"blueprint.json"),"utf8")).toBe(sourceText.replace('"Reading pipeline"','"relocated edit"'));
+ expect(send("load",{directory}).result.sha256).toBe(saved.result.sha256);
+},30000);

@@ -345,7 +345,7 @@ This is not a general JSON editor or a save mechanism for layout, node/port inse
 
 ## Qt read-only reader process
 
-P1.2C adds a one-shot local Node adapter around the existing Reader and Plugin Registry. It has one operation: read supplied UTF-8 JSON text. No path, save, generation, build or plugin-execution operation is exposed.
+P1.2C adds the version1 operation of a one-shot local Node adapter around the existing Reader and Plugin Registry: read supplied UTF-8 JSON text. That compatible operation has no path or write access. P1.2D adds the separate version2 load/preview/save operations described below; neither version exposes generation, build or plugin execution.
 
 Build the compiled runtime after the normal locked dependency installation:
 
@@ -373,4 +373,38 @@ Declarations and pins are independent host inputs. Qt may load a user-selected `
 
 Blueprint source is limited to 8 MiB UTF-8; stdin/reply messages to 32 MiB. Qt bounds stderr and enforces a 15-second process deadline, rejects malformed/version-mismatched/uncorrelated replies and ignores obsolete results. Missing Node, timeout, crash or invalid reply cannot replace the active project. Only the supported display data is rendered; structural and semantic decisions stay in TS. This process is not an OS sandbox or a general Plugin Host.
 
-The Qt GUI deliberately keeps all v2 data read-only, even when `semanticValid` is true. B1/B2 persistence APIs remain independent and are not exposed by this transport. See [the desktop usage guide](../../doc/project-usage-guide.md#510-只读查看-blueprint-v2) for opening projects, UnknownNode display and returning to the legacy editor.
+Successful version1 reading does not authorize saving. The v2 canvas remains structurally read-only; the restricted form and saving introduced in P1.2D use the version2 operations rather than turning `semanticValid` into permission. See [the viewing guide](../../doc/project-usage-guide.md#510-只读查看-blueprint-v2) and [restricted GUI editing](../../doc/project-usage-guide.md#511-blueprint-v2-受限编辑与保存).
+
+## Qt restricted document operations (Draft transport version 2)
+
+P1.2D adds `handleBlueprintDocumentRequest(input)` in `blueprint-document-protocol.ts`. The same compiled CLI awaits one versioned request and emits one correlated reply; it is not a persistent Host or network RPC service. Transport version2 is independent of Blueprint schemaVersion2 and generation manifest versions. Existing version1 read requests and `handleReaderRequest()` remain compatible.
+
+All requests carry `protocolVersion: 2`, `requestId`, `operation` and the independent `{descriptors,trustedLocks}` Registry input. Only these document operations are available:
+
+| Operation | Payload | Authority |
+| --- | --- | --- |
+| `load` | Absolute standalone `directory` | Existing Store load supplies the exact source/hash. Policy-rejected but structurally readable sources can remain displayed read-only, with no writable baseline. |
+| `preview` | Original baseline `sourceText`, complete canonical `edits` batch | Existing B2 preparation; updates Reader data and diagnostics without file writes. |
+| `save` | `directory`, original baseline `sourceText`, `expectedSha256`, complete canonical `edits` | Existing B2 save, then B1 controlled overwrite and re-read; no alternate transaction or path policy. |
+
+The envelope repeats version/requestId/operation and `canGenerate:false`. `result` carries the existing load/preparation/save result, including failure codes and `writeState`; `readResult` and `editTargets` provide display data and form hints when available. `writable` and `readOnlyReason` distinguish file-policy eligibility from document structure or semantic validity. Only a Store `loaded` result establishes a save baseline, and only `saved` with `writeState: "verified"` advances it.
+
+Project-name and port-name edits keep B2's ordinary string values. Node-property edits use `valueLiteral`, a JSON scalar literal string at the transport boundary, so Qt number serialization cannot silently convert `-0` to `0`. The adapter decodes that single literal and passes the resulting finite scalar to B2; it never reconstructs the document. For example:
+
+```typescript
+await handleBlueprintDocumentRequest({
+  protocolVersion: 2, requestId: "preview-1", operation: "preview",
+  registry: { descriptors, trustedLocks }, sourceText: originalSource,
+  edits: [
+    { kind: "project-name", value: "新工程" },
+    { kind: "node-property", sourceIndex: 0, property: "label", valueLiteral: '"温度"' },
+    { kind: "port-name", sourceIndex: 0, portIndex: 0, portId: "out", value: "输出" },
+  ],
+});
+```
+
+Shared B2 target eligibility supplies the form's available fields; submitting them is not an authorization token. Each preview/save reconstructs the explicit Registry and revalidates the edits. KnownNode with an invalid original property can still be offered a repair; UnknownNode internals, undeclared/nested properties and identity/connection fields remain unavailable. Multiple changes to one target replace its pending edit; save still uses the original disk source/hash, not an intermediate preview's source.
+
+Qt serializes saving within the active document. While a save runs, another save, preview, configuration change, project switch or close is refused. A lost/crashed/timed-out writer or malformed reply has an uncertain commit outcome: retain the draft and old baseline, do not auto-retry, and require explicit reload/inspection. A returned `committed-unverified` likewise does not mean the old file is intact. Store `not-written` failures retain the existing ordinary failure guarantees; no rollback may overwrite another writer. Cross-process/path-replacement/crash limits in **Actual write guarantees** remain unchanged.
+
+No v2 GUI SaveAs, new-project creation, layout persistence, dynamic ports, plugin execution or generation is added. Runtime bundling continues to stage the existing production TS dependency closure and schemas without new packages or build-time downloads.

@@ -53,6 +53,8 @@ qt_add_library(BlueprintEditorCore STATIC
     src/app/blueprint_v2_reader.h
     src/app/blueprint_v2_view.cpp
     src/app/blueprint_v2_view.h
+    src/app/blueprint_v2_edit_dialog.cpp
+    src/app/blueprint_v2_edit_dialog.h
     src/app/external_code_dialog.cpp
     src/app/external_code_dialog.h
     src/app/workspace_browser_widget.cpp
