@@ -33,6 +33,7 @@
 #include <QClipboard>
 #include <QWheelEvent>
 #include <QDialogButtonBox>
+#include <QProcess>
 
 namespace {
 QByteArray read(const QString &path) { QFile file(path); return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray(); }
@@ -42,6 +43,11 @@ void configure(MainWindow &w) { w.setV2ReaderConfiguration(QStringLiteral(V2_NOD
 void editProjectName(MainWindow &w,const QString &name) {
     QTimer::singleShot(0,&w,[&w,name]{auto *dialog=w.findChild<QDialog *>("v2EditValuesDialog");QVERIFY(dialog);dialog->findChild<QLineEdit *>("v2ProjectNameEdit")->setText(name);dialog->findChild<QPushButton *>("v2ApplyPreviewButton")->click();});
     auto *button=w.findChild<QPushButton *>("v2EditValuesButton");QVERIFY(button);QVERIFY(button->isEnabled());button->click();
+}
+QByteArray malformedSuccessScript(const QJsonObject &base,const QByteArray &mutation) {
+    return "const base="+QJsonDocument(base).toJson(QJsonDocument::Compact)+
+      ";let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const r=JSON.parse(s);const read=base.readResult;const status={load:'loaded',preview:'prepared',save:'saved'}[r.operation];let reply={protocolVersion:2,requestId:r.requestId,operation:r.operation,canGenerate:false,writable:true,readResult:structuredClone(read),editTargets:base.editTargets,result:{status,canGenerate:false,readResult:structuredClone(read),sha256:base.result.sha256,writeState:'verified',sourceText:read.sourceText,diagnostics:read.diagnostics}};"+
+      mutation+"process.stdout.write(JSON.stringify(reply));});";
 }
 QJsonObject blueprint() { return QJsonDocument::fromJson(read(fixture("blueprint.json"))).object(); }
 QString bundle(QTemporaryDir &temporary) {
@@ -88,6 +94,47 @@ void prepareGeneration(MainWindow &w,const QString &workspace) {
 class BlueprintV2GuiTest : public QObject {
  Q_OBJECT
 private slots:
+ void malformedOperationSuccessIsRejected_data() {
+   QTest::addColumn<QString>("operation");QTest::addColumn<QByteArray>("mutation");
+   const QList<QPair<QByteArray,QByteArray>> variants{
+     {"rejected-snapshot","reply.readResult={status:'rejected',sourceText:'',diagnostics:[],canGenerate:false};reply.result.readResult=reply.readResult;delete reply.editTargets;"},
+     {"missing-wrapped-snapshot","delete reply.result.readResult;"},
+     {"inconsistent-wrapped-snapshot","reply.result.readResult.document.projectName='different';"},
+     {"missing-metadata","delete reply.editTargets;"}};
+   for(const QString operation:{"load","preview","save"})for(const auto &variant:variants)QTest::newRow(qPrintable(operation+"-"+variant.first))<<operation<<variant.second;
+   QTest::newRow("prepared-source-mismatch")<<QString("preview")<<QByteArray("reply.result.sourceText='different';");
+ }
+ void malformedOperationSuccessIsRejected() {
+   QFETCH(QString,operation);QFETCH(QByteArray,mutation);QTemporaryDir project,runtime;write(project.filePath("blueprint.json"),read(fixture("blueprint.json")));
+   BlueprintV2Reader reader;reader.setConfiguration(QStringLiteral(V2_NODE_EXECUTABLE),QStringLiteral(V2_READER_ENTRY));QSignalSpy done(&reader,&BlueprintV2Reader::finished);const QJsonObject registry{{"descriptors",QJsonArray()},{"trustedLocks",QJsonArray()}};reader.load(project.path(),registry);QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,20000);QVERIFY(done[0][1].toString().isEmpty());const auto base=done[0][0].toJsonObject();
+   write(runtime.filePath("malformed.cjs"),malformedSuccessScript(base,mutation));reader.setConfiguration(QStringLiteral(V2_NODE_EXECUTABLE),runtime.filePath("malformed.cjs"));
+   const QJsonArray edits{QJsonObject{{"kind","project-name"},{"value","draft"}}};
+   if(operation=="load")reader.load(project.path(),registry);else if(operation=="preview")reader.preview(QString::fromUtf8(read(fixture("blueprint.json"))),edits,registry);else reader.save(project.path(),QString::fromUtf8(read(fixture("blueprint.json"))),base["result"].toObject()["sha256"].toString(),edits,registry);
+   QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,4000);QVERIFY2(done[1][0].toJsonObject().isEmpty(),"malformed successful DTO must not be emitted as transport success");QVERIFY(!done[1][1].toString().isEmpty());
+ }
+ void malformedSavedRejectedSnapshotRetainsDraftAndBaseline() {
+   QTemporaryDir project,runtime;const auto original=read(fixture("blueprint.json"));write(project.filePath("blueprint.json"),original);const QJsonObject registry{{"descriptors",QJsonArray()},{"trustedLocks",QJsonArray()}};
+   BlueprintV2Reader reader;reader.setConfiguration(QStringLiteral(V2_NODE_EXECUTABLE),QStringLiteral(V2_READER_ENTRY));QSignalSpy baseLoaded(&reader,&BlueprintV2Reader::finished);reader.load(project.path(),registry);QTRY_COMPARE_WITH_TIMEOUT(baseLoaded.size(),1,20000);const auto base=baseLoaded[0][0].toJsonObject();
+   MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);editProjectName(w,"retained draft");
+   write(runtime.filePath("malformed.cjs"),malformedSuccessScript(base,"reply.readResult={status:'rejected',sourceText:'',diagnostics:[],canGenerate:false};delete reply.result.readResult;delete reply.editTargets;"));w.setV2ReaderConfiguration(QStringLiteral(V2_NODE_EXECUTABLE),runtime.filePath("malformed.cjs"));QSignalSpy saved(&w,&MainWindow::v2SaveFinished);QVERIFY(w.saveProject());QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,4000);QVERIFY2(!saved[0][0].toBool(),"rejected snapshot cannot certify a verified save");QVERIFY(w.isModified());QVERIFY(!w.saveProject());QCOMPARE(read(project.filePath("blueprint.json")),original);QVERIFY(w.windowTitle().contains("retained draft"));
+ }
+ void provenNotDispatchedFailureCanSaveSameDraftAfterRuntimeRepair_data() {
+   QTest::addColumn<bool>("missingEntry");QTest::newRow("missing-entry")<<true;QTest::newRow("failed-to-start")<<false;
+ }
+ void provenNotDispatchedFailureCanSaveSameDraftAfterRuntimeRepair() {
+   QFETCH(bool,missingEntry);QTemporaryDir project;const auto original=read(fixture("blueprint.json"));write(project.filePath("blueprint.json"),original);MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);editProjectName(w,"retry same draft");
+   w.setV2ReaderConfiguration(missingEntry?QStringLiteral(V2_NODE_EXECUTABLE):project.filePath("missing-node.exe"),missingEntry?project.filePath("missing-entry.cjs"):QStringLiteral(V2_READER_ENTRY));QSignalSpy saved(&w,&MainWindow::v2SaveFinished);QVERIFY(w.saveProject());QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,4000);QVERIFY(!saved[0][0].toBool());QVERIFY(w.isModified());QCOMPARE(read(project.filePath("blueprint.json")),original);QVERIFY2(w.findChild<QPushButton *>("v2EditValuesButton")->isEnabled(),"a proven not-dispatched failure must preserve retryable draft state");
+   configure(w);QVERIFY(w.saveProject());QTRY_COMPARE_WITH_TIMEOUT(saved.size(),2,30000);QVERIFY(saved[1][0].toBool());QVERIFY(!w.isModified());QCOMPARE(loaded.size(),1);QCOMPARE(read(project.filePath("blueprint.json")),QByteArray(original).replace("Reading pipeline","retry same draft"));
+ }
+ void staleSaveContinuationCannotOverrideReturnOrNestedInteraction_data() {
+   QTest::addColumn<QString>("interaction");for(const QString interaction:{"return","nested-cancel","nested-preview"})QTest::newRow(qPrintable(interaction))<<interaction;
+ }
+ void staleSaveContinuationCannotOverrideReturnOrNestedInteraction() {
+   QFETCH(QString,interaction);QTemporaryDir project;write(project.filePath("blueprint.json"),read(fixture("blueprint.json")));MainWindow w;configure(w);QSignalSpy loaded(&w,&MainWindow::v2LoadFinished);w.openV2Project(project.path());QTRY_COMPARE_WITH_TIMEOUT(loaded.size(),1,20000);editProjectName(w,"first saved draft");
+   connect(&w,&MainWindow::v2SaveFinished,&w,[&](bool success){if(!success)return;if(interaction=="return")w.exitV2Mode();else if(interaction=="nested-preview")editProjectName(w,"new interaction draft");else {QTimer::singleShot(0,&w,[&]{w.findChild<QDialog *>("v2EditValuesDialog")->reject();});w.findChild<QPushButton *>("v2EditValuesButton")->click();}});
+   QSignalSpy saved(&w,&MainWindow::v2SaveFinished);{Answers answers({QMessageBox::AcceptRole,QMessageBox::RejectRole});w.openV2Project(QStringLiteral(V2_FIXTURE_DIR));QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,30000);QTest::qWait(2000);}
+   if(interaction=="return")QVERIFY2(!w.isV2Mode(),"Return must invalidate the former Save-to-Open intent");else {QCOMPARE(w.projectDirectory(),project.path());QCOMPARE(w.isModified(),interaction=="nested-preview");if(interaction=="nested-preview")QVERIFY(w.windowTitle().contains("new interaction draft"));}QCOMPARE(loaded.size(),2);
+ }
  void longExistingScalarsAreNotSilentlyTruncatedIntoPendingEdits() {
    const QString literal="\""+QString(40000,'x')+"\"";QJsonObject targets{{"projectName","old"},{"nodes",QJsonArray{QJsonObject{{"sourceIndex",0},{"properties",QJsonArray{QJsonObject{{"property","long"},{"valueLiteral",literal}}}},{"ports",QJsonArray()}}}}};
    BlueprintV2EditDialog dialog(targets,0,targets,{},nullptr);QCOMPARE(dialog.findChild<QLineEdit *>("v2Property_0")->text(),literal);dialog.findChild<QLineEdit *>("v2ProjectNameEdit")->setText("new");QCOMPARE(dialog.edits(),QJsonArray({QJsonObject{{"kind","project-name"},{"value","new"}}}));

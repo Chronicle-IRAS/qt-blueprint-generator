@@ -62,38 +62,54 @@ bool validReply(const QJsonObject &reply, const QString &id) {
     return true;
 }
 bool validDocumentReply(const QJsonObject &reply, const QString &id, const QString &operation) {
-    if (reply["protocolVersion"] != 2 || reply["requestId"] != id || reply["operation"] != operation || reply["canGenerate"] != false || !reply["result"].isObject()) return false;
-    const auto result = reply["result"].toObject(); const auto status = result["status"].toString();
+    if (reply["protocolVersion"] != 2 || reply["requestId"] != id || reply["operation"] != operation ||
+        reply["canGenerate"] != false || !reply["result"].isObject()) return false;
+    const auto result = reply["result"].toObject();
+    const auto status = result["status"].toString();
+    const bool success = status != "failed";
     if (result["canGenerate"] != false) return false;
-    if (status == "failed") {
+    if (!success) {
         if (!result["code"].isString()) return false;
         if (operation == "save" && result["writeState"] != "not-written" && result["writeState"] != "committed-unverified") return false;
     } else if (status != (operation == "load" ? "loaded" : operation == "preview" ? "prepared" : "saved")) return false;
     if (status == "loaded" || status == "saved") {
-        const QString hash=result["sha256"].toString();
-        if (hash.size()!=64) return false;
-        for (const auto c:hash) if (!QStringLiteral("0123456789abcdef").contains(c)) return false;
-        if (status=="saved" && result["writeState"]!="verified") return false;
+        const QString hash = result["sha256"].toString();
+        if (hash.size() != 64) return false;
+        for (const auto c : hash) if (!QStringLiteral("0123456789abcdef").contains(c)) return false;
+        if (status == "saved" && result["writeState"] != "verified") return false;
+        if (status == "loaded" && reply["writable"] != true) return false;
     }
+    // Successful operation DTOs require the same complete Reader snapshot in both locations.
+    // This checks transport shape/consistency, not Blueprint or plugin semantics.
+    if (success && (!reply["readResult"].isObject() || reply["readResult"].toObject()["status"] != "read" ||
+        !result["readResult"].isObject())) return false;
+    if (result.contains("readResult") && result["readResult"] != reply["readResult"]) return false;
     if (reply.contains("readResult")) {
-        auto read=reply["readResult"].toObject(); read["protocolVersion"]=1;read["requestId"]=id;
-        if (!read["sourceText"].isString() || !validReply(read,id)) return false;
+        auto read = reply["readResult"].toObject();
+        read["protocolVersion"] = 1;
+        read["requestId"] = id;
+        if (!read["sourceText"].isString() || !validReply(read, id)) return false;
+        if (status == "prepared" && (!result["sourceText"].isString() ||
+            result["sourceText"] != read["sourceText"] || result["diagnostics"] != read["diagnostics"])) return false;
         if (read["status"] == "read") {
             if (!reply["editTargets"].isObject()) return false;
-            auto targets=reply["editTargets"].toObject();
+            const auto targets = reply["editTargets"].toObject();
             if (!targets["projectName"].isString() || !targets["nodes"].isArray()) return false;
-            for (const auto value:targets["nodes"].toArray()) {
-                const auto node=value.toObject();
+            for (const auto value : targets["nodes"].toArray()) {
+                const auto node = value.toObject();
                 if (!node["sourceIndex"].isDouble() || !node["properties"].isArray() || !node["ports"].isArray()) return false;
-                for(const auto p:node["properties"].toArray()) if(!stringFields(p.toObject(),{"property","valueLiteral"}))return false;
-                for(const auto p:node["ports"].toArray()) if(!p.toObject()["portIndex"].isDouble()||!stringFields(p.toObject(),{"portId","value"}))return false;
+                for (const auto p : node["properties"].toArray())
+                    if (!stringFields(p.toObject(), {"property", "valueLiteral"})) return false;
+                for (const auto p : node["ports"].toArray())
+                    if (!p.toObject()["portIndex"].isDouble() || !stringFields(p.toObject(), {"portId", "value"})) return false;
             }
         }
-    } else if (status != "failed") return false;
+    }
     return true;
 }
 }
 BlueprintV2Reader::BlueprintV2Reader(QObject *parent) : QObject(parent) {
+    qRegisterMetaType<BlueprintV2TransportOutcome>();
     m_node = QStandardPaths::findExecutable(QStringLiteral("node"));
     m_entry = QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("v2-reader/tools/schema-contracts/blueprint-reader-cli.js"));
 }
@@ -118,18 +134,27 @@ void BlueprintV2Reader::stopProcess() {
     if (process->state() == QProcess::NotRunning) process->deleteLater();
 }
 void BlueprintV2Reader::fail(const QString &error) {
-    if(m_failing)return;
-    const bool uncertain=isSaving() && m_dispatched;
-    if(uncertain&&m_process&&m_process->state()!=QProcess::NotRunning){
+    if (m_failing) return;
+    const bool uncertain = isSaving() && m_dispatched;
+    const auto outcome = m_dispatched ? BlueprintV2TransportOutcome::Unknown : BlueprintV2TransportOutcome::NotDispatched;
+    if (uncertain && m_process && m_process->state() != QProcess::NotRunning) {
         // Do not release the single-flight gate until the writer has actually exited.
-        m_failing=true;auto *process=m_process.data();disconnect(process,nullptr,this,nullptr);
-        connect(process,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),this,[this,process,error]{
-            if(m_process!=process)return;m_process=nullptr;m_requestId.clear();m_failing=false;process->deleteLater();
-            emit finished({},tr("Save outcome unknown. Inspect the file and explicitly reload before saving again.")+"\n"+error);
+        m_failing = true;
+        auto *process = m_process.data();
+        disconnect(process, nullptr, this, nullptr);
+        connect(process, qOverload<int,QProcess::ExitStatus>(&QProcess::finished), this, [this,process,error,outcome] {
+            if (m_process != process) return;
+            m_process = nullptr;
+            m_requestId.clear();
+            m_failing = false;
+            process->deleteLater();
+            emit finished({}, tr("Save outcome unknown. Inspect the file and explicitly reload before saving again.") + "\n" + error, outcome);
         });
-        process->kill();return;
+        process->kill();
+        return;
     }
-    stopProcess(); emit finished({}, uncertain ? tr("Save outcome unknown. Inspect the file and explicitly reload before saving again.") + "\n" + error : error);
+    stopProcess();
+    emit finished({}, uncertain ? tr("Save outcome unknown. Inspect the file and explicitly reload before saving again.") + "\n" + error : error, outcome);
 }
 void BlueprintV2Reader::read(const QString &sourceText, const QJsonObject &registry) {
     dispatch({{"protocolVersion",1},{"sourceText",sourceText},{"registry",registry}});
@@ -160,7 +185,13 @@ void BlueprintV2Reader::dispatch(QJsonObject request) {
         if (system.contains(key)) environment.insert(key, system.value(key));
     process->setProcessEnvironment(environment);
     process->setProgram(m_node); process->setArguments({m_entry});
-    connect(process, &QProcess::started, this, [this,process, input] { m_dispatched=true;process->write(input); process->closeWriteChannel(); });
+    connect(process, &QProcess::started, this, [this,process,input] {
+        // FailedToStart cannot reach this callback. Once stdin delivery is attempted,
+        // even an immediate write error is conservatively an unknown dispatched outcome.
+        m_dispatched = true;
+        process->write(input);
+        process->closeWriteChannel();
+    });
     connect(process, &QProcess::readyReadStandardOutput, this, [this, process] {
         m_output += process->readAllStandardOutput();
         if (m_output.size() > MessageLimit) fail(tr("Reader reply exceeds the size limit."));
@@ -185,7 +216,10 @@ void BlueprintV2Reader::dispatch(QJsonObject request) {
         if (m_output.size() > MessageLimit || decoder.hasError() || parse.error != QJsonParseError::NoError || !json.isObject() || !(m_operation.isEmpty()?validReply(json.object(), m_requestId):validDocumentReply(json.object(),m_requestId,m_operation))) {
             fail(tr("Reader returned an invalid or uncorrelated reply.")); return;
         }
-        m_process = nullptr; m_requestId.clear();process->deleteLater(); emit finished(json.object(), {});
+        m_process = nullptr;
+        m_requestId.clear();
+        process->deleteLater();
+        emit finished(json.object(), {}, BlueprintV2TransportOutcome::Reply);
     });
     auto *timer = new QTimer(process); timer->setSingleShot(true);
     connect(timer, &QTimer::timeout, this, [this, process] { if (m_process == process) fail(tr("Reader timed out.")); });

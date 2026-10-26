@@ -647,6 +647,7 @@ Bound workspace: %3</source><translation>已应用的节点：%1（%2）
 </context>
 <context>
     <name>BlueprintV2View</name>
+    <message><source>Blueprint v2 — Read-only</source><translation>蓝图 v2 — 只读</translation></message>
     <message><source>Edit v2 values…</source><translation>编辑 v2 值…</translation></message>
     <message><source>Blueprint v2 — Restricted editing · Generation, build and export unavailable</source><translation>蓝图 v2 — 受限编辑 · 不支持生成、构建与导出</translation></message>
     <message><source>Fit View</source><translation>适应视图</translation></message>
@@ -690,6 +691,7 @@ Read-only snapshot
     <message><source>Saving Blueprint v2…</source><translation>正在保存蓝图 v2…</translation></message>
     <message><source>Blueprint v2 saved and verified.</source><translation>蓝图 v2 已保存并验证。</translation></message>
     <message><source>Blueprint v2 save failed; draft retained.</source><translation>蓝图 v2 保存失败；草稿已保留。</translation></message>
+    <message><source>Blueprint v2 was not written; draft retained and saving can be retried.</source><translation>蓝图 v2 未写入；草稿已保留，可重试保存。</translation></message>
     <message><source>Save outcome unknown. Inspect the file and explicitly reload before saving again.</source><translation>保存结果未知。请检查磁盘文件，并显式重新加载后再保存。</translation></message>
     <message><source>Save outcome unknown; explicit reload required</source><translation>保存结果未知；须显式重新加载</translation></message>
     <message><source>Directory protection prevents editing (%1)</source><translation>目录保护禁止编辑（%1）</translation></message>

@@ -20,6 +20,7 @@ class BlueprintV2EditDialog;
 
 class BlueprintScene;
 class BlueprintV2Reader;
+enum class BlueprintV2TransportOutcome;
 class BlueprintV2View;
 class QStackedWidget;
 class BuildService;
@@ -89,7 +90,7 @@ private:
     void chooseOpenV2Project();
     void updateModePermissions();
     void cancelV2Load();
-    void finishV2Operation(const QJsonObject &reply, const QString &error);
+    void finishV2Operation(const QJsonObject &reply, const QString &error, BlueprintV2TransportOutcome outcome);
     void acceptV2Load(const QJsonObject &reply, const QString &directory, const QJsonObject &registry);
     void editV2Values();
     bool confirmV2Transition(std::function<void()> resume);
@@ -100,6 +101,7 @@ private:
     bool m_v2Uncertain = false;
     QPointer<BlueprintV2EditDialog> m_v2Dialog;
     std::function<void()> m_v2Resume;
+    quint64 m_v2InteractionEpoch = 0;
     BlueprintV2Reader *m_v2Reader = nullptr;
     BlueprintV2View *m_v2View = nullptr;
     QStackedWidget *m_canvasStack = nullptr;

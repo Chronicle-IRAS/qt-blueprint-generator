@@ -640,6 +640,7 @@ target_compile_definitions(tst_blueprint_v2_gui PRIVATE
 if(TARGET blueprint_v2_reader)
     add_dependencies(tst_blueprint_v2_gui blueprint_v2_reader)
 endif()
-add_test(NAME blueprint_v2_gui COMMAND tst_blueprint_v2_gui)
+add_test(NAME blueprint_v2_gui COMMAND tst_blueprint_v2_gui
+    -o "${CMAKE_CURRENT_BINARY_DIR}/blueprint_v2_gui-qt.txt,txt")
 set_tests_properties(blueprint_v2_gui PROPERTIES TIMEOUT 240 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_PLUGIN_PATH=$<TARGET_FILE_DIR:Qt6::Core>/../plugins"
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")

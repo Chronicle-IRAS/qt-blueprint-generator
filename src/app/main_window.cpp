@@ -825,30 +825,80 @@ QString v2FailureDetail(const QJsonObject &reply,const QString &error) {
 }
 void MainWindow::cancelV2Load() { if(m_v2Operation=="save")return;++m_v2LoadSerial; m_pendingV2Directory.clear();m_v2Operation.clear(); if (m_v2Reader) m_v2Reader->cancel(); }
 void MainWindow::setV2ReaderConfiguration(const QString &node, const QString &entry, int timeout) { if(m_v2Operation=="save"||m_v2Operation=="preview")return;cancelV2Load(); m_v2Reader->setConfiguration(node, entry, timeout); }
-void MainWindow::finishV2Operation(const QJsonObject &reply,const QString &error) {
-    const auto operation=m_v2Operation;m_v2Operation.clear();
-    if(operation=="load") {
-        if(m_pendingV2Directory.isEmpty())return;
-        const auto directory=m_pendingV2Directory;const auto registry=m_pendingV2Registry;m_pendingV2Directory.clear();
-        if(!error.isEmpty()||reply["readResult"].toObject()["status"]!="read") {statusBar()->showMessage(tr("Cannot open Blueprint v2: %1").arg(v2FailureDetail(reply,error)));emit v2LoadFinished(false);return;}
-        if(m_buildService->isRunning()){emit v2LoadFinished(false);return;}
-        if(m_v2Mode&&!confirmV2Transition([this,directory,registry]{m_pendingV2Directory=directory;m_pendingV2Registry=registry;m_v2Operation="load";m_v2Reader->load(directory,registry);})){emit v2LoadFinished(false);return;}
-        acceptV2Load(reply,directory,registry);return;
+void MainWindow::finishV2Operation(const QJsonObject &reply, const QString &error, BlueprintV2TransportOutcome outcome) {
+    const auto operation = m_v2Operation;
+    m_v2Operation.clear();
+    if (operation == "load") {
+        if (m_pendingV2Directory.isEmpty()) return;
+        const auto directory = m_pendingV2Directory;
+        const auto registry = m_pendingV2Registry;
+        m_pendingV2Directory.clear();
+        if (!error.isEmpty() || reply["readResult"].toObject()["status"] != "read") {
+            statusBar()->showMessage(tr("Cannot open Blueprint v2: %1").arg(v2FailureDetail(reply,error)));
+            emit v2LoadFinished(false);
+            return;
+        }
+        if (m_buildService->isRunning()) { emit v2LoadFinished(false); return; }
+        const auto reloadTarget = [this,directory,registry] {
+            m_pendingV2Directory = directory;
+            m_pendingV2Registry = registry;
+            m_v2Operation = "load";
+            m_v2Reader->load(directory,registry);
+        };
+        if (m_v2Mode && !confirmV2Transition(reloadTarget)) { emit v2LoadFinished(false); return; }
+        acceptV2Load(reply,directory,registry);
+        return;
     }
-    if(operation=="preview") {
-        const bool success=error.isEmpty()&&reply["result"].toObject()["status"]=="prepared";
-        if(success){m_v2Accepted=reply;m_v2Edits=m_v2CandidateEdits;m_v2View->setReply(reply["readResult"].toObject());updateProjectTitle();if(m_v2Dialog)m_v2Dialog->accept();}
-        else if(m_v2Dialog)m_v2Dialog->showError(tr("Preview rejected. Check the field and location below.\n%1").arg(v2FailureDetail(reply,error)));
-        updateModePermissions();emit v2PreviewFinished(success);return;
+    if (operation == "preview") {
+        const bool success = error.isEmpty() && reply["result"].toObject()["status"] == "prepared";
+        if (success) {
+            m_v2Accepted = reply;
+            m_v2Edits = m_v2CandidateEdits;
+            m_v2View->setReply(reply["readResult"].toObject());
+            updateProjectTitle();
+            if (m_v2Dialog) m_v2Dialog->accept();
+        } else if (m_v2Dialog) {
+            m_v2Dialog->showError(tr("Preview rejected. Check the field and location below.\n%1").arg(v2FailureDetail(reply,error)));
+        }
+        updateModePermissions();
+        emit v2PreviewFinished(success);
+        return;
     }
-    if(operation=="save") {
-        const auto result=reply["result"].toObject();const bool success=error.isEmpty()&&result["status"]=="saved"&&result["writeState"]=="verified";
-        const auto epoch=m_projectEpoch;auto resume=std::move(m_v2Resume);m_v2Resume={};
-        if(success){m_v2Baseline=reply;m_v2Baseline["writable"]=true;m_v2Accepted=m_v2Baseline;m_v2Edits={};m_v2Uncertain=false;m_v2View->setReply(reply["readResult"].toObject());statusBar()->showMessage(tr("Blueprint v2 saved and verified."));}
-        else {m_v2Uncertain=!error.isEmpty()||result["writeState"]=="committed-unverified";statusBar()->showMessage((m_v2Uncertain?tr("Save outcome unknown. Inspect the file and explicitly reload before saving again."):tr("Blueprint v2 save failed; draft retained."))+"\n"+v2FailureDetail(reply,error));}
+    if (operation == "save") {
+        const auto result = reply["result"].toObject();
+        const bool success = error.isEmpty() && result["status"] == "saved" && result["writeState"] == "verified";
+        const auto epoch = m_projectEpoch;
+        const auto serial = m_v2LoadSerial;
+        const auto interaction = m_v2InteractionEpoch;
+        const auto directory = m_v2Directory;
+        auto resume = std::move(m_v2Resume);
+        m_v2Resume = {};
+        if (success) {
+            m_v2Baseline = reply;
+            m_v2Baseline["writable"] = true;
+            m_v2Accepted = m_v2Baseline;
+            m_v2Edits = {};
+            m_v2Uncertain = false;
+            m_v2View->setReply(reply["readResult"].toObject());
+            statusBar()->showMessage(tr("Blueprint v2 saved and verified."));
+        } else {
+            m_v2Uncertain = outcome == BlueprintV2TransportOutcome::Unknown || result["writeState"] == "committed-unverified";
+            const auto message = m_v2Uncertain
+                ? tr("Save outcome unknown. Inspect the file and explicitly reload before saving again.")
+                : outcome == BlueprintV2TransportOutcome::NotDispatched
+                    ? tr("Blueprint v2 was not written; draft retained and saving can be retried.")
+                    : tr("Blueprint v2 save failed; draft retained.");
+            statusBar()->showMessage(message + "\n" + v2FailureDetail(reply,error));
+        }
         m_v2View->setOperationStatus(statusBar()->currentMessage());
-        updateModePermissions();updateProjectTitle();emit v2SaveFinished(success);
-        if(success&&resume&&epoch==m_projectEpoch&&m_v2Operation.isEmpty())resume();
+        updateModePermissions();
+        updateProjectTitle();
+        emit v2SaveFinished(success);
+        // Completion listeners can start a newer interaction, even one cancelled without edits.
+        // Resume only while the same clean v2 document and the original intent still own the UI.
+        if (success && resume && m_v2Mode && epoch == m_projectEpoch && serial == m_v2LoadSerial &&
+            interaction == m_v2InteractionEpoch && directory == m_v2Directory &&
+            m_v2Operation.isEmpty() && !m_v2Dialog && !isModified() && !m_v2Uncertain) resume();
     }
 }
 void MainWindow::acceptV2Load(const QJsonObject &reply,const QString &directory,const QJsonObject &registry) {
@@ -862,6 +912,7 @@ void MainWindow::acceptV2Load(const QJsonObject &reply,const QString &directory,
 }
 void MainWindow::editV2Values() {
     if(!m_v2Mode||!m_v2Operation.isEmpty()||m_v2Uncertain||!m_v2Baseline["writable"].toBool())return;
+    ++m_v2InteractionEpoch;
     BlueprintV2EditDialog dialog(m_v2Accepted["editTargets"].toObject(),m_v2View->selectedSourceIndex(),m_v2Baseline["editTargets"].toObject(),m_v2Edits,this);m_v2Dialog=&dialog;
     const auto epoch=m_projectEpoch;
     connect(&dialog,&BlueprintV2EditDialog::previewRequested,this,[this,&dialog,epoch]{
@@ -908,6 +959,7 @@ void MainWindow::openV2Project(const QString &directory, const QString &bundlePa
     m_v2Reader->load(m_pendingV2Directory, registry);
 }
 void MainWindow::chooseOpenV2Project() {
+    if (m_v2Mode) ++m_v2InteractionEpoch;
     QDialog dialog(this); dialog.setObjectName("openV2ProjectDialog"); dialog.setWindowTitle(tr("Open Blueprint v2"));
     auto *layout = new QFormLayout(&dialog);
     auto *directory = new QLineEdit(&dialog); directory->setObjectName("v2ProjectDirectoryEdit");
@@ -931,6 +983,11 @@ void MainWindow::exitV2Mode() {
 }
 void MainWindow::leaveV2Mode() {
     const bool wasV2 = m_v2Mode;
+    if (wasV2) {
+        ++m_projectEpoch;
+        ++m_v2InteractionEpoch;
+        m_v2Resume = {};
+    }
     cancelV2Load(); m_v2Mode = false; m_v2Directory.clear();m_v2Edits={};m_v2Uncertain=false; m_canvasStack->setCurrentWidget(m_view); m_view->setEnabled(true);
     if (wasV2) { m_propertiesDock->setVisible(m_legacyPropertiesVisible); m_buildDock->setVisible(m_legacyBuildVisible); }
     updateModePermissions(); updateProjectTitle(); updatePropertyEditor();

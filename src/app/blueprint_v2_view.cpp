@@ -97,7 +97,12 @@ void BlueprintV2View::refreshPresentation() {
     for (auto *item : m_scene->selectedItems()) if (item->data(0).isValid()) selected = item->data(0).toInt();
     m_scene->clear();
     const auto &colors = EditorTheme::colors(); m_scene->setBackgroundBrush(colors.canvas);
-    m_banner->setText(m_writable ? tr("Blueprint v2 — Restricted editing · Generation, build and export unavailable") : tr("Blueprint v2 — Read-only · Generation, saving, build and export unavailable") + (m_readOnlyReason.isEmpty()?QString():" · "+m_readOnlyReason));
+    m_banner->setText(m_writable
+        ? tr("Blueprint v2 — Restricted editing · Generation, build and export unavailable")
+        : tr("Blueprint v2 — Read-only") + (m_readOnlyReason.isEmpty() ? QString() : " · " + m_readOnlyReason));
+    m_banner->setToolTip(m_writable
+        ? tr("Blueprint v2 — Restricted editing · Generation, build and export unavailable")
+        : tr("Blueprint v2 — Read-only · Generation, saving, build and export unavailable"));
     m_editButton->setText(tr("Edit v2 values…"));m_editButton->setEnabled(m_writable&&!m_busy);
     const auto nodes = m_reply["nodes"].toArray();
     QVector<QGraphicsRectItem *> items;

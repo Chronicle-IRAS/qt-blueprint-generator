@@ -5,6 +5,8 @@
 #include <QPointer>
 class QProcess;
 class QTimer;
+enum class BlueprintV2TransportOutcome { Reply, NotDispatched, Unknown };
+Q_DECLARE_METATYPE(BlueprintV2TransportOutcome)
 
 // Validates the process envelope, never Blueprint schema or plugin semantics.
 class BlueprintV2Reader final : public QObject {
@@ -20,7 +22,7 @@ public:
     bool isSaving() const { return m_operation == "save" && !m_requestId.isEmpty(); }
     void cancel();
 signals:
-    void finished(const QJsonObject &reply, const QString &error);
+    void finished(const QJsonObject &reply, const QString &error, BlueprintV2TransportOutcome outcome);
 private:
     void fail(const QString &error);
     void dispatch(QJsonObject request);
