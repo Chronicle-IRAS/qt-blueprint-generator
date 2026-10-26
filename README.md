@@ -42,11 +42,11 @@ AI 不会未经确认直接覆盖正式代码。公共契约、入口、构建�
 
 节点编辑能力不等同于运行时执行能力：分支、循环、并行、多页面及 External Code 的运行时装配尚不支持。AI 生成结果仍需审核和实际构建验证，不保证任意蓝图都可执行。
 
-独立的 TypeScript / Node.js 工具提供[内存 Plugin Registry](tools/schema-contracts/README.md#minimal-plugin-registry)，仅提供可信声明的登记与注销、查询与发现、冻结快照及蓝图验证。支持零插件启动；缺失插件会明确诊断，不改写或丢弃传入的解析后蓝图数据。Registry 只登记声明，不安装或动态执行插件；桌面通过下述只读入口使用这些 API。
+独立的 TypeScript / Node.js 工具提供[内存 Plugin Registry](tools/schema-contracts/README.md#minimal-plugin-registry)，仅提供可信声明的登记与注销、查询与发现、冻结快照及蓝图验证。支持零插件启动；缺失插件会明确诊断，不改写或丢弃传入的解析后蓝图数据。Registry 只登记声明，不安装或动态执行插件；桌面复用这些 API。
 
-桌面界面支持 [Blueprint v2 工程只读查看](doc/project-usage-guide.md#510-只读查看-blueprint-v2)：在画布中查看已知或缺失插件的节点、端口与连接，并检查属性和诊断。通过本地 Node 进程复用 TypeScript Reader 与 Registry，v2 模式关闭编辑、保存、生成、构建和导出。独立工具另提供[保留式保存](tools/schema-contracts/README.md#preserving-blueprint-document-store)及[受限局部编辑](tools/schema-contracts/README.md#restricted-blueprint-document-edits)，尚未开放为 GUI 编辑功能。
+桌面界面支持 [Blueprint v2 工程查看](doc/project-usage-guide.md#510-只读查看-blueprint-v2)及[受限编辑与保存](doc/project-usage-guide.md#511-blueprint-v2-受限编辑与保存)：查看已知或缺失插件的节点、端口、连接与诊断；在安全的独立工程目录中修改工程名称、已知节点的既有标量属性和静态端口显示名。预览与保存复用 TypeScript Reader、Registry 和原文保留式编辑/存储 API，保存前检查磁盘 SHA-256。未知节点、身份、插件锁和连接保持只读；v2 生成、构建与导出仍关闭。
 
-长期方向是通用、插件优先的蓝图平台。Qt Desktop Editor 与 Qt Target Plugin 分别承担编辑与目标生成职责；TypeScript / Node.js 工具提供 Blueprint v2 和插件声明契约验证。新协议仍为 Draft；v2 编辑和目标生成、嵌入式目标生成与跨目标通信属于后续扩展。
+长期方向是通用、插件优先的蓝图平台。Qt Desktop Editor 与 Qt Target Plugin 分别承担编辑与目标生成职责；TypeScript / Node.js 工具提供 Blueprint v2 和插件声明契约验证。新协议仍为 Draft；更广泛的 v2 编辑和目标生成、嵌入式目标生成与跨目标通信属于后续扩展。
 
 ## 技术栈
 

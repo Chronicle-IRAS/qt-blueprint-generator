@@ -22,12 +22,12 @@ Phase 1 不支持 Decision、ExternalCode 运行时、连线标签、分支、�
 
 ## 后续阶段与进入条件
 
-P1.2C 的桌面只读入口已连接 TS Reader/Registry：可打开 v2 工程、查看已知/未知节点、端口、连接、属性与诊断；缺失插件和普通语义问题不丢弃结构合法的数据。默认零插件，可信声明由用户独立选择。此模式禁止保存、编辑、生成及构建导出，Schema 1 继续走既有可写路径。下文尚待实现的 GUI 能力指插件节点编辑、持久化交互和目标生成，而非本次只读查看。操作见[使用指南](project-usage-guide.md#510-只读查看-blueprint-v2)。
+P1.2C 的桌面查看入口已连接 TS Reader/Registry：可打开 v2 工程、查看已知/未知节点、端口、连接、属性与诊断；缺失插件和普通语义问题不丢弃结构合法的数据。P1.2D 接入工程名、KnownNode 既有声明标量及静态端口显示名的预览与安全保存，复用 B2/B1，并保留未经修改的原文片段。默认零插件，可信声明由用户独立选择；无安全存储基线的目录仅浏览。身份、连接、布局和生成/构建导出仍不开放，Schema 1 继续走原有路径。操作见[查看指南](project-usage-guide.md#510-只读查看-blueprint-v2)与[受限编辑](project-usage-guide.md#511-blueprint-v2-受限编辑与保存)。
 
 以下阶段是顺序收敛的 Draft 计划，各阶段需独立实现、验证和审核。参考[平台架构](architecture/plugin-platform.md)、[蓝图 Schema v2](architecture/blueprint-schema-v2.md)和[Plugin API v1](architecture/plugin-api-v1.md)。新核心服务、protocol、NodeRegistry、IRCompiler、AIProvider 优先评估 TS/Node；现有 C++/Qt 保留不迁移，Cordis 仍是候选，Python 仅按具体 SDK/tool 需求评估，不预设 Worker。新协议仍未冻结。
 
 1. **P0 契约基础**：P0.1 已完成 Blueprint v2 结构 Schema，P0.2 已完成独立只读语义校验。P0.3 增加 [Plugin Descriptor Contracts](architecture/plugin-descriptor-contracts.md) 与可信上下文装配，校验声明式 Manifest、精确依赖/版本、所有权、静态节点/属性/端口、类型、节点与 Target 双方支持及 Bridge 映射，见[API](../tools/schema-contracts/README.md)。协议仍 Draft；Host、动态 ID 历史、超出 B2 范围的编辑后未知片段保留、Core IR/hash 与显式复制转换仍未实现。C++ 可写模型保持 Schema 1，P1.2C 通过 TS 读取 v2。
-2. **P1 最小插件注册与 Qt GUI 接入**：P1.1 已实现[独立 TS Registry](../tools/schema-contracts/README.md#minimal-plugin-registry)，复用 P0.3 做原子批量登记/注销、依赖与引用复验、节点/类型/Target/Bridge 发现与精确查询，提供不可变快照、零插件与只读图验证。P1.2A 新增[独立 v2 JSON 文本读取 API](../tools/schema-contracts/README.md#read-only-blueprint-document-reader)，复用现有结构/语义/声明校验，返回原文、不可变解析数据及带 sourceIndex 的 KnownNode/UnknownNode 展示信息。缺插件、缺定义或锁不可信时保留节点；普通属性/端口语义错误不等于定义未知。所有读取结果均关闭生成。P1.2C 已提供 Qt 只读占位、属性与诊断展示及一次性 Node 通信；插件节点编辑、GUI 保存和动态执行仍未实现。Cordis/完整 Sidecar Host 仍为候选，不预建通用调度框架。
+2. **P1 最小插件注册与 Qt GUI 接入**：P1.1 已实现[独立 TS Registry](../tools/schema-contracts/README.md#minimal-plugin-registry)，复用 P0.3 做原子批量登记/注销、依赖与引用复验、节点/类型/Target/Bridge 发现与精确查询，提供不可变快照、零插件与只读图验证。P1.2A 新增[独立 v2 JSON 文本读取 API](../tools/schema-contracts/README.md#read-only-blueprint-document-reader)，复用现有结构/语义/声明校验，返回原文、不可变解析数据及带 sourceIndex 的 KnownNode/UnknownNode 展示信息。缺插件、缺定义或锁不可信时保留节点；普通属性/端口语义错误不等于定义未知。所有读取结果均关闭生成。P1.2C 提供 Qt 查看与一次性 Node 通信，P1.2D 接入 B2 字段的受限预览/保存；通用节点编辑与动态执行仍未实现。Cordis/完整 Sidecar Host 仍为候选，不预建通用调度框架。
 3. **P2 Qt Target 适配器**：优先复用已验证 Qt IR、候选和 Runtime v2 路径。v2 → LegacyQt 转接只接收现有线性流程、直接前驱同名同类型等可表示语义；拒绝其他语义，不猜边、不转换类型、不破坏原图。Legacy v1 字节产物、v2 固定 factory 和旧清单保持兼容。
 4. **P3 首个 Embedded Target**：后续选择一套明确支持的芯片/SDK/工具链和首批节点，验证完整目标工程及可审查产物，目前不预定具体选型。用户驱动 Snapshot 拟复用当前导入器的复制及哈希机制，Reference 模式需另行设计；AI 只接收接口摘要。
 5. **P4 实际演示与产品验收**：在同一个 Qt 桌面编辑器选择 Qt 或 Embedded target，每份毕业演示蓝图执行一个 Build Unit，同 Unit 可包含多个与目标兼容的插件。分别实际验证 Qt 工程和首个 Embedded 完整工程的交叉编译；烧录、硬件运行及广泛芯片支持不作为毕业条件。P0.2 的 API/可读诊断只证明独立校验实现，不等于这些产品路径已验收。
@@ -37,7 +37,7 @@ P1.2C 的桌面只读入口已连接 TS Reader/Registry：可打开 v2 工程、
 
 P1.2B1 提供独立的 [v2 保留式文档存储](../tools/schema-contracts/README.md#preserving-blueprint-document-store)：原始 JSON 文本按 UTF-8 创建、显式另存为或经 SHA-256 冲突检查覆盖，随后重读复验。缺失插件、未知定义及其他语义问题不会导致数据被删除或阻止保留式保存；结构非法仍拒绝，生成始终关闭。安全范围是独立目录中的单个 `blueprint.json`，不包含布局、GUI 或旧工程迁移。
 
-P1.2B2 增加[受限局部编辑](../tools/schema-contracts/README.md#restricted-blueprint-document-edits)：仅修改工程名称、KnownNode 既有且直接声明的标量属性，以及已有静态端口的显示名称。节点按 sourceIndex 定位，端口同时核对数组位置和声明 ID；批量操作整体验证，失败不返回可保存的候选文本。只替换原文中的授权值范围，其余片段保留原始 UTF-8 字节；重复 JSON 键或不确定定位拒绝编辑。保存复用 B1 的原文件哈希与文件事务，并检查 Registry 授权快照。嵌套属性、节点/端口增删、任意 JSON 编辑、布局、GUI 和生成仍不在本阶段范围内。
+P1.2B2 增加[受限局部编辑](../tools/schema-contracts/README.md#restricted-blueprint-document-edits)：仅修改工程名称、KnownNode 既有且直接声明的标量属性，以及已有静态端口的显示名称。节点按 sourceIndex 定位，端口同时核对数组位置和声明 ID；批量操作整体验证，失败不返回可保存的候选文本。只替换原文中的授权值范围，其余片段保留原始 UTF-8 字节；重复 JSON 键或不确定定位拒绝编辑。保存复用 B1 的原文件哈希与文件事务，并检查 Registry 授权快照。P1.2D 接入受限 GUI，不增加嵌套属性、节点/端口增删、任意 JSON 编辑、布局或生成能力。
 
 ## 迁移与信任约束
 

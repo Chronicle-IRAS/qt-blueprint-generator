@@ -26,6 +26,31 @@ const failure = (code: BlueprintEditFailureCode, message: string, diagnostics?: 
 });
 const own = (object: unknown, key: string): unknown => object && typeof object === "object" ? Object.getOwnPropertyDescriptor(object, key)?.value : undefined;
 const scalar = (value: unknown): value is Scalar => value === null || typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value));
+function propertyEligible(node: ReadDocument["nodes"][number], definition: {propertiesSchema: unknown}, property: string): boolean {
+  return property !== "__proto__" && own(own(definition.propertiesSchema, "properties"), property) !== undefined &&
+    !!node.data.properties && typeof node.data.properties === "object" && !Array.isArray(node.data.properties) && scalar(own(node.data.properties, property));
+}
+function portEligible(node: ReadDocument["nodes"][number], definition: {portMode: string; ports: readonly {id: string}[]}, portIndex: number, portId: string): boolean {
+  return definition.portMode === "static" && node.data.ports[portIndex]?.id === portId &&
+    node.data.ports.filter(p => p.id === portId).length === 1 && definition.ports.filter(p => p.id === portId).length === 1;
+}
+export interface BlueprintEditTargets {
+  projectName: string;
+  nodes: {sourceIndex: number; properties: {property: string; valueLiteral: string}[]; ports: {portIndex: number; portId: string; value: string}[]}[];
+}
+/** Declarative hints only; preparation reauthorizes every target and contract. */
+export function blueprintEditTargets(read: ReadDocument, registry: PluginRegistry): BlueprintEditTargets {
+  return {projectName: String(read.document.projectName), nodes: read.nodes.flatMap(node => {
+    if (node.kind !== "known") return [];
+    const definition = registry.getNode(node.typeId, node.nodeDefinitionVersion)!.declaration;
+    const properties = Object.keys(node.data.properties && typeof node.data.properties === "object" ? node.data.properties : {}).filter(property => propertyEligible(node, definition, property)).map(property => {
+      const value = own(node.data.properties, property) as Scalar;
+      return {property, valueLiteral: Object.is(value, -0) ? "-0" : JSON.stringify(value)};
+    });
+    const ports = node.data.ports.flatMap((port, portIndex) => typeof port.id === "string" && portEligible(node, definition, portIndex, port.id) ? [{portIndex, portId: port.id, value: String(port.name)}] : []);
+    return [{sourceIndex: node.sourceIndex, properties, ports}];
+  })};
+}
 const at = (span: JsonValueSpan | undefined, key: string | number) => typeof key === "number" ? span?.items?.[key] : span?.members?.get(key);
 const pointer = (key: string) => "/" + key.replaceAll("~", "~0").replaceAll("/", "~1");
 const errorLocation = (error: ErrorObject) => [error.instancePath, error.schemaPath, error.keyword].map(part => `${part.length}:${part}`).join("");
@@ -74,16 +99,13 @@ export function prepareBlueprintEdits(sourceText: string, edits: readonly Bluepr
         // Ajv's existing P0.3 compiler deliberately omits this key from properties.
         // It cannot certify even a valid-looking replacement; preserve it as opaque data.
         if (edit.property === "__proto__") return failure("PROPERTY_CONTRACT", "The existing property evaluator cannot certify __proto__ edits");
-        if (typeof edit.property !== "string" || own(own(definition.propertiesSchema, "properties"), edit.property) === undefined) return failure("TARGET_UNAVAILABLE", "Property requires an explicit root declaration");
-        const properties = node.data.properties;
-        if (!properties || Array.isArray(properties) || typeof properties !== "object" || !scalar(own(properties, edit.property))) return failure("TARGET_UNAVAILABLE", "Property must already be a direct scalar member");
+        if (typeof edit.property !== "string" || !propertyEligible(node, definition, edit.property)) return failure("TARGET_UNAVAILABLE", "Property must already be a directly declared scalar member");
         target = at(at(nodeSpan, "properties"), edit.property);
         const names = editedProperties.get(edit.sourceIndex) ?? new Set<string>();
         names.add(edit.property); editedProperties.set(edit.sourceIndex, names);
       } else {
         if (typeof edit.value !== "string" || typeof edit.portId !== "string" || !Number.isSafeInteger(edit.portIndex) || edit.portIndex < 0) return failure("INVALID_EDIT", "Port name requires an exact index and ID");
-        if (definition.portMode !== "static" || node.data.ports[edit.portIndex]?.id !== edit.portId ||
-          node.data.ports.filter(p => p.id === edit.portId).length !== 1 || definition.ports.filter(p => p.id === edit.portId).length !== 1) return failure("TARGET_UNAVAILABLE", "Port requires a unique static declaration at the supplied position");
+        if (!portEligible(node, definition, edit.portIndex, edit.portId)) return failure("TARGET_UNAVAILABLE", "Port requires a unique static declaration at the supplied position");
         target = at(at(at(nodeSpan, "ports"), edit.portIndex), "name");
       }
     } else return failure("INVALID_EDIT", "Unsupported edit kind");

@@ -16,6 +16,8 @@
 #include <QWheelEvent>
 #include <QMenu>
 #include <QContextMenuEvent>
+#include <QPushButton>
+#include <QHBoxLayout>
 
 namespace {
 class ReadOnlyGraphicsView final : public QGraphicsView {
@@ -46,8 +48,13 @@ protected:
 BlueprintV2View::BlueprintV2View(QWidget *parent) : QWidget(parent) {
     auto *layout = new QVBoxLayout(this);
     m_banner = new QLabel(this); m_banner->setObjectName("v2ReadOnlyBanner");
+    m_banner->setWordWrap(true);
     m_banner->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    m_banner->setTextInteractionFlags(Qt::TextSelectableByMouse); layout->addWidget(m_banner);
+    m_banner->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    auto *header=new QHBoxLayout;header->addWidget(m_banner,1);
+    m_editButton=new QPushButton(tr("Edit v2 values…"),this);m_editButton->setObjectName("v2EditValuesButton");header->addWidget(m_editButton);layout->addLayout(header);
+    connect(m_editButton,&QPushButton::clicked,this,&BlueprintV2View::editRequested);
+    m_status=new QLabel(this);m_status->setObjectName("v2OperationStatus");m_status->setWordWrap(true);m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);m_status->hide();layout->addWidget(m_status);
     auto *split = new QSplitter(this); layout->addWidget(split, 1);
     m_scene = new QGraphicsScene(this);
     m_view = new ReadOnlyGraphicsView(m_scene, split); m_view->setObjectName("v2GraphicsView");
@@ -60,6 +67,12 @@ BlueprintV2View::BlueprintV2View(QWidget *parent) : QWidget(parent) {
     connect(m_scene, &QGraphicsScene::selectionChanged, this, &BlueprintV2View::showSelection);
 }
 void BlueprintV2View::setReply(const QJsonObject &reply) { m_reply = reply; refreshPresentation(); }
+int BlueprintV2View::selectedSourceIndex() const {
+    for(auto *item:m_scene->selectedItems())if(item->data(0).isValid())return item->data(0).toInt();
+    return -1;
+}
+void BlueprintV2View::setEditState(bool writable,bool busy,const QString &reason) {m_writable=writable;m_busy=busy;m_readOnlyReason=reason;refreshPresentation();}
+void BlueprintV2View::setOperationStatus(const QString &text) {m_status->setText(text);m_status->setVisible(!text.isEmpty());}
 BlueprintV2View::~BlueprintV2View() { disconnect(m_scene, nullptr, this, nullptr); }
 void BlueprintV2View::changeEvent(QEvent *event) { QWidget::changeEvent(event); if (event->type() == QEvent::LanguageChange) refreshPresentation(); }
 void BlueprintV2View::showEvent(QShowEvent *event) {
@@ -84,7 +97,13 @@ void BlueprintV2View::refreshPresentation() {
     for (auto *item : m_scene->selectedItems()) if (item->data(0).isValid()) selected = item->data(0).toInt();
     m_scene->clear();
     const auto &colors = EditorTheme::colors(); m_scene->setBackgroundBrush(colors.canvas);
-    m_banner->setText(tr("Blueprint v2 — Read-only · Generation, saving, build and export unavailable"));
+    m_banner->setText(m_writable
+        ? tr("Blueprint v2 — Restricted editing · Generation, build and export unavailable")
+        : tr("Blueprint v2 — Read-only") + (m_readOnlyReason.isEmpty() ? QString() : " · " + m_readOnlyReason));
+    m_banner->setToolTip(m_writable
+        ? tr("Blueprint v2 — Restricted editing · Generation, build and export unavailable")
+        : tr("Blueprint v2 — Read-only · Generation, saving, build and export unavailable"));
+    m_editButton->setText(tr("Edit v2 values…"));m_editButton->setEnabled(m_writable&&!m_busy);
     const auto nodes = m_reply["nodes"].toArray();
     QVector<QGraphicsRectItem *> items;
     qreal rowY = 0, rowHeight = 0;

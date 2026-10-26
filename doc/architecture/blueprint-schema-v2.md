@@ -8,6 +8,8 @@ P0.3 的 [Descriptor 协议](plugin-descriptor-contracts.md) 定义可信描述�
 
 P1.2A 补充独立的 [TS 只读文档读取 API](../../tools/schema-contracts/README.md#read-only-blueprint-document-reader)：读取 v2 JSON 文本，保留原文和完整解析数据，复用 Registry 校验并返回带 sourceIndex 的 KnownNode/UnknownNode 展示信息。精确定义与可信精确锁缺一不可；普通属性或端口语义错误不自动使定义变成未知。所有结果均禁止生成。Reader 自身不提供保存或布局恢复；P1.2C 通过下述只读适配接入 Qt。B1/B2 的保存边界与未来 opaque/layout 要求分别说明，机器 Schema 不变。
 
+P1.2D 在 Qt 中接入 B2 已授权字段的预览与安全保存，仍由 TypeScript 调用现有 Reader/Registry/编辑器/Store；不在 C++ 中重写 Schema 或定位 JSON 片段。工程名、已知节点的既有直接声明标量和静态端口显示名以外的数据保持只读。保存须有独立目录和磁盘 SHA-256 基线；通信或进程丢失可能导致提交状态未知，必须重新检查，不能据此宣称已回滚。该接入不增加机器 Schema 字段，不提供布局、自动迁移或生成能力，操作见[指南](../project-usage-guide.md#511-blueprint-v2-受限编辑与保存)。
+
 P1.2B1 在 Reader 外增加独立的 [TS 保留式文档存储](../../tools/schema-contracts/README.md#preserving-blueprint-document-store)：仅将未修改的原始 JSON 文本按 UTF-8 写入独立目录的 `blueprint.json`，并重新读取复验。结构非法拒绝，语义错误允许原文保存且返回诊断，生成始终关闭。覆盖核对原文件 SHA-256，同目录临时写入后发布；目录保护、并发及崩溃边界见 API 文档。该 Store 本身不编辑文档、不保存布局、不迁移 v1；受限编辑由下述 P1.2B2 API 提供。
 
 P1.2B2 的 [TS 受限编辑器](../../tools/schema-contracts/README.md#restricted-blueprint-document-edits)仅开放 projectName、KnownNode 既有直接声明的标量属性及已有静态端口 name。按原始 JSON 值范围整体替换，其他片段（含未知节点及 opaque payload）保持原始 UTF-8 字节；重复键、定位歧义、越界及新契约错误拒绝操作。保存仍使用 B1，并绑定原文哈希与当前 Registry 快照。此限制性能力不等于任意 JSON 编辑、布局保存或迁移，机器 Schema 不变。

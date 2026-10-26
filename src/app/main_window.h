@@ -13,9 +13,14 @@
 #include "app/generation_controller.h"
 #include "ui/theme.h"
 #include <QPointer>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <functional>
+class BlueprintV2EditDialog;
 
 class BlueprintScene;
 class BlueprintV2Reader;
+enum class BlueprintV2TransportOutcome;
 class BlueprintV2View;
 class QStackedWidget;
 class BuildService;
@@ -73,6 +78,8 @@ public:
 
 signals:
     void v2LoadFinished(bool success);
+    void v2PreviewFinished(bool success);
+    void v2SaveFinished(bool success);
 
 protected:
     void changeEvent(QEvent *event) override;
@@ -83,6 +90,18 @@ private:
     void chooseOpenV2Project();
     void updateModePermissions();
     void cancelV2Load();
+    void finishV2Operation(const QJsonObject &reply, const QString &error, BlueprintV2TransportOutcome outcome);
+    void acceptV2Load(const QJsonObject &reply, const QString &directory, const QJsonObject &registry);
+    void editV2Values();
+    bool confirmV2Transition(std::function<void()> resume);
+    void leaveV2Mode();
+    QJsonObject m_v2Registry, m_pendingV2Registry, m_v2Baseline, m_v2Accepted;
+    QJsonArray m_v2Edits, m_v2CandidateEdits;
+    QString m_v2Operation;
+    bool m_v2Uncertain = false;
+    QPointer<BlueprintV2EditDialog> m_v2Dialog;
+    std::function<void()> m_v2Resume;
+    quint64 m_v2InteractionEpoch = 0;
     BlueprintV2Reader *m_v2Reader = nullptr;
     BlueprintV2View *m_v2View = nullptr;
     QStackedWidget *m_canvasStack = nullptr;
